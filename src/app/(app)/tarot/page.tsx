@@ -30,10 +30,28 @@ type ChatMessage =
       sajuFree?: boolean;
       ziweiFree?: boolean;
       guidanceOnly?: boolean;
+      timePassApplied?: boolean;
     }
   | { role: "error"; text: string };
 
 type Room = { id: string; title: string; updatedAt: string };
+
+type ActiveTimePass = {
+  passId: string;
+  minutes: number;
+  includesOptions: boolean;
+  startedAt: string;
+  expiresAt: string;
+};
+
+type TimePass = { id: string; minutes: number; includesOptions: boolean };
+
+function formatRemaining(ms: number) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 function CardImage({
   card,
@@ -188,11 +206,27 @@ function TarotChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTimePass, setActiveTimePass] = useState<ActiveTimePass | null>(null);
+  const [timePasses, setTimePasses] = useState<TimePass[]>([]);
+  const [startingPass, setStartingPass] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (!activeTimePass) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [activeTimePass]);
+
+  useEffect(() => {
+    if (activeTimePass && new Date(activeTimePass.expiresAt).getTime() <= now) {
+      setActiveTimePass(null);
+    }
+  }, [activeTimePass, now]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -210,6 +244,8 @@ function TarotChat() {
         setCoins(data.coins);
         setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
         setHasPartner(Boolean(data.partner?.nickname));
+        setActiveTimePass(data.activeTimePass ?? null);
+        setTimePasses(data.timePasses ?? []);
       }
 
       let roomList: Room[] = [];
@@ -276,6 +312,32 @@ function TarotChat() {
       setHistoryLoaded(true);
     })();
   }, [user, activeRoomId]);
+
+  async function handleStartTimePass(passId: string) {
+    if (!user || startingPass) return;
+    setStartingPass(passId);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/tarot/time-pass/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ passId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "이용권을 사용하지 못했어요.");
+        return;
+      }
+      setActiveTimePass(data.activeTimePass);
+      setTimePasses((prev) => prev.filter((p) => p.id !== passId));
+      setNow(Date.now());
+    } finally {
+      setStartingPass(null);
+    }
+  }
 
   async function handleNewRoom() {
     if (!user) return;
@@ -365,6 +427,7 @@ function TarotChat() {
           sajuFree: data.sajuFree,
           ziweiFree: data.ziweiFree,
           guidanceOnly: data.guidanceOnly,
+          timePassApplied: data.timePassApplied,
         },
       ]);
     } catch {
@@ -376,6 +439,17 @@ function TarotChat() {
       setLoading(false);
     }
   }
+
+  const timePassActive = Boolean(
+    activeTimePass && new Date(activeTimePass.expiresAt).getTime() > now
+  );
+  const spreadCoveredDisplay = timePassActive;
+  const optionsCoveredDisplay = timePassActive && Boolean(activeTimePass?.includesOptions);
+  const displayedCost =
+    (spreadCoveredDisplay ? 0 : SPREADS[spread].cost) +
+    (includeSaju ? (optionsCoveredDisplay ? 0 : SAJU_ADD_ON_COST) : 0) +
+    (includeZiwei ? (optionsCoveredDisplay ? 0 : ZIWEI_ADD_ON_COST) : 0) +
+    (includeCompatibility ? (optionsCoveredDisplay ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -421,6 +495,37 @@ function TarotChat() {
           + 새 대화
         </button>
         </div>
+
+        {(activeTimePass || timePasses.length > 0) && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-point bg-point-bg px-3 py-2 text-sm">
+            {activeTimePass ? (
+              <span className="text-point">
+                ⏱ {formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)} 남음 ·{" "}
+                {activeTimePass.minutes}분권
+                {activeTimePass.includesOptions ? " (전부 무제한)" : " (타로만 무제한)"}
+              </span>
+            ) : (
+              timePasses.map((pass) => (
+                <div
+                  key={pass.id}
+                  className="flex items-center gap-2 rounded-full border border-point px-3 py-1 text-point"
+                >
+                  <span>
+                    {pass.minutes}분권{pass.includesOptions ? "" : " (타로만)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleStartTimePass(pass.id)}
+                    disabled={startingPass === pass.id}
+                    className="rounded-full bg-cta-fill px-2 py-0.5 text-xs text-cta-text disabled:opacity-50"
+                  >
+                    사용하기
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-0">
@@ -502,6 +607,9 @@ function TarotChat() {
                       : "이번 답변에는 자미두수 해석이 포함되지 않아 해당 코인은 차감되지 않았어요."}
                 </p>
               )}
+              {msg.charged && msg.timePassApplied && (
+                <p className="mt-1 w-full px-1 text-xs text-point">이용권으로 이용한 리딩이에요.</p>
+              )}
             </div>
           );
         })}
@@ -565,12 +673,8 @@ function TarotChat() {
             </button>
           )}
           <span className="text-sm text-text">
-            총{" "}
-            {SPREADS[spread].cost +
-              (includeSaju ? SAJU_ADD_ON_COST : 0) +
-              (includeZiwei ? ZIWEI_ADD_ON_COST : 0) +
-              (includeCompatibility ? COMPATIBILITY_ADD_ON_COST : 0)}
-            코인
+            총 {displayedCost}코인
+            {spreadCoveredDisplay && <span className="text-point"> (이용권 적용)</span>}
           </span>
         </div>
       )}

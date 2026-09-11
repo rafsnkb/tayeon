@@ -72,6 +72,17 @@ export async function POST(req: NextRequest) {
   const rawPartner = userData?.partner;
   const partner = isValidPartner(rawPartner) ? rawPartner : null;
 
+  const activeTimePass = userData?.activeTimePass as
+    | { minutes: number; includesOptions: boolean; expiresAt: string }
+    | null
+    | undefined;
+  const timePassActive = Boolean(
+    activeTimePass && new Date(activeTimePass.expiresAt).getTime() > Date.now()
+  );
+  // 15분(타로만) 티어는 스프레드 기본요금만 커버, 30/60분(전부 포함) 티어는 옵션 추가금까지 커버.
+  const spreadCovered = timePassActive;
+  const optionsCovered = timePassActive && Boolean(activeTimePass?.includesOptions);
+
   if ((includeSaju || includeZiwei) && !birthInfo) {
     return NextResponse.json(
       {
@@ -127,10 +138,10 @@ export async function POST(req: NextRequest) {
   }
 
   const cost =
-    SPREADS[spread].cost +
-    (includeSaju ? SAJU_ADD_ON_COST : 0) +
-    (includeZiwei ? ZIWEI_ADD_ON_COST : 0) +
-    (includeCompatibility ? COMPATIBILITY_ADD_ON_COST : 0);
+    (spreadCovered ? 0 : SPREADS[spread].cost) +
+    (includeSaju ? (optionsCovered ? 0 : SAJU_ADD_ON_COST) : 0) +
+    (includeZiwei ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
+    (includeCompatibility ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
 
   if (balance < cost) {
     return NextResponse.json(
@@ -317,10 +328,10 @@ export async function POST(req: NextRequest) {
     const ziweiFree = Boolean(cardsOk && includeZiwei && !attempt.ziweiOk);
 
     const chargedCost = cardsOk
-      ? SPREADS[spread].cost +
-        (sajuCharged ? SAJU_ADD_ON_COST : 0) +
-        (ziweiCharged ? ZIWEI_ADD_ON_COST : 0) +
-        (compatibilityCharged ? COMPATIBILITY_ADD_ON_COST : 0)
+      ? (spreadCovered ? 0 : SPREADS[spread].cost) +
+        (sajuCharged ? (optionsCovered ? 0 : SAJU_ADD_ON_COST) : 0) +
+        (ziweiCharged ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
+        (compatibilityCharged ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0)
       : 0;
 
     const cards = cardsOk
@@ -350,6 +361,7 @@ export async function POST(req: NextRequest) {
       interpretation,
       historySummary,
       charged: cardsOk,
+      timePassApplied: cardsOk && spreadCovered,
       createdAt: now,
     });
 
@@ -371,6 +383,7 @@ export async function POST(req: NextRequest) {
       charged: cardsOk,
       sajuFree,
       ziweiFree,
+      timePassApplied: cardsOk && spreadCovered,
     });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {

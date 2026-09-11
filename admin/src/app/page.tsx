@@ -27,6 +27,14 @@ type SearchedUser = {
 
 type Status = "loading" | "unauthenticated" | "forbidden" | "ok";
 
+// admin/은 타연 본체와 완전히 분리된 별도 앱이라 src/lib/tarot/pricing.ts를 import하지 않음 —
+// 본체의 TIME_PASS_PACKAGES와 값이 바뀌면 이 목록도 같이 수동으로 맞춰줄 것.
+const TIME_PASS_TIERS = [
+  { label: "15분권 (타로만)", minutes: 15, includesOptions: false, priceWon: 8900 },
+  { label: "30분권 (전부 포함)", minutes: 30, includesOptions: true, priceWon: 19900 },
+  { label: "60분권 (전부 포함)", minutes: 60, includesOptions: true, priceWon: 35900 },
+] as const;
+
 export default function AdminHome() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
@@ -44,6 +52,11 @@ export default function AdminHome() {
 
   const [suspendReason, setSuspendReason] = useState<Record<string, string>>({});
   const [suspendBusy, setSuspendBusy] = useState<string | null>(null);
+
+  const [passTier, setPassTier] = useState<Record<string, number>>({});
+  const [passReason, setPassReason] = useState<Record<string, string>>({});
+  const [passBusy, setPassBusy] = useState<string | null>(null);
+  const [passMessage, setPassMessage] = useState<Record<string, string>>({});
 
   const [detailOpen, setDetailOpen] = useState<Record<string, boolean>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
@@ -125,6 +138,38 @@ export default function AdminHome() {
       setGrantReason((r) => ({ ...r, [uid]: "" }));
     } finally {
       setGrantBusy(null);
+    }
+  }
+
+  async function handleGrantTimePass(uid: string) {
+    if (!user) return;
+    const tier = TIME_PASS_TIERS[passTier[uid] ?? 0];
+    setPassBusy(uid);
+    setPassMessage((m) => ({ ...m, [uid]: "" }));
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/users/${uid}/grant-time-pass`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          minutes: tier.minutes,
+          includesOptions: tier.includesOptions,
+          priceWon: tier.priceWon,
+          reason: passReason[uid] ?? "",
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setPassMessage((m) => ({ ...m, [uid]: body.error ?? "지급에 실패했습니다." }));
+        return;
+      }
+      setPassMessage((m) => ({ ...m, [uid]: `${tier.label} 지급 완료` }));
+      setPassReason((r) => ({ ...r, [uid]: "" }));
+    } finally {
+      setPassBusy(null);
     }
   }
 
@@ -350,6 +395,41 @@ export default function AdminHome() {
             </div>
             {grantMessage[r.uid] && (
               <p className="text-sm text-zinc-600">{grantMessage[r.uid]}</p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
+              <select
+                value={passTier[r.uid] ?? 0}
+                onChange={(e) =>
+                  setPassTier((t) => ({ ...t, [r.uid]: Number(e.target.value) }))
+                }
+                className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
+              >
+                {TIME_PASS_TIERS.map((tier, i) => (
+                  <option key={tier.minutes} value={i}>
+                    {tier.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="사유 (선택)"
+                value={passReason[r.uid] ?? ""}
+                onChange={(e) =>
+                  setPassReason((rs) => ({ ...rs, [r.uid]: e.target.value }))
+                }
+                className="flex-1 min-w-[120px] rounded border border-zinc-300 px-2 py-1.5 text-sm"
+              />
+              <button
+                onClick={() => handleGrantTimePass(r.uid)}
+                disabled={passBusy === r.uid}
+                className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                이용권 지급
+              </button>
+            </div>
+            {passMessage[r.uid] && (
+              <p className="text-sm text-zinc-600">{passMessage[r.uid]}</p>
             )}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
