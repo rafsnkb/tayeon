@@ -60,12 +60,14 @@ export async function GET(req: NextRequest) {
   const existing = await userRef.get();
   const isNewUser = !existing.exists;
 
+  // 이 로그인의 카카오 응답에 닉네임/프로필사진이 없을 수 있음(동의항목 미획득 등) — 그 경우
+  // 기존에 저장된 값을 null로 덮어쓰지 않고 그대로 유지한다.
   await userRef.set(
     {
       provider: "kakao",
       kakaoId: profile.id,
-      nickname,
-      profileImage,
+      ...(nickname !== null ? { nickname } : {}),
+      ...(profileImage !== null ? { profileImage } : {}),
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
