@@ -23,3 +23,24 @@ export const ZIWEI_ADD_ON_COST = 150;
 // 상대 1인분 데이터까지 추가로 고려하는 부담을 감안해 자미두수(150)보다는 낮고 사주(50)보다는
 // 높은 값으로 잡음 — 확정된 가격표는 아니므로 필요 시 조정할 것.
 export const COMPATIBILITY_ADD_ON_COST = 100;
+
+// 코인 충전 상품. 1코인=1원 기준 + 대량 구매일수록 커지는 보너스 코인(사용자가 직접 확정).
+export const COIN_PACKAGES = [
+  { priceWon: 1100, coins: 1100 },
+  { priceWon: 3300, coins: 3500 },
+  { priceWon: 5500, coins: 6000 },
+  { priceWon: 12500, coins: 14000 },
+  { priceWon: 35000, coins: 40000 },
+  { priceWon: 55000, coins: 65000 },
+  { priceWon: 110000, coins: 135000 },
+] as const;
+
+// 시간제 무제한 상품(구매 시간 내 이용 무제한). 15분 티어는 타로만, 30/60분 티어는
+// 사주/자미두수/궁합 옵션까지 전부 포함 — 사용자가 직접 확정한 가격/범위.
+// ⚠️ 이 상수는 상품 표시용일 뿐, "무제한 세션"을 실제로 판정/적용하는 백엔드 로직은
+// 아직 없음 (지금 코인 차감 로직은 이 상품 구매를 전혀 모름) — 별도 구현 필요.
+export const TIME_PASS_PACKAGES = [
+  { priceWon: 8900, minutes: 15, includesOptions: false },
+  { priceWon: 19900, minutes: 30, includesOptions: true },
+  { priceWon: 35900, minutes: 60, includesOptions: true },
+] as const;

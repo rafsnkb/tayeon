@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/tarot", label: "타로 보기" },
   { href: "/me", label: "내 정보" },
   { href: "/compatibility", label: "궁합 상대 정보" },
+  { href: "/charge", label: "코인 충전" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

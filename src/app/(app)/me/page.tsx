@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { TONES, type ToneKey } from "@/lib/tarot/tone";
@@ -124,9 +125,14 @@ export default function MePage() {
         <p className="text-lg text-bold-text">{nickname ?? "-"}</p>
       </div>
 
-      <div className="rounded-lg border border-border p-4">
-        <span className="text-sm text-text">보유 코인</span>
-        <p className="text-lg text-bold-text">{coins ?? "-"}</p>
+      <div className="flex items-center justify-between rounded-lg border border-border p-4">
+        <div>
+          <span className="text-sm text-text">보유 코인</span>
+          <p className="text-lg text-bold-text">{coins ?? "-"}</p>
+        </div>
+        <Link href="/charge" className="text-sm text-point underline">
+          충전하기
+        </Link>
       </div>
 
       <div className="rounded-lg border border-border p-4">

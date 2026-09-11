@@ -5,13 +5,18 @@ const KAKAO_REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!;
 const KAKAO_REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!;
 const KAKAO_CLIENT_SECRET = process.env.KAKAO_CLIENT_SECRET!;
 
+// req.url's origin isn't reliable behind Cloud Run/App Hosting's proxy (shows the
+// container's internal bind address, not the public domain), so redirects are built
+// from the known-good public origin instead.
+const APP_ORIGIN = new URL(KAKAO_REDIRECT_URI).origin;
+
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
 
   if (error || !code) {
     return NextResponse.redirect(
-      new URL(`/login?error=${error ?? "missing_code"}`, req.url)
+      new URL(`/login?error=${error ?? "missing_code"}`, APP_ORIGIN)
     );
   }
 
@@ -29,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   if (!tokenRes.ok) {
     console.error("Kakao token exchange failed:", tokenRes.status, await tokenRes.text());
-    return NextResponse.redirect(new URL("/login?error=token_exchange_failed", req.url));
+    return NextResponse.redirect(new URL("/login?error=token_exchange_failed", APP_ORIGIN));
   }
 
   const { access_token } = (await tokenRes.json()) as { access_token: string };
@@ -39,7 +44,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!profileRes.ok) {
-    return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", req.url));
+    return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", APP_ORIGIN));
   }
 
   const profile = (await profileRes.json()) as {
@@ -74,6 +79,6 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.redirect(
-    new URL(`/login/complete#${params.toString()}`, req.url)
+    new URL(`/login/complete#${params.toString()}`, APP_ORIGIN)
   );
 }
