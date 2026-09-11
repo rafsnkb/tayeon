@@ -26,6 +26,7 @@ export default function CompatibilityPage() {
   const [calendarType, setCalendarType] = useState<Partner["calendarType"]>("solar");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
+  const [timeUnknown, setTimeUnknown] = useState(false);
   const [gender, setGender] = useState<Partner["gender"]>("unspecified");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export default function CompatibilityPage() {
           nickname: nickname.trim(),
           calendarType,
           birthDate: birthDate || null,
-          birthTime: birthTime || null,
+          birthTime: timeUnknown ? null : birthTime || null,
           gender,
         }),
       });
@@ -76,13 +77,14 @@ export default function CompatibilityPage() {
         nickname: nickname.trim(),
         calendarType,
         birthDate: birthDate || null,
-        birthTime: birthTime || null,
+        birthTime: timeUnknown ? null : birthTime || null,
         gender,
       });
       setNickname("");
       setCalendarType("solar");
       setBirthDate("");
       setBirthTime("");
+      setTimeUnknown(false);
       setGender("unspecified");
     } finally {
       setSubmitting(false);
@@ -199,9 +201,22 @@ export default function CompatibilityPage() {
               type="time"
               value={birthTime}
               onChange={(e) => setBirthTime(e.target.value)}
-              className="rounded-lg border border-border bg-surface px-3 py-2 outline-none"
+              disabled={timeUnknown}
+              className="rounded-lg border border-border bg-surface px-3 py-2 outline-none disabled:opacity-50"
             />
           </label>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={timeUnknown}
+              onChange={(e) => setTimeUnknown(e.target.checked)}
+            />
+            태어난 시간을 몰라요
+          </label>
+          {timeUnknown && (
+            <p className="text-sm text-urgent">태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요.</p>
+          )}
 
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium text-text">성별 (선택)</span>

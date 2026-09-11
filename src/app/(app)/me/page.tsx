@@ -251,6 +251,9 @@ export default function MePage() {
           />
           태어난 시간을 몰라요
         </label>
+        {timeUnknown && (
+          <p className="text-sm text-urgent">태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요.</p>
+        )}
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">자시법</span>
