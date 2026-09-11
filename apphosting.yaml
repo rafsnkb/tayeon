@@ -1,0 +1,60 @@
+# Firebase App Hosting configuration for 타연 (production, tayeon-d5149)
+runConfig:
+  minInstances: 0
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyCRXh6LJL3bcdff4h8qpivwxvFxPff0ikI"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "tayeon-d5149.firebaseapp.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "tayeon-d5149"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "tayeon-d5149.firebasestorage.app"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "897620122361"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:897620122361:web:4e09d26808e21cee96a028"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-PKC7S8QLNV"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_KAKAO_REST_API_KEY
+    value: "e3733ff5647eb49e88c6ff4910189d57"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_KAKAO_REDIRECT_URI
+    value: "https://tayeon.kr/api/auth/kakao/callback"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: FIREBASE_SERVICE_ACCOUNT_EMAIL
+    value: "firebase-adminsdk-fbsvc@tayeon-d5149.iam.gserviceaccount.com"
+    availability:
+      - RUNTIME
+
+  # Secret-backed values — created via `firebase apphosting:secrets:set`, values live in Secret Manager only
+  - variable: KAKAO_CLIENT_SECRET
+    secret: KAKAO_CLIENT_SECRET
+  - variable: ANTHROPIC_API_KEY
+    secret: ANTHROPIC_API_KEY

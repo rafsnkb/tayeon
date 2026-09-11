@@ -15,8 +15,8 @@ export default async function LoginPage({
   const { error } = await searchParams;
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-xl font-bold">타연 로그인 테스트</h1>
-      {error && <p className="text-red-500">로그인 실패: {error}</p>}
+      <h1 className="text-xl font-bold text-bold-text">타연 로그인 테스트</h1>
+      {error && <p className="text-urgent">로그인 실패: {error}</p>}
       <a
         href={getKakaoAuthorizeUrl()}
         className="rounded bg-yellow-400 px-6 py-3 font-medium text-black"

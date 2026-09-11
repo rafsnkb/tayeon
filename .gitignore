@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/admin/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -16,13 +17,19 @@
 # next.js
 /.next/
 /out/
+/admin/.next/
+/admin/out/
 
 # production
 /build
+/admin/build
 
 # misc
 .DS_Store
 *.pem
+
+# raw design source files (PSD etc.) — not needed at runtime, too large for git
+/resources/
 
 # debug
 npm-debug.log*

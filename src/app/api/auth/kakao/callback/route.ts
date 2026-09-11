@@ -51,7 +51,11 @@ export async function GET(req: NextRequest) {
   const nickname = profile.properties?.nickname ?? null;
   const profileImage = profile.properties?.profile_image ?? null;
 
-  await adminDb.collection("users").doc(uid).set(
+  const userRef = adminDb.collection("users").doc(uid);
+  const existing = await userRef.get();
+  const isNewUser = !existing.exists;
+
+  await userRef.set(
     {
       provider: "kakao",
       kakaoId: profile.id,
@@ -64,7 +68,12 @@ export async function GET(req: NextRequest) {
 
   const customToken = await adminAuth.createCustomToken(uid);
 
+  const params = new URLSearchParams({
+    token: customToken,
+    isNewUser: String(isNewUser),
+  });
+
   return NextResponse.redirect(
-    new URL(`/login/complete#token=${customToken}`, req.url)
+    new URL(`/login/complete#${params.toString()}`, req.url)
   );
 }

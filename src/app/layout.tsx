@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const esamanru = localFont({
+  src: [
+    { path: "../../asset/font/esamanru Light.ttf", weight: "300", style: "normal" },
+    { path: "../../asset/font/esamanru Medium.ttf", weight: "500", style: "normal" },
+    { path: "../../asset/font/esamanru Bold.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-esamanru",
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -21,9 +29,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${esamanru.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-bg text-text">
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT_SCRIPT}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }

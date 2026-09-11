@@ -1,26 +1,186 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f7f4fb;
+  --surface: #ffffff;
+  --border: #e0d5f0;
+  --bold-text: #1a0f2e;
+  --text: #6b5c84;
+  --point: #ff007f;
+  --point-strong: #ff2a93;
+  --point-muted: #cc0066;
+  --point-bg: rgba(255, 0, 127, 0.08);
+  --cta-fill: #1a0f2e;
+  --cta-text: #ffffff;
+  --urgent: #e53935;
+  --urgent-text: #ffffff;
+  --success: #43a047;
+  --success-text: #ffffff;
+  --warning: #fff3cd;
+  --warning-text: #856404;
+  --accent: #7c4dff;
+}
+
+.dark {
+  --bg: #141517;
+  --surface: #1c1d21;
+  --border: #2a2c31;
+  --bold-text: #f3f4f6;
+  --text: #8e95a3;
+  --point: #ff007f;
+  --point-strong: #ff2a93;
+  --point-muted: #cc0066;
+  --point-bg: rgba(255, 0, 127, 0.1);
+  --cta-fill: #dcdee3;
+  --cta-text: #141517;
+  --urgent: #ef5350;
+  --urgent-text: #ffffff;
+  --success: #66bb6a;
+  --success-text: #0b1f0e;
+  --warning: #3e2f00;
+  --warning-text: #ffe082;
+  --accent: #b39ddb;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-bold-text: var(--bold-text);
+  --color-text: var(--text);
+  --color-point: var(--point);
+  --color-point-strong: var(--point-strong);
+  --color-point-muted: var(--point-muted);
+  --color-point-bg: var(--point-bg);
+  --color-cta-fill: var(--cta-fill);
+  --color-cta-text: var(--cta-text);
+  --color-urgent: var(--urgent);
+  --color-urgent-text: var(--urgent-text);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-esamanru);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 300;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/*
+ * 타이포그래피 스케일 (esamanru 3종 웨이트 기준)
+ * Light(300): 본문/보조 텍스트 | Medium(500): 카드 제목/탭 라벨/일반 제목 | Bold(700): 큰 타이틀/섹션 헤더/CTA
+ */
+@utility bodyLarge {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+@utility bodyMedium {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@utility bodySmall {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+@utility titleLarge {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+}
+
+@utility titleMedium {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+@utility titleSmall {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@utility labelLarge {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@utility labelMedium {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+@utility labelSmall {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+@utility headlineLarge {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 2.5rem;
+}
+
+@utility headlineMedium {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+}
+
+@utility headlineSmall {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text);
 }
