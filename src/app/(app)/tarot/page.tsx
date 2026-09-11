@@ -199,7 +199,9 @@ function TarotChat() {
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "1");
   const [spread, setSpread] = useState<SpreadKey>("one");
   const [hasBirthInfo, setHasBirthInfo] = useState(false);
+  const [myTimeUnknown, setMyTimeUnknown] = useState(false);
   const [hasPartner, setHasPartner] = useState(false);
+  const [partnerTimeUnknown, setPartnerTimeUnknown] = useState(false);
   const [includeSaju, setIncludeSaju] = useState(false);
   const [includeZiwei, setIncludeZiwei] = useState(false);
   const [includeCompatibility, setIncludeCompatibility] = useState(false);
@@ -243,7 +245,9 @@ function TarotChat() {
         const data = await meRes.json();
         setCoins(data.coins);
         setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
+        setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
         setHasPartner(Boolean(data.partner?.nickname));
+        setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
         setActiveTimePass(data.activeTimePass ?? null);
         setTimePasses(data.timePasses ?? []);
       }
@@ -379,6 +383,27 @@ function TarotChat() {
     e.preventDefault();
     const trimmed = question.trim();
     if (!trimmed || loading || !user || !activeRoomId) return;
+
+    if (includeZiwei && myTimeUnknown) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "error",
+          text: "자미두수를 보려면 태어난 시간이 필요해요. 자미두수는 태어난 시간(시진)에 따라 명궁·신궁의 위치가 달라지기 때문에, 시간 정보 없이는 정확하게 계산할 수 없어요. 내 정보에서 태어난 시간을 입력해주세요.",
+        },
+      ]);
+      return;
+    }
+    if (includeZiwei && includeCompatibility && partnerTimeUnknown) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "error",
+          text: "자미두수+궁합을 함께 보려면 상대방의 태어난 시간도 필요해요. 자미두수는 태어난 시간(시진)에 따라 명궁·신궁의 위치가 달라지기 때문에, 시간 정보 없이는 상대방의 자미두수를 정확하게 계산할 수 없어요. 궁합 상대 정보에서 태어난 시간을 입력해주세요.",
+        },
+      ]);
+      return;
+    }
 
     setMessages((prev) => [...prev, { role: "user", text: trimmed }]);
     setQuestion("");
