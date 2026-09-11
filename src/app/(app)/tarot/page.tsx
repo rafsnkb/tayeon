@@ -522,9 +522,9 @@ function TarotChat() {
         </div>
 
         {(activeTimePass || timePasses.length > 0) && (
-          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-point bg-point-bg px-3 py-2 text-sm">
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-point bg-point-bg px-3 py-2 text-xs">
             {activeTimePass ? (
-              <span className="text-point">
+              <span className="whitespace-nowrap text-point">
                 ⏱ {formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)} 남음 ·{" "}
                 {activeTimePass.minutes}분권
                 {activeTimePass.includesOptions ? " (전부 무제한)" : " (타로만 무제한)"}
@@ -533,7 +533,7 @@ function TarotChat() {
               timePasses.map((pass) => (
                 <div
                   key={pass.id}
-                  className="flex items-center gap-2 rounded-full border border-point px-3 py-1 text-point"
+                  className="flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-point px-3 py-1 text-point"
                 >
                   <span>
                     {pass.minutes}분권{pass.includesOptions ? "" : " (타로만)"}
@@ -647,13 +647,13 @@ function TarotChat() {
       </div>
 
       <div className="shrink-0 border-t border-border p-4">
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {(Object.keys(SPREADS) as SpreadKey[]).map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setSpread(key)}
-            className={`rounded-full border px-3 py-1.5 text-sm ${
+            className={`flex-shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
               spread === key ? "border-point bg-point-bg text-point" : "border-border text-text"
             }`}
           >
@@ -669,7 +669,7 @@ function TarotChat() {
               <button
                 type="button"
                 onClick={() => setIncludeSaju(!includeSaju)}
-                className={`rounded-full border px-3 py-1.5 text-sm ${
+                className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
                   includeSaju ? "border-point bg-point-bg text-point" : "border-border text-text"
                 }`}
               >
@@ -678,7 +678,7 @@ function TarotChat() {
               <button
                 type="button"
                 onClick={() => setIncludeZiwei(!includeZiwei)}
-                className={`rounded-full border px-3 py-1.5 text-sm ${
+                className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
                   includeZiwei ? "border-point bg-point-bg text-point" : "border-border text-text"
                 }`}
               >
@@ -690,14 +690,14 @@ function TarotChat() {
             <button
               type="button"
               onClick={() => setIncludeCompatibility(!includeCompatibility)}
-              className={`rounded-full border px-3 py-1.5 text-sm ${
+              className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
                 includeCompatibility ? "border-point bg-point-bg text-point" : "border-border text-text"
               }`}
             >
               +궁합 · {COMPATIBILITY_ADD_ON_COST}코인
             </button>
           )}
-          <span className="text-sm text-text">
+          <span className="whitespace-nowrap text-xs text-text">
             총 {displayedCost}코인
             {spreadCoveredDisplay && <span className="text-point"> (이용권 적용)</span>}
           </span>
@@ -705,7 +705,7 @@ function TarotChat() {
       )}
 
       {!hasBirthInfo && (
-        <p className="pt-2 text-sm text-text">
+        <p className="pt-2 text-xs text-text">
           <Link href="/me" className="text-point underline">
             내 정보
           </Link>
@@ -713,7 +713,7 @@ function TarotChat() {
         </p>
       )}
       {!hasPartner && (
-        <p className="pt-1 text-sm text-text">
+        <p className="pt-1 text-xs text-text">
           <Link href="/compatibility" className="text-point underline">
             궁합 상대 정보
           </Link>
@@ -726,13 +726,13 @@ function TarotChat() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="궁금한 것을 물어보세요"
-          className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-bold-text outline-none"
+          className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm text-bold-text outline-none"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading}
-          className="rounded-full bg-cta-fill px-5 py-2 text-cta-text disabled:opacity-50"
+          className="flex-shrink-0 whitespace-nowrap rounded-full bg-cta-fill px-4 py-2 text-sm text-cta-text disabled:opacity-50"
         >
           질문하기
         </button>
