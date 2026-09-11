@@ -1,0 +1,43 @@
+# Firebase App Hosting configuration for 타연 관리자 (production, tayeon-d5149)
+runConfig:
+  minInstances: 0
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyCRXh6LJL3bcdff4h8qpivwxvFxPff0ikI"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "tayeon-d5149.firebaseapp.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "tayeon-d5149"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "tayeon-d5149.firebasestorage.app"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "897620122361"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:897620122361:web:4e09d26808e21cee96a028"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: FIREBASE_SERVICE_ACCOUNT_EMAIL
+    value: "firebase-adminsdk-fbsvc@tayeon-d5149.iam.gserviceaccount.com"
+    availability:
+      - RUNTIME
+  - variable: ADMIN_UIDS
+    value: "8bOaK7MA9ohyqcSqCdlMKx88p2f2"
+    availability:
+      - RUNTIME
