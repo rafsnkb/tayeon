@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Separate app with its own eslint config.
     "admin/**",
+    // Separate project with its own tsconfig/package.json.
+    "functions/**",
   ]),
 ]);
 
