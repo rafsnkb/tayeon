@@ -19,11 +19,25 @@ import {
   ZIWEI_ADD_ON_COST,
   COMPATIBILITY_ADD_ON_COST,
 } from "@/lib/tarot/pricing";
-import { DEFAULT_TONE, isToneKey } from "@/lib/tarot/tone";
+import { DEFAULT_TONE, isToneKey, type ToneKey } from "@/lib/tarot/tone";
 import { calculateSaju, buildSajuPromptBlock, type SajuResult } from "@/lib/saju/calculate";
 import { calculateZiwei, buildZiweiPromptBlock, type ZiweiResult } from "@/lib/ziwei/calculate";
 import { isValidBirthInfo, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
+
+// 궁합 옵션이 꺼진 채 상대방 관계를 묻는 질문을 서버가 결정적으로 차단할 때(LLM 호출 없음) 쓰는
+// 안내 문구 — 사용자가 고른 AI 말투(tone)에 맞춰 4종으로 나눠서, 획일적인 시스템 메시지처럼
+// 느껴지지 않도록 함(2026-09-12).
+const GUIDANCE_NO_COMPATIBILITY: Record<ToneKey, (nickname: string) => string> = {
+  warm: (nickname) =>
+    `${nickname}님과의 궁합을 정확히 보고 싶으신 거죠? 지금은 상대방 사주 정보가 없어서 마음까지 깊이 헤아리기가 어려워요. 메뉴의 궁합 상대 정보에서 생년월일을 저장하고 +궁합 옵션을 함께 켜주시면, 두 분의 흐름을 더 정성껏 봐드릴게요.`,
+  direct: (nickname) =>
+    `지금 상태로는 ${nickname}님과의 궁합까진 못 봐요. 메뉴 궁합 상대 정보에 생년월일 넣고 +궁합 옵션 켜세요 — 그래야 제대로 나옵니다.`,
+  mystical: (nickname) =>
+    `${nickname}님과의 인연을 온전히 읽으려면, 그 분의 운명이 새겨진 생년월일이 필요합니다. 메뉴의 궁합 상대 정보에 기록을 남기고 +궁합의 문을 함께 열어주세요. 그때 비로소 두 분을 잇는 실이 보일 거예요.`,
+  friendly: (nickname) =>
+    `${nickname}이랑 궁합 보려면 그 사람 생년월일도 있어야 돼! 메뉴 궁합 상대 정보에 저장하고 +궁합 옵션 켜줘봐, 그래야 제대로 봐줄 수 있어.`,
+};
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -131,8 +145,10 @@ export async function POST(req: NextRequest) {
   // 사주/자미두수는 켜져 있는데 궁합(상대방 정보)은 안 켜진 상태에서, 질문이 저장된 상대방을
   // 가리키는 경우 — LLM 판단에만 맡기면 "내 사주로 상대방 반응을 우회 설명"하는 경우가 있어서
   // (2026-09-11) 서버에서 결정적으로 차단하고 안내한다. API 호출 자체를 하지 않아 비용도 안 듦.
+  // 안내 문구를 사용자가 고른 AI 말투(tone)에 맞게 4종으로 나눠서, 딱딱한 시스템 메시지처럼
+  // 느껴지지 않도록 함(2026-09-12 — 획일적인 안내문이 "일반적인 AI 답변 같다"는 피드백을 받음).
   if ((includeSaju || includeZiwei) && !includeCompatibility && partner && question.includes(partner.nickname)) {
-    const guidance = `${partner.nickname}님과의 사주/자미두수 궁합을 보려면 메뉴의 궁합 상대 정보에서 상대방 정보를 저장하고 +궁합 옵션도 함께 켜주세요.`;
+    const guidance = GUIDANCE_NO_COMPATIBILITY[tone](partner.nickname);
     const now = new Date().toISOString();
     await roomRef.collection("readings").add({
       question,
