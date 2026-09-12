@@ -29,6 +29,8 @@ export function partnerToBirthInfo(partner: Partner): BirthInfo | null {
     birthTime: partner.birthTime,
     timeUnknown: !partner.birthTime,
     jasiRule: "midnight",
+    // 상대 정보는 마찰 감소를 위해 자시법과 마찬가지로 진태양시 보정도 따로 입력받지 않고 고정.
+    useTrueSolarTime: false,
     gender: partner.gender,
   };
 }

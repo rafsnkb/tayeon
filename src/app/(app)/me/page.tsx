@@ -23,6 +23,7 @@ export default function MePage() {
   const [birthTime, setBirthTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
   const [jasiRule, setJasiRule] = useState<JasiRule>("midnight");
+  const [useTrueSolarTime, setUseTrueSolarTime] = useState(false);
   const [gender, setGender] = useState<BirthInfo["gender"] | "">("");
   const [savingBirthInfo, setSavingBirthInfo] = useState(false);
   const [birthInfoError, setBirthInfoError] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function MePage() {
           setBirthTime(info.birthTime ?? "");
           setTimeUnknown(info.timeUnknown);
           setJasiRule(info.jasiRule);
+          setUseTrueSolarTime(Boolean(info.useTrueSolarTime));
           setGender(info.gender);
         }
       }
@@ -87,7 +89,15 @@ export default function MePage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ calendarType, birthDate, birthTime, timeUnknown, jasiRule, gender }),
+        body: JSON.stringify({
+          calendarType,
+          birthDate,
+          birthTime,
+          timeUnknown,
+          jasiRule,
+          useTrueSolarTime,
+          gender,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -269,6 +279,20 @@ export default function MePage() {
             ))}
           </select>
         </label>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={useTrueSolarTime}
+            onChange={(e) => setUseTrueSolarTime(e.target.checked)}
+          />
+          진태양시 보정 사용 (사주에만 적용)
+        </label>
+        <p className="text-xs text-text">
+          표준시(동경 135°)와 한반도 실제 경도(약 127°) 차이로 생기는 약 30분의 시차를 보정해서
+          시주/일주를 계산해요. 유파마다 다른 방식이라 선택 사항이며, 자미두수 계산에는 적용되지
+          않아요.
+        </p>
 
         {birthInfoError && <p className="text-sm text-urgent">{birthInfoError}</p>}
 

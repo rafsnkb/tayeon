@@ -7,6 +7,10 @@ export type BirthInfo = {
   timeUnknown: boolean;
   jasiRule: JasiRule;
   gender: "male" | "female";
+  /** 진태양시(眞太陽時) 보정 — 표준시(동경 135°)와 한반도 실제 경도(약 127°) 차이로 생기는
+   * 약 30분의 시차를 보정해서 시주/일주를 판정할지 여부. 기본 false(보정 없음, 정시 기준).
+   * 사주(manseryeok)에만 적용되고 자미두수(iztro)는 이 옵션과 무관하게 항상 정시 기준. */
+  useTrueSolarTime: boolean;
 };
 
 export const JASI_RULE_LABEL: Record<JasiRule, string> = {

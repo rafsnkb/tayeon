@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
           ? (birthInfo.jasiRule as JasiRule)
           : "midnight",
         gender: birthInfo.gender,
+        useTrueSolarTime: Boolean(birthInfo.useTrueSolarTime),
       },
     };
   }

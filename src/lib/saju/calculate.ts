@@ -31,6 +31,9 @@ export function calculateSaju(birthInfo: BirthInfo): SajuResult | null {
     isLunar: birthInfo.calendarType === "lunar",
     dayBoundary: birthInfo.jasiRule,
     gender: birthInfo.gender,
+    // 한반도 평균 경도(127.5°) 기준 진태양시 보정 — 사용자가 켠 경우에만 적용, 기본은 라이브러리
+    // 기본값(보정 없음, 정시 기준)과 동일하게 OFF.
+    trueSolarTime: birthInfo.useTrueSolarTime ? {} : undefined,
   });
 
   const obj = result.toObject();

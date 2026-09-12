@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     timeUnknown: Boolean(body.timeUnknown),
     jasiRule: JASI_RULES.includes(body.jasiRule as JasiRule) ? (body.jasiRule as JasiRule) : "midnight",
     gender: body.gender,
+    useTrueSolarTime: Boolean(body.useTrueSolarTime),
   };
 
   await adminDb.collection("users").doc(uid).set({ birthInfo }, { merge: true });
