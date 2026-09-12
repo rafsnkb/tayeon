@@ -32,6 +32,7 @@ type ChatMessage =
       guidanceOnly?: boolean;
       flaggedForAbuse?: boolean;
       timePassApplied?: boolean;
+      suggestions?: string[];
     }
   | { role: "error"; text: string };
 
@@ -214,6 +215,7 @@ function TarotChat() {
   const [startingPass, setStartingPass] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const questionInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
@@ -299,6 +301,7 @@ function TarotChat() {
       charged: boolean;
       guidanceOnly: boolean;
       flaggedForAbuse: boolean;
+      suggestions: string[];
     }[];
     return readings.flatMap((r) => [
       { role: "user", text: r.question },
@@ -314,6 +317,7 @@ function TarotChat() {
         charged: r.charged,
         guidanceOnly: r.guidanceOnly,
         flaggedForAbuse: r.flaggedForAbuse,
+        suggestions: r.suggestions,
       },
     ]);
   }
@@ -467,6 +471,7 @@ function TarotChat() {
           guidanceOnly: data.guidanceOnly,
           flaggedForAbuse: data.flaggedForAbuse,
           timePassApplied: data.timePassApplied,
+          suggestions: data.suggestions,
         },
       ]);
     } catch {
@@ -674,6 +679,30 @@ function TarotChat() {
               {msg.charged && msg.timePassApplied && (
                 <p className="mt-1 w-full px-1 text-xs text-point">이용권으로 이용한 리딩이에요.</p>
               )}
+              {msg.charged && i === messages.length - 1 && (msg.suggestions?.length ?? 0) > 0 && (
+                <div className="mt-2 flex w-full flex-col gap-1.5">
+                  {msg.suggestions!.map((s, j) => (
+                    <button
+                      key={j}
+                      type="button"
+                      onClick={() => {
+                        setQuestion(s);
+                        questionInputRef.current?.focus();
+                      }}
+                      className="rounded-full border border-point px-3 py-1.5 text-left text-sm text-point"
+                    >
+                      {j + 1}. {s}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => questionInputRef.current?.focus()}
+                    className="rounded-full border border-border px-3 py-1.5 text-left text-sm text-text"
+                  >
+                    {msg.suggestions!.length + 1}. 직접 입력할게요
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -762,6 +791,7 @@ function TarotChat() {
 
       <form onSubmit={handleSubmit} className="flex gap-2 pt-2">
         <input
+          ref={questionInputRef}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="궁금한 것을 물어보세요"

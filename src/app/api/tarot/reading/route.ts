@@ -10,6 +10,7 @@ import {
   NO_CHARGE_MARKER,
   GUIDANCE_MARKER,
   HISTORY_SUMMARY_MARKER,
+  SUGGESTIONS_MARKER,
 } from "@/lib/tarot/prompt";
 import {
   SPREADS,
@@ -333,19 +334,44 @@ export async function POST(req: NextRequest) {
           )
       );
 
-      // Split off the trailing history-summary block (never shown to the user) from the
-      // user-facing interpretation.
+      // Split off the trailing history-summary + suggested-follow-ups blocks (never shown as-is
+      // to the user — summary feeds the next turn's history, suggestions render as quick-reply
+      // chips) from the user-facing interpretation.
       const summaryIdx = strippedInterpretation.indexOf(HISTORY_SUMMARY_MARKER);
       const interpretation =
         summaryIdx === -1
           ? strippedInterpretation
           : strippedInterpretation.slice(0, summaryIdx).trimEnd();
+
+      const tail =
+        summaryIdx === -1
+          ? ""
+          : strippedInterpretation.slice(summaryIdx + HISTORY_SUMMARY_MARKER.length);
+      const suggestionsIdx = tail.indexOf(SUGGESTIONS_MARKER);
       const historySummary =
         cardsOk && summaryIdx !== -1
-          ? strippedInterpretation.slice(summaryIdx + HISTORY_SUMMARY_MARKER.length).trim()
+          ? (suggestionsIdx === -1 ? tail : tail.slice(0, suggestionsIdx)).trim()
           : null;
+      const suggestions =
+        cardsOk && suggestionsIdx !== -1
+          ? tail
+              .slice(suggestionsIdx + SUGGESTIONS_MARKER.length)
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .slice(0, 3)
+          : [];
 
-      return { interpretation, historySummary, cardsOk, sajuOk, ziweiOk, markedNoCharge, markedGuidance };
+      return {
+        interpretation,
+        historySummary,
+        suggestions,
+        cardsOk,
+        sajuOk,
+        ziweiOk,
+        markedNoCharge,
+        markedGuidance,
+      };
     }
 
     // 카드/스프레드가 잘못됐거나 사주·자미두수가 빠지면, 사용자에게 보여주기 전에 재생성을
@@ -364,7 +390,7 @@ export async function POST(req: NextRequest) {
       attempt = await generate();
     }
 
-    const { interpretation, historySummary, cardsOk } = attempt;
+    const { interpretation, historySummary, suggestions, cardsOk } = attempt;
     // 카드/스프레드 자체가 무효면 전체 무과금(기존 동작 유지). 카드는 정상인데 사주/자미두수만
     // 빠졌다면, 기본 스프레드 요금은 정상 청구하고 빠진 옵션의 추가금만 면제한다 — 재시도까지
     // 실패했다고 해서 이미 완성된 카드 해석 전체를 무과금 처리하면 사용자 입장에서 결과물은
@@ -413,6 +439,7 @@ export async function POST(req: NextRequest) {
       partnerNickname: compatibilityCharged && partner ? partner.nickname : null,
       interpretation,
       historySummary,
+      suggestions,
       charged: cardsOk,
       guidanceOnly,
       flaggedForAbuse,
@@ -441,6 +468,7 @@ export async function POST(req: NextRequest) {
       sajuFree,
       ziweiFree,
       timePassApplied: cardsOk && spreadCovered,
+      suggestions,
     });
   } catch (error) {
     if (error instanceof Anthropic.APIError) {

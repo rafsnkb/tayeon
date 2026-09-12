@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       charged: data.charged ?? true,
       guidanceOnly: Boolean(data.guidanceOnly),
       flaggedForAbuse: Boolean(data.flaggedForAbuse),
+      suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
     };
   });
 
