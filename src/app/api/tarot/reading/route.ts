@@ -348,11 +348,19 @@ export async function POST(req: NextRequest) {
       return { interpretation, historySummary, cardsOk, sajuOk, ziweiOk, markedNoCharge, markedGuidance };
     }
 
-    // 카드/스프레드가 잘못됐거나 사주·자미두수가 빠지면, 사용자에게 보여주기 전에 한 번 더
-    // 재생성을 시도한다 — 대부분의 경우 재시도에서 정상적으로 해결되어 사용자가 실패를 볼 일
-    // 자체가 크게 줄어든다(2026-09-11).
+    // 카드/스프레드가 잘못됐거나 사주·자미두수가 빠지면, 사용자에게 보여주기 전에 재생성을
+    // 시도한다 — 대부분의 경우 재시도에서 정상적으로 해결되어 사용자가 실패를 볼 일 자체가 크게
+    // 줄어든다(2026-09-11). 최대 시도 횟수를 2→3회로 늘림(2026-09-12) — 1회 재시도까지 실패해서
+    // 모델이 완전히 헛도는(카드 언급 없이 "카드 준비 중" 같은 알 수 없는 텍스트를 내놓거나, 금지된
+    // 되묻기를 하는) 응답이 그대로 노출되는 사례가 실사용에서 발견됨. 실패했을 때만 추가 API
+    // 호출이 발생하므로 정상 응답엔 비용·지연 영향 없음.
+    const MAX_ATTEMPTS = 3;
     let attempt = await generate();
-    if (!(attempt.cardsOk && attempt.sajuOk && attempt.ziweiOk)) {
+    for (
+      let i = 1;
+      i < MAX_ATTEMPTS && !(attempt.cardsOk && attempt.sajuOk && attempt.ziweiOk);
+      i++
+    ) {
       attempt = await generate();
     }
 
