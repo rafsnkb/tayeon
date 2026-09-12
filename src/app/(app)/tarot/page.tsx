@@ -30,6 +30,7 @@ type ChatMessage =
       sajuFree?: boolean;
       ziweiFree?: boolean;
       guidanceOnly?: boolean;
+      flaggedForAbuse?: boolean;
       timePassApplied?: boolean;
     }
   | { role: "error"; text: string };
@@ -296,6 +297,8 @@ function TarotChat() {
           partnerNickname: string | null;
           interpretation: string;
           charged: boolean;
+          guidanceOnly: boolean;
+          flaggedForAbuse: boolean;
         }[];
         const history: ChatMessage[] = readings.flatMap((r) => [
           { role: "user", text: r.question },
@@ -309,6 +312,8 @@ function TarotChat() {
             includeCompatibility: r.includeCompatibility,
             partnerNickname: r.partnerNickname,
             charged: r.charged,
+            guidanceOnly: r.guidanceOnly,
+            flaggedForAbuse: r.flaggedForAbuse,
           },
         ]);
         setMessages(history);
@@ -452,6 +457,7 @@ function TarotChat() {
           sajuFree: data.sajuFree,
           ziweiFree: data.ziweiFree,
           guidanceOnly: data.guidanceOnly,
+          flaggedForAbuse: data.flaggedForAbuse,
           timePassApplied: data.timePassApplied,
         },
       ]);
@@ -617,10 +623,12 @@ function TarotChat() {
               {!msg.charged && !msg.guidanceOnly && (
                 <div className="mt-1 w-full text-xs">
                   <p className="px-1 text-text">해당 답변은 코인 차감이 되지 않습니다.</p>
-                  <p className="mt-1 text-center text-urgent">
-                    타로와 무관하거나 시스템의 기능을 악용하려는 질문을 반복적으로 계속할 경우,
-                    서비스 이용이 정지될 수 있습니다.
-                  </p>
+                  {msg.flaggedForAbuse && (
+                    <p className="mt-1 text-center text-urgent">
+                      타로와 무관하거나 시스템의 기능을 악용하려는 질문을 반복적으로 계속할 경우,
+                      서비스 이용이 정지될 수 있습니다.
+                    </p>
+                  )}
                 </div>
               )}
               {msg.charged && (msg.sajuFree || msg.ziweiFree) && (

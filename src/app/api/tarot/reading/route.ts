@@ -5,7 +5,12 @@ import { anthropic } from "@/lib/anthropic";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { drawCards } from "@/lib/tarot/draw";
-import { buildTarotSystemPrompt, NO_CHARGE_MARKER, HISTORY_SUMMARY_MARKER } from "@/lib/tarot/prompt";
+import {
+  buildTarotSystemPrompt,
+  NO_CHARGE_MARKER,
+  GUIDANCE_MARKER,
+  HISTORY_SUMMARY_MARKER,
+} from "@/lib/tarot/prompt";
 import {
   SPREADS,
   isSpreadKey,
@@ -101,6 +106,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 자미두수는 태어난 시간(시진)에 따라 명궁·신궁 위치가 달라져서 시간 모르면 정확히 계산 못 함 —
+  // 지금까지는 /tarot 프론트에서만 막고 있었는데, API를 직접 두드리면 우회 가능했음(2026-09-12).
+  if (includeZiwei && birthInfo?.timeUnknown) {
+    return NextResponse.json(
+      {
+        error:
+          "자미두수를 보려면 태어난 시간이 필요해요. 자미두수는 태어난 시간(시진)에 따라 명궁·신궁의 위치가 달라지기 때문에, 시간 정보 없이는 정확하게 계산할 수 없어요. 내 정보에서 태어난 시간을 입력해주세요.",
+      },
+      { status: 400 }
+    );
+  }
+  if (includeZiwei && includeCompatibility && partner && !partner.birthTime) {
+    return NextResponse.json(
+      {
+        error:
+          "자미두수+궁합을 함께 보려면 상대방의 태어난 시간도 필요해요. 자미두수는 태어난 시간(시진)에 따라 명궁·신궁의 위치가 달라지기 때문에, 시간 정보 없이는 상대방의 자미두수를 정확하게 계산할 수 없어요. 궁합 상대 정보에서 태어난 시간을 입력해주세요.",
+      },
+      { status: 400 }
+    );
+  }
+
   // 사주/자미두수는 켜져 있는데 궁합(상대방 정보)은 안 켜진 상태에서, 질문이 저장된 상대방을
   // 가리키는 경우 — LLM 판단에만 맡기면 "내 사주로 상대방 반응을 우회 설명"하는 경우가 있어서
   // (2026-09-11) 서버에서 결정적으로 차단하고 안내한다. API 호출 자체를 하지 않아 비용도 안 듦.
@@ -120,6 +146,7 @@ export async function POST(req: NextRequest) {
       historySummary: null,
       charged: false,
       guidanceOnly: true,
+      flaggedForAbuse: false,
       createdAt: now,
     });
     await roomRef.update({ updatedAt: now });
@@ -134,6 +161,7 @@ export async function POST(req: NextRequest) {
       remainingCoins: balance,
       charged: false,
       guidanceOnly: true,
+      flaggedForAbuse: false,
     });
   }
 
@@ -256,21 +284,33 @@ export async function POST(req: NextRequest) {
 
       const textBlock = response.content.find((block) => block.type === "text");
       const rawInterpretation = textBlock?.text ?? "";
+      // Two markers, two different user-facing outcomes: NO_CHARGE_MARKER is for genuine abuse
+      // (injection/off-topic) and surfaces the "repeat this and you may be suspended" warning;
+      // GUIDANCE_MARKER is for cases that aren't the user's fault (e.g. missing +궁합 option) and
+      // shows only a quiet notice. Keep them distinguishable end-to-end so the frontend can tell
+      // them apart (src/app/(app)/tarot/page.tsx).
       const markedNoCharge = rawInterpretation.startsWith(NO_CHARGE_MARKER);
+      const markedGuidance = !markedNoCharge && rawInterpretation.startsWith(GUIDANCE_MARKER);
       const strippedInterpretation = markedNoCharge
         ? rawInterpretation.slice(NO_CHARGE_MARKER.length).trimStart()
-        : rawInterpretation;
+        : markedGuidance
+          ? rawInterpretation.slice(GUIDANCE_MARKER.length).trimStart()
+          : rawInterpretation;
 
       // Safety net for when the model should have used NO_CHARGE_MARKER but didn't (e.g. writes
       // a full reading built around the wrong spread/cards, mimicked from history): the system
       // prompt mandates every drawn card be named, so require a majority of the actually-drawn
       // cards to appear — not just one, which a wrong-structure hallucination can satisfy by
       // coincidence (e.g. naming 10 cards for a 5-card spread has good odds of overlapping 1-2).
+      // This safety net is a model slip-up, not user abuse, so it must not carry the suspension
+      // warning either — see flaggedForAbuse below.
       const mentionedDrawnCardCount = drawnCards.filter((d) =>
         strippedInterpretation.includes(d.card.nameKo)
       ).length;
       const cardsOk =
-        !markedNoCharge && mentionedDrawnCardCount >= Math.ceil(drawnCards.length / 2);
+        !markedNoCharge &&
+        !markedGuidance &&
+        mentionedDrawnCardCount >= Math.ceil(drawnCards.length / 2);
 
       // Same idea for the saju/ziwei add-ons: the user paid extra for them, so if the option was
       // requested but the response shows no sign of touching it, it was silently dropped and
@@ -305,7 +345,7 @@ export async function POST(req: NextRequest) {
           ? strippedInterpretation.slice(summaryIdx + HISTORY_SUMMARY_MARKER.length).trim()
           : null;
 
-      return { interpretation, historySummary, cardsOk, sajuOk, ziweiOk };
+      return { interpretation, historySummary, cardsOk, sajuOk, ziweiOk, markedNoCharge, markedGuidance };
     }
 
     // 카드/스프레드가 잘못됐거나 사주·자미두수가 빠지면, 사용자에게 보여주기 전에 한 번 더
@@ -321,6 +361,11 @@ export async function POST(req: NextRequest) {
     // 빠졌다면, 기본 스프레드 요금은 정상 청구하고 빠진 옵션의 추가금만 면제한다 — 재시도까지
     // 실패했다고 해서 이미 완성된 카드 해석 전체를 무과금 처리하면 사용자 입장에서 결과물은
     // 다 봤는데 뜬금없이 "타로와 무관한 질문" 경고가 뜨는 혼란스러운 경험이 되기 때문.
+    // 무과금 사유 3가지를 프론트에 구분해서 전달한다(2026-09-12): guidanceOnly(사용자 잘못 아님,
+    // 조용히 안내만) / flaggedForAbuse(진짜 인젝션·무관 요청, 정지 경고 노출) / 둘 다 false(카드
+    // 안전장치가 잡아낸 모델 쪽 구조 오류 — 사용자를 악용으로 몰지 않고 무과금 안내만 보여줌).
+    const guidanceOnly = !cardsOk && attempt.markedGuidance;
+    const flaggedForAbuse = !cardsOk && attempt.markedNoCharge;
     const sajuCharged = Boolean(cardsOk && includeSaju && attempt.sajuOk);
     const ziweiCharged = Boolean(cardsOk && includeZiwei && attempt.ziweiOk);
     const compatibilityCharged = Boolean(cardsOk && compatibilityBlock);
@@ -361,6 +406,8 @@ export async function POST(req: NextRequest) {
       interpretation,
       historySummary,
       charged: cardsOk,
+      guidanceOnly,
+      flaggedForAbuse,
       timePassApplied: cardsOk && spreadCovered,
       createdAt: now,
     });
@@ -381,6 +428,8 @@ export async function POST(req: NextRequest) {
       interpretation,
       remainingCoins: cardsOk ? balance - chargedCost : balance,
       charged: cardsOk,
+      guidanceOnly,
+      flaggedForAbuse,
       sajuFree,
       ziweiFree,
       timePassApplied: cardsOk && spreadCovered,

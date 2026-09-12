@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
       partnerNickname: data.partnerNickname ?? null,
       interpretation: data.interpretation,
       charged: data.charged ?? true,
+      guidanceOnly: Boolean(data.guidanceOnly),
+      flaggedForAbuse: Boolean(data.flaggedForAbuse),
     };
   });
 

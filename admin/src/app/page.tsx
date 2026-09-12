@@ -7,7 +7,12 @@ import { auth } from "@/lib/firebase/client";
 
 type FlaggedReading = { question: string; createdAt: string; spread: string | null };
 
-type FlaggedReadingDetail = FlaggedReading & { interpretation: string; roomTitle: string | null };
+type FlaggedReadingDetail = FlaggedReading & {
+  interpretation: string;
+  roomTitle: string | null;
+  roomId: string;
+  readingId: string;
+};
 
 type SearchedUser = {
   uid: string;
@@ -66,6 +71,8 @@ export default function AdminHome() {
       { recentCount: number; noChargeCount: number; perRoomLimit: number; flagged: FlaggedReadingDetail[] }
     >
   >({});
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
+  const [reviewAllBusy, setReviewAllBusy] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -230,6 +237,75 @@ export default function AdminHome() {
     }
   }
 
+  // 상세 패널 + 검색 결과 카드의 무료처리 건수/목록을 서버에서 다시 받아와 동기화한다 —
+  // 확인/일괄확인 후 공통으로 호출.
+  async function refreshFlagged(uid: string) {
+    if (!user) return;
+    const token = await user.getIdToken();
+    const res = await fetch(`/api/admin/users/${uid}/flagged-readings`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const body = await res.json();
+    setDetailData((d) => ({ ...d, [uid]: body }));
+    setResults((rs) =>
+      rs.map((r) =>
+        r.uid === uid
+          ? {
+              ...r,
+              moderation: {
+                ...r.moderation,
+                noChargeCount: body.noChargeCount,
+                recentFlagged: body.flagged.slice(0, 3),
+              },
+            }
+          : r
+      )
+    );
+  }
+
+  async function handleReviewOne(uid: string, roomId: string, readingId: string) {
+    if (!user) return;
+    const key = `${uid}:${roomId}:${readingId}`;
+    setReviewBusy(key);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(
+        `/api/admin/users/${uid}/rooms/${roomId}/readings/${readingId}/review`,
+        { method: "POST", headers: { authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error ?? "확인 처리에 실패했습니다.");
+        return;
+      }
+      await refreshFlagged(uid);
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
+  async function handleReviewAll(uid: string) {
+    if (!user) return;
+    if (!confirm("이 유저의 무료처리 건을 전부 확인 처리할까요?")) return;
+    setReviewAllBusy(uid);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/admin/users/${uid}/flagged-readings/review-all`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error ?? "일괄 확인 처리에 실패했습니다.");
+        return;
+      }
+      await refreshFlagged(uid);
+    } finally {
+      setReviewAllBusy(null);
+    }
+  }
+
   if (status === "loading" || status === "unauthenticated") {
     return <main className="p-6 text-sm text-zinc-500">확인 중...</main>;
   }
@@ -325,7 +401,7 @@ export default function AdminHome() {
                   ))}
                 </ul>
               )}
-              {r.moderation.noChargeCount > 0 && (
+              {(r.moderation.noChargeCount > 0 || detailOpen[r.uid]) && (
                 <button
                   onClick={() => handleToggleDetail(r.uid)}
                   className="mt-1 text-xs font-medium text-zinc-900 underline"
@@ -340,16 +416,38 @@ export default function AdminHome() {
                   )}
                   {detailData[r.uid] && (
                     <>
-                      <p className="text-xs text-zinc-400">
-                        방마다 최근 {detailData[r.uid].perRoomLimit}건 범위 내에서 무료처리{" "}
-                        {detailData[r.uid].noChargeCount}건
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-zinc-400">
+                          방마다 최근 {detailData[r.uid].perRoomLimit}건 범위 내에서 무료처리{" "}
+                          {detailData[r.uid].noChargeCount}건
+                        </p>
+                        {detailData[r.uid].noChargeCount > 0 && (
+                          <button
+                            onClick={() => handleReviewAll(r.uid)}
+                            disabled={reviewAllBusy === r.uid}
+                            className="shrink-0 rounded border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-700 disabled:opacity-50"
+                          >
+                            {reviewAllBusy === r.uid ? "처리 중..." : "전부 확인 처리"}
+                          </button>
+                        )}
+                      </div>
                       {detailData[r.uid].flagged.map((f, i) => (
                         <div key={i} className="rounded bg-zinc-50 p-2 text-xs">
-                          <p className="text-zinc-400">
-                            {f.createdAt.slice(0, 19).replace("T", " ")} · {f.roomTitle ?? "-"} ·{" "}
-                            {f.spread ?? "-"}
-                          </p>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-zinc-400">
+                              {f.createdAt.slice(0, 19).replace("T", " ")} · {f.roomTitle ?? "-"} ·{" "}
+                              {f.spread ?? "-"}
+                            </p>
+                            <button
+                              onClick={() => handleReviewOne(r.uid, f.roomId, f.readingId)}
+                              disabled={reviewBusy === `${r.uid}:${f.roomId}:${f.readingId}`}
+                              className="shrink-0 text-zinc-500 underline disabled:opacity-50"
+                            >
+                              {reviewBusy === `${r.uid}:${f.roomId}:${f.readingId}`
+                                ? "처리 중..."
+                                : "확인"}
+                            </button>
+                          </div>
                           <p className="mt-1 whitespace-pre-wrap text-zinc-800">
                             <span className="font-medium">Q.</span> {f.question}
                           </p>

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminAuth } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
-import { scanReadings, DETAIL_PER_ROOM_LIMIT } from "@/lib/moderation";
+import { reviewAllFlagged, DETAIL_PER_ROOM_LIMIT } from "@/lib/moderation";
 
-export async function GET(
+export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ uid: string }> }
 ) {
@@ -12,15 +13,13 @@ export async function GET(
   }
 
   const { uid } = await params;
-  const { recentCount, noChargeCount, flagged } = await scanReadings(
+  const adminUser = await adminAuth.getUser(adminUid);
+  const { reviewedCount } = await reviewAllFlagged(
     uid,
-    DETAIL_PER_ROOM_LIMIT
+    DETAIL_PER_ROOM_LIMIT,
+    adminUid,
+    adminUser.email ?? null
   );
 
-  return NextResponse.json({
-    recentCount,
-    noChargeCount,
-    perRoomLimit: DETAIL_PER_ROOM_LIMIT,
-    flagged,
-  });
+  return NextResponse.json({ reviewedCount });
 }
