@@ -276,50 +276,58 @@ function TarotChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // /api/tarot/reading은 응답 전달 전에 네트워크가 끊기면(모바일에서 흔함) 서버는 이미 리딩을
+  // 저장·차감까지 마쳤는데 클라이언트만 실패로 보는 상황이 생길 수 있다 — 그 경우를 감지하기 위해
+  // 방 히스토리 재조회 로직을 재사용 가능한 함수로 분리(2026-09-12, handleSubmit의 catch에서도 씀).
+  async function fetchRoomHistory(roomId: string): Promise<ChatMessage[] | null> {
+    if (!user) return null;
+    const idToken = await user.getIdToken();
+    const res = await fetch(`/api/tarot/history?roomId=${roomId}`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const readings = data.readings as {
+      question: string;
+      spread: SpreadKey;
+      cards: TarotCardInfo[];
+      includeSaju: boolean;
+      includeZiwei: boolean;
+      includeCompatibility: boolean;
+      partnerNickname: string | null;
+      interpretation: string;
+      charged: boolean;
+      guidanceOnly: boolean;
+      flaggedForAbuse: boolean;
+    }[];
+    return readings.flatMap((r) => [
+      { role: "user", text: r.question },
+      {
+        role: "assistant",
+        text: r.interpretation,
+        spread: r.spread,
+        cards: r.cards,
+        includeSaju: r.includeSaju,
+        includeZiwei: r.includeZiwei,
+        includeCompatibility: r.includeCompatibility,
+        partnerNickname: r.partnerNickname,
+        charged: r.charged,
+        guidanceOnly: r.guidanceOnly,
+        flaggedForAbuse: r.flaggedForAbuse,
+      },
+    ]);
+  }
+
   useEffect(() => {
     if (!user || !activeRoomId) return;
 
     (async () => {
       setHistoryLoaded(false);
-      const idToken = await user.getIdToken();
-      const res = await fetch(`/api/tarot/history?roomId=${activeRoomId}`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const readings = data.readings as {
-          question: string;
-          spread: SpreadKey;
-          cards: TarotCardInfo[];
-          includeSaju: boolean;
-          includeZiwei: boolean;
-          includeCompatibility: boolean;
-          partnerNickname: string | null;
-          interpretation: string;
-          charged: boolean;
-          guidanceOnly: boolean;
-          flaggedForAbuse: boolean;
-        }[];
-        const history: ChatMessage[] = readings.flatMap((r) => [
-          { role: "user", text: r.question },
-          {
-            role: "assistant",
-            text: r.interpretation,
-            spread: r.spread,
-            cards: r.cards,
-            includeSaju: r.includeSaju,
-            includeZiwei: r.includeZiwei,
-            includeCompatibility: r.includeCompatibility,
-            partnerNickname: r.partnerNickname,
-            charged: r.charged,
-            guidanceOnly: r.guidanceOnly,
-            flaggedForAbuse: r.flaggedForAbuse,
-          },
-        ]);
-        setMessages(history);
-      }
+      const history = await fetchRoomHistory(activeRoomId);
+      if (history) setMessages(history);
       setHistoryLoaded(true);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeRoomId]);
 
   async function handleStartTimePass(passId: string) {
@@ -462,10 +470,33 @@ function TarotChat() {
         },
       ]);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "error", text: "네트워크 오류가 발생했어요." },
-      ]);
+      // 응답이 오는 도중 연결이 끊기면(모바일에서 흔함), 서버는 이미 리딩 저장·코인 차감까지
+      // 끝냈을 수 있다 — 무작정 재요청하면 이중 차감 위험이 있으므로, 대신 방 히스토리를 다시
+      // 조회해서 이번 질문이 실제로 처리됐는지 확인한다(2026-09-12).
+      const recovered = await fetchRoomHistory(activeRoomId).catch(() => null);
+      const last = recovered?.[recovered.length - 1];
+      const secondLast = recovered?.[recovered.length - 2];
+      const questionWasAnswered =
+        last?.role === "assistant" && secondLast?.role === "user" && secondLast.text === trimmed;
+
+      if (recovered && questionWasAnswered) {
+        setMessages(recovered);
+        const idToken = await user.getIdToken().catch(() => null);
+        if (idToken) {
+          const meRes = await fetch("/api/user/me", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          }).catch(() => null);
+          if (meRes?.ok) {
+            const meData = await meRes.json();
+            setCoins(meData.coins);
+          }
+        }
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { role: "error", text: "네트워크 오류가 발생했어요." },
+        ]);
+      }
     } finally {
       setLoading(false);
     }
