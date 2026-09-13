@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
 import { NewChatIcon, ChevronRightIcon } from "./tarot/icons";
@@ -25,6 +25,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  // hori.chat 실제 확인(2026-09-14): /terms, /support 같은 하위 페이지는 사이드바가 아예 없는
+  // 별도의 단순한 화면이고, 상시 사이드바는 메인 채팅 화면에만 있다. 타연도 같은 원칙 —
+  // "뒤로가기"로 들어가는 서브페이지(SubPageTopBar 쓰는 화면들)는 사이드바 없이 단순 중앙정렬.
+  const isMainRoute = pathname === "/tarot";
   const {
     user,
     profileImage,
@@ -78,6 +83,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!authChecked || !user) return null;
+
+  // 서브페이지(/me, /settings, /charge 등)는 사이드바 없이 단순 중앙정렬 — hori.chat의 /terms,
+  // /support와 동일한 원칙(위 isMainRoute 주석 참고). 사이드바+플렉스로 관련 복잡한 폭 계산이
+  // 전혀 필요 없어서 별도의 단순한 트리로 일찍 반환한다.
+  if (!isMainRoute) {
+    return (
+      <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col overflow-hidden">
+        {children}
+      </div>
+    );
+  }
 
   const timePassLabel = activeTimePass
     ? `${formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)} 남음`
@@ -203,9 +219,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
           꽉 채운다 — 여기서 max-w를 걸면 모바일도 아니고 데스크탑도 아닌 중간 폭(예: 900px)에서
           탑바·하단바가 좁은 칼럼 안에 갇혀 양옆에 빈 검은 배경만 남는 문제가 있었다
           (2026-09-14, 사용자 피드백: "탑바/하단바가 잘려있다"). 사이드바가 뜨는 xl부터만 폭을
-          제한하고 가운데 정렬한다. */}
-      <div className="flex w-full flex-1 flex-col overflow-hidden xl:mx-auto xl:max-w-4xl">
-        {children}
+          제한하고 가운데 정렬한다 — 바깥 div(flex-1)가 사이드바 옆 남는 공간을 전부 차지하고,
+          안쪽 div가 그 안에서 max-w로 잡힌 뒤 중앙 정렬된다. flex-1과 mx-auto를 같은 요소에
+          같이 걸면 flex-grow가 auto 마진보다 먼저 공간을 다 먹어버려서 오른쪽에만 빈 공간이
+          남는 버그가 있었음(2026-09-14, 재현 확인 후 수정). */}
+      <div className="flex w-full flex-1 flex-col overflow-hidden xl:items-center">
+        <div className="flex h-full w-full flex-1 flex-col overflow-hidden xl:max-w-4xl">
+          {children}
+        </div>
       </div>
     </div>
   );
