@@ -52,8 +52,12 @@ export async function computeStatsSummary(): Promise<StatsSummary> {
     [...AGE_BRACKETS, UNKNOWN].map((b) => [b, 0])
   );
 
-  const usersSnap = await adminDb.collection("users").select("birthInfo").get();
-  for (const doc of usersSnap.docs) {
+  // provider가 "kakao"인 문서만 실제 가입자로 집계한다 — curl로 직접 만든 테스트 계정(uid가
+  // "test:"로 시작, 실제 카카오 로그인을 거치지 않음)이 통계에 섞여 들어가는 걸 막기 위함
+  // (2026-09-13, 실제 프로덕션 DB에서 이런 테스트 계정 2개가 섞여 집계된 걸 발견하고 수정).
+  const usersSnap = await adminDb.collection("users").select("birthInfo", "provider").get();
+  const realUserDocs = usersSnap.docs.filter((doc) => doc.data().provider === "kakao");
+  for (const doc of realUserDocs) {
     const birthInfo = doc.data().birthInfo as
       | { gender?: string; birthDate?: string }
       | undefined;
@@ -75,8 +79,9 @@ export async function computeStatsSummary(): Promise<StatsSummary> {
   let totalChargedReadings = 0;
 
   // scanReadings(moderation.ts)와 같은 방식으로 유저→방→리딩 순으로 순차 조회 — room이 많아도
-  // 한꺼번에 대량의 동시 쿼리를 쏘지 않도록 함.
-  for (const userDoc of usersSnap.docs) {
+  // 한꺼번에 대량의 동시 쿼리를 쏘지 않도록 함. 테스트 계정(realUserDocs에서 걸러진 것)의 리딩도
+  // 통계에서 제외한다.
+  for (const userDoc of realUserDocs) {
     const roomsSnap = await userDoc.ref.collection("rooms").get();
     for (const room of roomsSnap.docs) {
       const readingsSnap = await room.ref.collection("readings").select("charged", "topic").get();
@@ -91,7 +96,7 @@ export async function computeStatsSummary(): Promise<StatsSummary> {
   }
 
   return {
-    totalUsers: usersSnap.size,
+    totalUsers: realUserDocs.length,
     genderCounts,
     ageBracketCounts,
     totalChargedReadings,
