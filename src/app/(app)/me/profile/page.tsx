@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
-import { JASI_RULE_LABEL, type BirthInfo, type JasiRule } from "@/lib/tarot/birthInfo";
+import type { BirthInfo, JasiRule } from "@/lib/tarot/birthInfo";
 import SubPageTopBar from "@/components/SubPageTopBar";
 
 function ToggleGroup<T extends string>({
@@ -176,29 +176,6 @@ export default function MyProfilePage() {
               value={gender || "female"}
               onChange={setGender}
             />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <FieldLabel>사주 계산 옵션</FieldLabel>
-            <label className="flex items-center gap-2 pt-1 text-sm text-icon-muted">
-              <input
-                type="checkbox"
-                checked={useTrueSolarTime}
-                onChange={(e) => setUseTrueSolarTime(e.target.checked)}
-              />
-              진태양시 보정 사용 (사주에만 적용)
-            </label>
-            <select
-              value={jasiRule}
-              onChange={(e) => setJasiRule(e.target.value as JasiRule)}
-              className="mt-2 h-12 rounded-2xl border border-border bg-bg px-3 text-sm font-semibold text-white outline-none"
-            >
-              {(Object.keys(JASI_RULE_LABEL) as JasiRule[]).map((key) => (
-                <option key={key} value={key}>
-                  {JASI_RULE_LABEL[key]}
-                </option>
-              ))}
-            </select>
           </div>
 
           {error && <p className="text-sm text-urgent">{error}</p>}

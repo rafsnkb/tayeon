@@ -72,6 +72,28 @@ function ComingSoon() {
   alert("아직 준비 중인 기능이에요.");
 }
 
+// 완벽한 UA 파싱은 아니고, 계정정보 모달의 "접속환경" 표시용 대략적인 추정치.
+function describeEnvironment(): string {
+  if (typeof navigator === "undefined") return "-";
+  const ua = navigator.userAgent;
+  let os = "알 수 없음";
+  const iosMatch = ua.match(/OS (\d+)_(\d+)/);
+  const androidMatch = ua.match(/Android (\d+(?:\.\d+)?)/);
+  const macMatch = ua.match(/Mac OS X (\d+[_.]\d+)/);
+  if (/iPhone|iPad|iPod/.test(ua)) os = iosMatch ? `iOS ${iosMatch[1]}.${iosMatch[2]}` : "iOS";
+  else if (/Android/.test(ua)) os = androidMatch ? `Android ${androidMatch[1]}` : "Android";
+  else if (/Windows/.test(ua)) os = "Windows";
+  else if (/Mac OS X/.test(ua)) os = macMatch ? `macOS ${macMatch[1].replace("_", ".")}` : "macOS";
+
+  let browser = "알 수 없음";
+  if (/Edg\//.test(ua)) browser = "Edge";
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = "Chrome";
+  else if (/Firefox\//.test(ua)) browser = "Firefox";
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = "Safari";
+
+  return `${os}/${browser}`;
+}
+
 /** 피그마 "Screen / MyPage" — 예전엔 /me가 바로 생년월일시 폼이었는데, 이제는 다른 설정 화면들로
  * 가는 허브. 공지사항/친구초대는 사용자가 애초에 "이 두 화면은 안 만들어뒀다"고 한 항목이라
  * 목적지 없이 안내만 띄움. */
@@ -203,6 +225,18 @@ export default function MyPage() {
                 <span className="font-semibold text-white">
                   {termsAgreedAt ? new Date(termsAgreedAt).toLocaleString("ko-KR") : "-"}
                 </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-icon-muted">최근 로그인</span>
+                <span className="font-semibold text-white">
+                  {user?.metadata.lastSignInTime
+                    ? new Date(user.metadata.lastSignInTime).toLocaleString("ko-KR")
+                    : "-"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-icon-muted">접속환경</span>
+                <span className="font-semibold text-white">{describeEnvironment()}</span>
               </div>
             </div>
             <p className="mt-4 text-xs text-icon-muted">
