@@ -122,7 +122,7 @@ export default function ChargePage() {
             </div>
           )}
 
-          <ul className="list-disc space-y-1 pl-4 text-xs text-icon-muted">
+          <ul className="list-disc space-y-1 rounded-[28px] border border-border bg-topbar p-4 pl-8 text-xs text-icon-muted">
             {tab === "coin" ? (
               <>
                 <li>구입한 코인의 유효기간은 무기한이며, 사용한 코인은 환불되지 않습니다.</li>
@@ -137,7 +137,7 @@ export default function ChargePage() {
             )}
             <li>
               자세한 내용은{" "}
-              <Link href="/terms" className="text-point underline">
+              <Link href="/terms" className="font-bold text-point underline">
                 이용약관
               </Link>
               을 확인해주세요.
