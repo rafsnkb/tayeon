@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
-import { NewChatIcon } from "./tarot/icons";
+import { NewChatIcon, ChevronRightIcon } from "./tarot/icons";
+
+const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
 
 function formatRemaining(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -37,6 +39,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
   } = useRooms();
   const [menuOpen, setMenuOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // 데스크탑(lg+)에서만 의미 있는 상시 사이드바 접기 상태 — hori.chat 참조(2026-09-14).
+  // 모바일 오버레이 드로어(menuOpen)와는 별개 개념.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"
+  );
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (authChecked && !user) router.replace("/login");
@@ -84,55 +99,81 @@ function AppShell({ children }: { children: React.ReactNode }) {
         onClick={() => setMenuOpen(false)}
       />
       <div
-        className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[85%] flex-col bg-topbar transition-transform duration-200 lg:static lg:z-auto lg:w-[300px] lg:max-w-none lg:translate-x-0 lg:border-r lg:border-border ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[85%] flex-col bg-topbar transition-transform duration-200 lg:static lg:z-auto lg:max-w-none lg:translate-x-0 lg:border-r lg:border-border ${
           menuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${sidebarCollapsed ? "lg:w-20" : "lg:w-[300px]"}`}
       >
-        {/* 피그마 "Screen / MenuOpen" — 292px 폭, 상단(로고+코인+이용권) / 중단(최근 대화 목록,
-            스크롤) / 하단(아바타+새 대화)으로 구성 */}
+        {/* 피그마 "Screen / MenuOpen" 기반 + hori.chat 레이아웃 참조(2026-09-14) — 데스크탑에서
+            로고 옆 화살표로 사이드바를 아이콘 전용 레일로 접을 수 있음(hori.chat과 동일 동작) */}
         <div className="shrink-0">
-          <div className="flex h-16 items-center px-4">
-            <span className="text-2xl font-bold">
+          <div className={`flex h-16 items-center px-4 ${sidebarCollapsed ? "lg:justify-center lg:px-0" : "justify-between"}`}>
+            <span className={`text-2xl font-bold ${sidebarCollapsed ? "lg:hidden" : ""}`}>
               <span className="text-white">타</span>
               <span className="text-point">연</span>
             </span>
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              aria-label={sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-icon-muted hover:bg-[#26272c] lg:flex"
+            >
+              <ChevronRightIcon
+                className={`h-3 w-2 transition-transform ${sidebarCollapsed ? "" : "rotate-180"}`}
+              />
+            </button>
           </div>
-          <div className="flex items-center justify-between px-4 py-1.5">
-            <span className="text-sm font-semibold text-icon-muted">보유코인</span>
-            <span className="flex items-center gap-1">
-              <img src="/icons/coin.png" alt="" className="h-5 w-5" />
-              <span className="text-lg font-bold text-gold">{coins ?? "-"}</span>
-            </span>
-          </div>
-          <div className="flex items-center justify-between px-4 py-1.5">
-            <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
-            <span className="text-sm font-semibold text-white">{timePassLabel}</span>
+          <div className={sidebarCollapsed ? "lg:hidden" : ""}>
+            <div className="flex items-center justify-between px-4 py-1.5">
+              <span className="text-sm font-semibold text-icon-muted">보유코인</span>
+              <span className="flex items-center gap-1">
+                <img src="/icons/coin.png" alt="" className="h-5 w-5" />
+                <span className="text-lg font-bold text-gold">{coins ?? "-"}</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-1.5">
+              <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
+              <span className="text-sm font-semibold text-white">{timePassLabel}</span>
+            </div>
           </div>
           <div className="mt-2 h-px bg-border" />
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={handleNewRoom}
+              aria-label="새 대화"
+              className="mt-2 hidden h-10 w-10 items-center justify-center self-center rounded-full bg-cta-fill text-cta-text lg:mx-auto lg:flex"
+            >
+              <NewChatIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 py-2">
-          <p className="px-2 py-2 text-sm font-semibold text-icon-muted">최근 대화</p>
-          <div className="flex flex-col gap-1">
-            {rooms.map((room) => (
-              <button
-                key={room.id}
-                type="button"
-                onClick={() => handleSelectRoom(room.id)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold ${
-                  room.id === activeRoomId
-                    ? "bg-[#40424a] text-bold-text"
-                    : "text-[#dcdee3] hover:bg-[#26272c]"
-                }`}
-              >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
-                <span className="truncate">{room.title}</span>
-              </button>
-            ))}
+          <div className={sidebarCollapsed ? "lg:hidden" : ""}>
+            <p className="px-2 py-2 text-sm font-semibold text-icon-muted">최근 대화</p>
+            <div className="flex flex-col gap-1">
+              {rooms.map((room) => (
+                <button
+                  key={room.id}
+                  type="button"
+                  onClick={() => handleSelectRoom(room.id)}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold ${
+                    room.id === activeRoomId
+                      ? "bg-[#40424a] text-bold-text"
+                      : "text-[#dcdee3] hover:bg-[#26272c]"
+                  }`}
+                >
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
+                  <span className="truncate">{room.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 p-4">
+        <div
+          className={`flex shrink-0 items-center gap-2 p-4 ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
+        >
           <button
             type="button"
             onClick={() => {
@@ -149,14 +190,16 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={handleNewRoom}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-cta-fill text-sm font-semibold text-cta-text"
+            className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-cta-fill text-sm font-semibold text-cta-text ${
+              sidebarCollapsed ? "lg:hidden" : ""
+            }`}
           >
             <NewChatIcon className="h-4 w-4" />새 대화
           </button>
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-hidden lg:mx-0 lg:max-w-4xl">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-hidden lg:max-w-4xl">
         {children}
       </div>
     </div>
