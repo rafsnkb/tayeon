@@ -21,6 +21,8 @@ import {
   ZiweiIcon,
   CompatibilityIcon,
   CloseIcon,
+  PencilIcon,
+  TrashIcon,
   SpreadOneIcon,
   SpreadThreeIcon,
   SpreadDualIcon,
@@ -297,6 +299,7 @@ function TarotChat() {
     loaded: roomsLoaded,
     createRoom,
     deleteRoom,
+    renameRoom,
     hasBirthInfo,
     myTimeUnknown,
     hasPartner,
@@ -435,6 +438,13 @@ function TarotChat() {
     if (rooms.length <= 1) return;
     if (!confirm("이 대화방을 삭제할까요?")) return;
     await deleteRoom(roomId);
+  }
+
+  async function handleRenameRoom(roomId: string) {
+    const current = rooms.find((r) => r.id === roomId);
+    const next = prompt("새 대화방 이름을 입력해주세요.", current?.title ?? "");
+    if (!next || !next.trim()) return;
+    await renameRoom(roomId, next);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -601,7 +611,18 @@ function TarotChat() {
             {roomInfoOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setRoomInfoOpen(false)} />
-                <div className="absolute right-0 top-12 z-20 rounded-xl border border-border bg-topbar p-1 shadow-lg">
+                <div className="absolute right-0 top-12 z-20 flex flex-col rounded-xl border border-border bg-topbar p-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRoomInfoOpen(false);
+                      if (activeRoomId) handleRenameRoom(activeRoomId);
+                    }}
+                    className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-bold-text"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                    이름 변경
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -609,8 +630,9 @@ function TarotChat() {
                       if (activeRoomId) handleDeleteRoom(activeRoomId);
                     }}
                     disabled={rooms.length <= 1}
-                    className="whitespace-nowrap rounded-lg px-4 py-3 text-sm font-semibold text-bold-text disabled:opacity-40"
+                    className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-urgent disabled:opacity-40"
                   >
+                    <TrashIcon className="h-4 w-4" />
                     대화 삭제
                   </button>
                 </div>

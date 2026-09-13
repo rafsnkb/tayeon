@@ -3,15 +3,8 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { JASI_RULE_LABEL, type BirthInfo, type JasiRule } from "@/lib/tarot/birthInfo";
 import SubPageTopBar from "@/components/SubPageTopBar";
-
-type Partner = {
-  nickname: string;
-  birthDate: string | null;
-  birthTime: string | null;
-  gender: "male" | "female" | "unspecified";
-  calendarType: "solar" | "lunar";
-};
 
 function ToggleGroup<T extends string>({
   options,
@@ -46,19 +39,21 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
 }
 
-/** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 전부 선택 입력이고
- * "삭제하기"가 추가로 있음. 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을
- * 보여주고 기존 값으로 미리 채워두는 방식이라 그에 맞춰 단순화함. */
-export default function CompatibilityPage() {
+/** 피그마 "Screen / MyProfile" — 기존 /me에 있던 생년월일시 폼을 그대로 가져오되(백엔드 데이터
+ * 구조는 안 바꿈 — 음력 윤달/출생지는 BirthInfo 타입에 없어서 이번 패스에선 뺌), 닉네임 수정만
+ * 새로 추가함(피그마엔 있는데 기존엔 가입 후 수정할 방법이 없었음 — /api/user/birth-info가
+ * 선택적 nickname도 같이 받도록 확장). */
+export default function MyProfilePage() {
   const [user, setUser] = useState<User | null>(null);
-  const [hasPartner, setHasPartner] = useState(false);
   const [nickname, setNickname] = useState("");
-  const [calendarType, setCalendarType] = useState<Partner["calendarType"]>("solar");
+  const [calendarType, setCalendarType] = useState<BirthInfo["calendarType"]>("solar");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
-  const [gender, setGender] = useState<Partner["gender"]>("unspecified");
-  const [submitting, setSubmitting] = useState(false);
+  const [jasiRule, setJasiRule] = useState<JasiRule>("midnight");
+  const [useTrueSolarTime, setUseTrueSolarTime] = useState(false);
+  const [gender, setGender] = useState<BirthInfo["gender"] | "">("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,20 +61,19 @@ export default function CompatibilityPage() {
       if (!u) return;
       setUser(u);
       const idToken = await u.getIdToken();
-      const res = await fetch("/api/user/partner", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
+      const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
       if (res.ok) {
         const data = await res.json();
-        const partner = data.partner as Partner | null;
-        if (partner) {
-          setHasPartner(true);
-          setNickname(partner.nickname);
-          setCalendarType(partner.calendarType);
-          setBirthDate(partner.birthDate ?? "");
-          setBirthTime(partner.birthTime ?? "");
-          setTimeUnknown(!partner.birthTime);
-          setGender(partner.gender);
+        setNickname(data.nickname ?? "");
+        const info = data.birthInfo as BirthInfo | null;
+        if (info) {
+          setCalendarType(info.calendarType);
+          setBirthDate(info.birthDate ?? "");
+          setBirthTime(info.birthTime ?? "");
+          setTimeUnknown(info.timeUnknown);
+          setJasiRule(info.jasiRule);
+          setUseTrueSolarTime(Boolean(info.useTrueSolarTime));
+          setGender(info.gender);
         }
       }
     });
@@ -87,65 +81,47 @@ export default function CompatibilityPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !nickname.trim() || submitting) return;
-    setSubmitting(true);
+    if (!user || saving || !gender) return;
+    setSaving(true);
     setError(null);
     try {
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/user/partner", {
+      const res = await fetch("/api/user/birth-info", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
-          nickname: nickname.trim(),
+          nickname,
           calendarType,
-          birthDate: birthDate || null,
-          birthTime: timeUnknown ? null : birthTime || null,
+          birthDate,
+          birthTime,
+          timeUnknown,
+          jasiRule,
+          useTrueSolarTime,
           gender,
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
+        const data = await res.json();
         setError(data.error ?? "저장에 실패했어요.");
-        return;
       }
-      setHasPartner(true);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
-  async function handleDelete() {
-    if (!user || submitting) return;
-    if (!confirm("저장된 상대 정보를 삭제할까요?")) return;
-    setSubmitting(true);
-    try {
-      const idToken = await user.getIdToken();
-      await fetch("/api/user/partner", {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      setHasPartner(false);
-      setNickname("");
-      setBirthDate("");
-      setBirthTime("");
-      setTimeUnknown(false);
-      setGender("unspecified");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const canSave = Boolean(gender && birthDate && nickname.trim());
 
   return (
     <form onSubmit={handleSave} className="flex h-full flex-col overflow-hidden bg-bg">
-      <SubPageTopBar title="궁합 상대 프로필 관리" />
+      <SubPageTopBar title="내 프로필 관리" />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
-            <FieldLabel>궁합 상대 닉네임 (변경 가능)</FieldLabel>
+            <FieldLabel>닉네임 (변경 가능)</FieldLabel>
             <input
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="상대방을 뭐라고 부를까요?"
+              placeholder="당신을 뭐라고 부를까요?"
               className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
             />
           </label>
@@ -160,8 +136,8 @@ export default function CompatibilityPage() {
             />
             <ToggleGroup
               options={[
-                { value: "solar" as const, label: "양력" },
-                { value: "lunar" as const, label: "음력" },
+                { value: "solar", label: "양력" },
+                { value: "lunar", label: "음력" },
               ]}
               value={calendarType}
               onChange={setCalendarType}
@@ -194,35 +170,46 @@ export default function CompatibilityPage() {
             <FieldLabel>성별</FieldLabel>
             <ToggleGroup
               options={[
-                { value: "female" as const, label: "여성" },
-                { value: "male" as const, label: "남성" },
-                { value: "unspecified" as const, label: "선택안함" },
+                { value: "female", label: "여성" },
+                { value: "male", label: "남성" },
               ]}
-              value={gender}
+              value={gender || "female"}
               onChange={setGender}
             />
           </div>
 
-          {error && <p className="text-sm text-urgent">{error}</p>}
-
-          {hasPartner && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={submitting}
-              className="self-start text-sm font-semibold text-urgent disabled:opacity-50"
+          <div className="flex flex-col gap-1">
+            <FieldLabel>사주 계산 옵션</FieldLabel>
+            <label className="flex items-center gap-2 pt-1 text-sm text-icon-muted">
+              <input
+                type="checkbox"
+                checked={useTrueSolarTime}
+                onChange={(e) => setUseTrueSolarTime(e.target.checked)}
+              />
+              진태양시 보정 사용 (사주에만 적용)
+            </label>
+            <select
+              value={jasiRule}
+              onChange={(e) => setJasiRule(e.target.value as JasiRule)}
+              className="mt-2 h-12 rounded-2xl border border-border bg-bg px-3 text-sm font-semibold text-white outline-none"
             >
-              삭제하기
-            </button>
-          )}
+              {(Object.keys(JASI_RULE_LABEL) as JasiRule[]).map((key) => (
+                <option key={key} value={key}>
+                  {JASI_RULE_LABEL[key]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {error && <p className="text-sm text-urgent">{error}</p>}
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
         <button
           type="submit"
-          disabled={!nickname.trim() || submitting}
+          disabled={!canSave || saving}
           className={`h-12 w-full rounded-2xl text-lg font-semibold ${
-            nickname.trim() ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            canSave ? "bg-point text-white" : "bg-chip-fill text-placeholder"
           } disabled:opacity-60`}
         >
           저장하기

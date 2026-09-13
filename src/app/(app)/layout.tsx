@@ -8,7 +8,7 @@ import { auth } from "@/lib/firebase/client";
 import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
-import { MenuIcon, NewChatIcon, PlusIcon } from "./tarot/icons";
+import { NewChatIcon, PlusIcon } from "./tarot/icons";
 import {
   COMPANY_NAME_EN,
   COMPANY_NAME_KO,
@@ -100,19 +100,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      {/* /tarot는 방 이름ㆍ새 대화 버튼이 포함된 자체 TopBar를 그리므로 공통 헤더를 숨긴다 —
-          햄버거는 menuBus를 통해 이 레이아웃의 메뉴 드로어를 그대로 연다. */}
-      {pathname !== "/tarot" && (
-        <header className="flex shrink-0 items-center border-b border-border bg-surface px-2 py-2">
-          <button
-            onClick={() => setMenuOpen(true)}
-            aria-label="메뉴 열기"
-            className="flex h-12 w-12 items-center justify-center text-text"
-          >
-            <MenuIcon className="h-3 w-5" />
-          </button>
-        </header>
-      )}
+      {/* (app)/ 아래 모든 페이지가 이제 자체 TopBar를 그린다 — /tarot는 햄버거+방이름 있는 TopBar,
+          나머지는 SubPageTopBar(뒤로가기+제목, 피그마 MyPage 등이 실제로 뒤로가기만 쓰고 햄버거가
+          없었음). 그래서 공용 헤더는 더 이상 필요 없어 없앰(2026-09-14) — 햄버거는 menuBus를 통해
+          /tarot의 TopBar에서 이 레이아웃의 메뉴 드로어를 그대로 연다. */}
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-hidden">
         {children}

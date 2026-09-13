@@ -2,6 +2,14 @@
 // 전부 stroke="currentColor"라 부모의 text-* 클래스로 색을 제어한다.
 import type { SVGProps } from "react";
 
+export function BackIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="12" height="22" viewBox="0 0 12 22" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M11 21L1 11L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function MenuIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="12" viewBox="0 0 20 12" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -115,6 +123,143 @@ export function SpreadCelticIcon(props: SVGProps<SVGSVGElement>) {
       <path d="M4 3C4 1.89543 4.89543 1 6 1H16C17.1046 1 18 1.89543 18 3V19C18 20.1046 17.1046 21 16 21H6C4.89543 21 4 20.1046 4 19V3Z" stroke="currentColor" strokeWidth="2" />
       <path d="M2.5 17C1.67157 17 1 16.3284 1 15.5V6.5C1 5.67157 1.67157 5 2.5 5C3.32843 5 4 5.67157 4 6.5V15.5C4 16.3284 3.32843 17 2.5 17Z" stroke="currentColor" strokeWidth="2" />
       <path d="M19.5 17C18.6716 17 18 16.3284 18 15.5V6.5C18 5.67157 18.6716 5 19.5 5C20.3284 5 21 5.67157 21 6.5V15.5C21 16.3284 20.3284 17 19.5 17Z" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+// 아래는 MyPage 허브 등 새 화면에서 쓰는 범용 아이콘들 — Figma REST API가 플랜 한도(Starter,
+// 4.6일 재설정)에 걸려 원본 벡터를 더 이상 내보낼 수 없어서, 스크린샷(asset/Screen/*.png)을 보고
+// 표준적인 UI 아이콘 형태(돋보기/장바구니/카드/리스트/톱니바퀴 등 — 특정 브랜드 일러스트가 아닌
+// 범용 글리프)로 다시 그렸다(2026-09-14).
+export function ChevronRightIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="8" height="16" viewBox="0 0 8 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M1 1L7 8L1 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function SearchIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="2" />
+      <path d="M19 19L14.5 14.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function InvitePersonIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="8" cy="4" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M1 15C1 11.134 4.13401 8 8 8C10.1 8 11.98 8.93 13.24 10.41" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M16 4V10M13 7H19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function CartIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M1 1H3L5.4 12.2C5.5 12.9 6.1 13.4 6.8 13.4H15.3C16 13.4 16.6 12.9 16.7 12.2L18 5H4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7.5" cy="17.5" r="1.3" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="15" cy="17.5" r="1.3" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+export function CardIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <rect x="1" y="1" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M1 6H19" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M4 11H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ListIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M1 1H19M1 7H19M1 13H12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function IdCardIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <rect x="1" y="1" width="18" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="6.5" cy="7" r="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 5.5H16M12 8.5H15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function PersonIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="8" cy="5" r="4" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M1 19C1 14.5817 4.13401 11 8 11C11.866 11 15 14.5817 15 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function CompassIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M13.5 6.5L11.2 11.2L6.5 13.5L8.8 8.8L13.5 6.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function GearIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="10" cy="9" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M10 1V3M10 15V17M2.5 5L4.2 6M15.8 12L17.5 13M2.5 13L4.2 12M15.8 6L17.5 5M1 9H3M17 9H19"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function LogoutDoorIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M8 1H3C1.89543 1 1 1.89543 1 3V17C1 18.1046 1.89543 19 3 19H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M13 14L18 9L13 4M18 9H7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function PencilIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M12.5 1.5L16.5 5.5L6 16H2V12L12.5 1.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 4L14 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function TrashIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M1 4H15M6 4V2C6 1.44772 6.44772 1 7 1H9C9.55228 1 10 1.44772 10 2V4M12.5 4L12 16C11.95 16.55 11.5 17 10.95 17H5.05C4.5 17 4.05 16.55 4 16L3.5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function InfoCircleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 7.2V11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="8" cy="4.7" r="0.9" fill="currentColor" />
     </svg>
   );
 }

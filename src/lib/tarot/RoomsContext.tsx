@@ -47,6 +47,7 @@ type RoomsContextValue = {
   authChecked: boolean;
   createRoom: () => Promise<Room | null>;
   deleteRoom: (roomId: string) => Promise<void>;
+  renameRoom: (roomId: string, title: string) => Promise<void>;
   refreshMe: () => Promise<void>;
 };
 
@@ -166,6 +167,21 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const renameRoom = useCallback(
+    async (roomId: string, title: string) => {
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/tarot/rooms/${roomId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) return;
+      setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, title: title.trim().slice(0, 40) } : r)));
+    },
+    [user]
+  );
+
   return (
     <RoomsContext.Provider
       value={{
@@ -189,6 +205,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         authChecked,
         createRoom,
         deleteRoom,
+        renameRoom,
         refreshMe,
       }}
     >

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const body = (await req.json()) as Partial<BirthInfo>;
+  const body = (await req.json()) as Partial<BirthInfo> & { nickname?: string };
 
   if (!body.birthDate) {
     return NextResponse.json({ error: "생년월일을 입력해주세요." }, { status: 400 });
@@ -30,7 +30,11 @@ export async function POST(req: NextRequest) {
     useTrueSolarTime: Boolean(body.useTrueSolarTime),
   };
 
-  await adminDb.collection("users").doc(uid).set({ birthInfo }, { merge: true });
+  const update: Record<string, unknown> = { birthInfo };
+  if (typeof body.nickname === "string" && body.nickname.trim()) {
+    update.nickname = body.nickname.trim();
+  }
+  await adminDb.collection("users").doc(uid).set(update, { merge: true });
 
   return NextResponse.json({ ok: true });
 }
