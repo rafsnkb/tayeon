@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { COIN_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
-import { TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
+import { TIER_TEXTURE, TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
 import SubPageTopBar from "@/components/SubPageTopBar";
 
 type Tab = "coin" | "time";
@@ -12,10 +12,19 @@ function formatWon(won: number) {
   return `₩${won.toLocaleString("ko-KR")}`;
 }
 
-// 피그마 카드 테두리가 상품 등급이 올라갈수록 청록→파랑→보라→마젠타로 옮겨가는 그라디언트 —
-// 코인 카드는 전부 같은 성운 텍스처(asset/texture/prizebg_tier_4, public/coin-texture.jpg)를
-// 공유하고 테두리 색으로만 등급을 구분한다(피그마 실제 카드들도 텍스처 패턴 자체는 동일해 보임).
+// 피그마 카드 테두리가 상품 등급이 올라갈수록 청록→파랑→보라→마젠타로 옮겨가는 그라디언트.
 const COIN_BORDER = ["#2f8bee", "#2f8bee", "#3f7de0", "#6a5fd6", "#8335d6", "#a52fc4", "#ff007f"];
+// 코인 상품 7종이 성운 텍스처 4장을 가격대별로 나눠 쓴다(1,100/3,500→tier4, 6,000/14,000→tier3,
+// 40,000/65,000→tier2, 135,000→tier1 — 사용자가 직접 지정한 매핑, 2026-09-14).
+const COIN_TEXTURE = [
+  TIER_TEXTURE[4],
+  TIER_TEXTURE[4],
+  TIER_TEXTURE[3],
+  TIER_TEXTURE[3],
+  TIER_TEXTURE[2],
+  TIER_TEXTURE[2],
+  TIER_TEXTURE[1],
+];
 
 /** 피그마 "Screen / Buy - Coin". 실제 구매 기능은 포트원 연동 전이라 여전히 안내만 뜸(기존 동작 유지). */
 export default function ChargePage() {
@@ -42,13 +51,14 @@ export default function ChargePage() {
               {COIN_PACKAGES.map((pkg, i) => {
                 const bonus = pkg.coins - pkg.priceWon;
                 const color = COIN_BORDER[i % COIN_BORDER.length];
+                const bg = COIN_TEXTURE[i % COIN_TEXTURE.length];
                 return (
                   <button
                     key={pkg.priceWon}
                     type="button"
                     onClick={handlePurchaseClick}
                     className="relative flex items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left"
-                    style={{ borderColor: color, backgroundImage: "url(/coin-texture.jpg)" }}
+                    style={{ borderColor: color, backgroundImage: `url(${bg})` }}
                   >
                     <div className="absolute inset-0 bg-[#19191d]/70" />
                     <div className="relative">
@@ -124,7 +134,7 @@ export default function ChargePage() {
           </ul>
         </div>
       </div>
-      <div className="shrink-0 p-4">
+      <div className="shrink-0 border-t border-border bg-topbar p-4">
         <div className="flex overflow-hidden rounded-full bg-chip-fill">
           <button
             type="button"
