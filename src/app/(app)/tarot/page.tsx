@@ -739,7 +739,7 @@ function TarotChat() {
           type="button"
           onClick={openMenu}
           aria-label="메뉴 열기"
-          className="flex h-16 w-16 shrink-0 items-center justify-center text-icon-muted"
+          className="flex h-16 w-16 shrink-0 items-center justify-center text-icon-muted lg:hidden"
         >
           <MenuIcon className="h-3 w-5" />
         </button>
