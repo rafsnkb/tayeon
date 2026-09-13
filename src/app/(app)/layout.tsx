@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
-import { NewChatIcon, PlusIcon } from "./tarot/icons";
+import { NewChatIcon } from "./tarot/icons";
 
 function formatRemaining(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -88,22 +88,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
               스크롤) / 하단(그라디언트+아바타+새 대화)으로 구성 */}
           <div className="flex w-[292px] max-w-[85%] flex-col bg-topbar">
             <div className="shrink-0">
-              <div className="flex h-16 items-center justify-between px-4">
+              <div className="flex h-16 items-center px-4">
                 <span className="text-2xl font-bold">
                   <span className="text-white">타</span>
                   <span className="text-point">연</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    router.push("/charge");
-                  }}
-                  aria-label="코인 충전"
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-cta-fill text-cta-text"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                </button>
               </div>
               <div className="flex items-center justify-between px-4 py-1.5">
                 <span className="text-sm font-semibold text-icon-muted">보유코인</span>
