@@ -21,6 +21,11 @@
   --warning: #fff3cd;
   --warning-text: #856404;
   --accent: #7c4dff;
+  --topbar: #ffffff;
+  --chip-fill: #f0eaf9;
+  --icon-muted: #9b8fae;
+  --placeholder: #a89bbd;
+  --gold: #b8860b;
 }
 
 .dark {
@@ -42,6 +47,11 @@
   --warning: #3e2f00;
   --warning-text: #ffe082;
   --accent: #b39ddb;
+  --topbar: #19191d;
+  --chip-fill: #27292d;
+  --icon-muted: #868b9a;
+  --placeholder: #585858;
+  --gold: #f9de92;
 }
 
 @theme inline {
@@ -63,6 +73,11 @@
   --color-warning: var(--warning);
   --color-warning-text: var(--warning-text);
   --color-accent: var(--accent);
+  --color-topbar: var(--topbar);
+  --color-chip-fill: var(--chip-fill);
+  --color-icon-muted: var(--icon-muted);
+  --color-placeholder: var(--placeholder);
+  --color-gold: var(--gold);
   --font-sans: var(--font-esamanru);
   --font-mono: var(--font-geist-mono);
 }

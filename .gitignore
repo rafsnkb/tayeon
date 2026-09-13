@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# scratch/working files (e.g. Figma API dumps for design-to-code work)
+/.tmp
+
 # dependencies
 /node_modules
 /admin/node_modules

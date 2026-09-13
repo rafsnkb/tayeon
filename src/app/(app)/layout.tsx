@@ -6,6 +6,7 @@ import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
+import { onOpenMenu } from "@/lib/ui/menuBus";
 import {
   COMPANY_NAME_EN,
   COMPANY_NAME_KO,
@@ -52,6 +53,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   }, [router]);
 
+  useEffect(() => onOpenMenu(() => setMenuOpen(true)), []);
+
   function handleToggleTheme() {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -62,15 +65,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center border-b border-border bg-surface px-4 py-3">
-        <button
-          onClick={() => setMenuOpen(true)}
-          aria-label="메뉴 열기"
-          className="text-2xl leading-none"
-        >
-          ☰
-        </button>
-      </header>
+      {/* /tarot는 방 이름ㆍ새 대화 버튼이 포함된 자체 TopBar를 그리므로 공통 헤더를 숨긴다 —
+          햄버거는 menuBus를 통해 이 레이아웃의 메뉴 드로어를 그대로 연다. */}
+      {pathname !== "/tarot" && (
+        <header className="flex shrink-0 items-center border-b border-border bg-surface px-4 py-3">
+          <button
+            onClick={() => setMenuOpen(true)}
+            aria-label="메뉴 열기"
+            className="text-2xl leading-none"
+          >
+            ☰
+          </button>
+        </header>
+      )}
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-hidden">
         {children}

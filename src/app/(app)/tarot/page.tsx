@@ -12,6 +12,28 @@ import {
   COMPATIBILITY_ADD_ON_COST,
   type SpreadKey,
 } from "@/lib/tarot/pricing";
+import { openMenu } from "@/lib/ui/menuBus";
+import {
+  MenuIcon,
+  SendIcon,
+  RoomInfoIcon,
+  NewChatIcon,
+  SajuIcon,
+  ZiweiIcon,
+  CompatibilityIcon,
+  CloseIcon,
+  SpreadOneIcon,
+  SpreadThreeIcon,
+  SpreadDualIcon,
+  SpreadCelticIcon,
+} from "./icons";
+
+const SPREAD_ICONS: Record<SpreadKey, (props: { className?: string }) => React.JSX.Element> = {
+  one: SpreadOneIcon,
+  three: SpreadThreeIcon,
+  dual: SpreadDualIcon,
+  celtic: SpreadCelticIcon,
+};
 
 type TarotCardInfo = { id: string; nameKo: string; nameEn: string; reversed: boolean };
 
@@ -182,6 +204,151 @@ function WelcomePopup({ onClose }: { onClose: () => void }) {
   );
 }
 
+const SPREAD_DESCRIPTIONS: Record<SpreadKey, string> = {
+  one: "간단한 질문에 추천",
+  three: "제일 범용성 높은 스프레드",
+  dual: "어느 한쪽을 선택해야 할 때 추천",
+  celtic: "세부적인 심층 분석에 추천",
+};
+
+function CoinIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return <img src="/icons/coin.png" alt="" className={className} />;
+}
+
+/** 피그마 "Screen / SpreadSelect"의 List_Spread — 스프레드 4종을 설명+가격과 함께 고르는 바텀시트 */
+function SpreadSelectSheet({
+  spread,
+  onSelect,
+  onClose,
+}: {
+  spread: SpreadKey;
+  onSelect: (key: SpreadKey) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="w-full rounded-t-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center gap-3 p-3">
+          <div className="w-5" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-bold text-bold-text">스프레드 선택</p>
+            <p className="text-sm font-semibold text-icon-muted">원하는 스프레드를 선택할 수 있어요</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-1 rounded-2xl bg-border/40 p-2">
+          {(Object.keys(SPREADS) as SpreadKey[]).map((key, i) => {
+            const Icon = SPREAD_ICONS[key];
+            const selected = spread === key;
+            return (
+              <div key={key}>
+                {i > 0 && <div className="h-px bg-border" />}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(key);
+                    onClose();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg p-2 text-left"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center text-bold-text">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1">
+                      <span className="text-lg font-semibold text-bold-text">{SPREADS[key].label}</span>
+                      {selected && (
+                        <span className="shrink-0 rounded-full bg-point px-2 py-0.5 text-xs font-semibold text-white">
+                          선택됨
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-sm font-semibold text-icon-muted">
+                      {SPREAD_DESCRIPTIONS[key]}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-0.5">
+                    <span className="text-xs font-semibold text-icon-muted">질문 1회</span>
+                    <span className="flex items-center gap-1">
+                      <CoinIcon className="h-5 w-5" />
+                      <span className="text-base font-semibold text-gold">{SPREADS[key].cost}</span>
+                    </span>
+                  </span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 피그마 "Screen / MenuOpen"의 최근 대화 리스트(Chatlist_*)를 참고한 대화방 전환 바텀시트 —
+ * 원래 디자인은 방 목록을 메뉴 드로어 안에 두지만, 메뉴 드로어는 (app)/layout.tsx에 있고 방 상태는
+ * 여기(페이지)에 있어서 이번 패스에서는 우선 여기서 독립된 시트로 제공한다(기능 유지가 목적). */
+function RoomListSheet({
+  rooms,
+  activeRoomId,
+  onSelect,
+  onNewRoom,
+  onClose,
+}: {
+  rooms: Room[];
+  activeRoomId: string | null;
+  onSelect: (roomId: string) => void;
+  onNewRoom: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="flex max-h-[70vh] w-full flex-col gap-2 rounded-t-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-1 flex items-center justify-between px-1">
+          <p className="text-lg font-bold text-bold-text">대화방</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onNewRoom();
+            onClose();
+          }}
+          className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-cta-fill text-sm font-semibold text-cta-text"
+        >
+          <NewChatIcon className="h-4 w-4" />새 대화
+        </button>
+        <div className="flex flex-col gap-1 overflow-y-auto">
+          {rooms.map((room) => (
+            <button
+              key={room.id}
+              type="button"
+              onClick={() => {
+                onSelect(room.id);
+                onClose();
+              }}
+              className={`flex items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold ${
+                room.id === activeRoomId ? "bg-chip-fill text-bold-text" : "text-icon-muted"
+              }`}
+            >
+              <span className="truncate">{room.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TarotPage() {
   return (
     <Suspense fallback={null}>
@@ -214,6 +381,9 @@ function TarotChat() {
   const [timePasses, setTimePasses] = useState<TimePass[]>([]);
   const [startingPass, setStartingPass] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [spreadSheetOpen, setSpreadSheetOpen] = useState(false);
+  const [roomInfoOpen, setRoomInfoOpen] = useState(false);
+  const [roomListOpen, setRoomListOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
 
@@ -222,16 +392,11 @@ function TarotChat() {
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!activeTimePass) return;
+    if (!activeTimePass || new Date(activeTimePass.expiresAt).getTime() <= now) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTimePass]);
-
-  useEffect(() => {
-    if (activeTimePass && new Date(activeTimePass.expiresAt).getTime() <= now) {
-      setActiveTimePass(null);
-    }
-  }, [activeTimePass, now]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -518,84 +683,85 @@ function TarotChat() {
     (includeZiwei ? (optionsCoveredDisplay ? 0 : ZIWEI_ADD_ON_COST) : 0) +
     (includeCompatibility ? (optionsCoveredDisplay ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
 
+  const activeRoom = rooms.find((r) => r.id === activeRoomId);
+
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-bg">
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
+      {spreadSheetOpen && (
+        <SpreadSelectSheet
+          spread={spread}
+          onSelect={setSpread}
+          onClose={() => setSpreadSheetOpen(false)}
+        />
+      )}
+      {roomListOpen && (
+        <RoomListSheet
+          rooms={rooms}
+          activeRoomId={activeRoomId}
+          onSelect={handleSelectRoom}
+          onNewRoom={handleNewRoom}
+          onClose={() => setRoomListOpen(false)}
+        />
+      )}
 
-      <div className="shrink-0 p-4 pb-0">
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-bold-text">타연 · 타로</h1>
-          <span className="text-sm text-text">보유 코인: {coins ?? "-"}</span>
-        </div>
-
-        <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-        {rooms.map((room) => (
-          <div key={room.id} className="group relative flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => handleSelectRoom(room.id)}
-              className={`rounded-full border px-3 py-1.5 text-sm whitespace-nowrap ${
-                activeRoomId === room.id
-                  ? "border-point bg-point-bg text-point"
-                  : "border-border text-text"
-              }`}
-            >
-              {room.title}
-            </button>
-            {rooms.length > 1 && (
-              <button
-                type="button"
-                onClick={() => handleDeleteRoom(room.id)}
-                aria-label="대화방 삭제"
-                className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-urgent text-[10px] text-urgent-text group-hover:flex"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
+      <div className="relative flex h-16 shrink-0 items-center border-b border-border bg-topbar">
         <button
           type="button"
-          onClick={handleNewRoom}
-          className="flex-shrink-0 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-text"
+          onClick={openMenu}
+          aria-label="메뉴 열기"
+          className="flex h-16 w-16 shrink-0 items-center justify-center text-icon-muted"
         >
-          + 새 대화
+          <MenuIcon className="h-3 w-5" />
         </button>
-        </div>
-
-        {(activeTimePass || timePasses.length > 0) && (
-          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-point bg-point-bg px-3 py-2 text-xs">
-            {activeTimePass ? (
-              <span className="whitespace-nowrap text-point">
-                ⏱ {formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)} 남음 ·{" "}
-                {activeTimePass.minutes}분권
-                {activeTimePass.includesOptions ? " (전부 무제한)" : " (타로만 무제한)"}
-              </span>
-            ) : (
-              timePasses.map((pass) => (
-                <div
-                  key={pass.id}
-                  className="flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-point px-3 py-1 text-point"
-                >
-                  <span>
-                    {pass.minutes}분권{pass.includesOptions ? "" : " (타로만)"}
-                  </span>
+        <button
+          type="button"
+          onClick={() => setRoomListOpen(true)}
+          className="min-w-0 flex-1 truncate text-left text-base font-semibold text-[#dbdbdb]"
+        >
+          {activeRoom?.title ?? "새 대화"}
+        </button>
+        <div className="flex shrink-0 items-center gap-2 pr-4">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setRoomInfoOpen((v) => !v)}
+              aria-label="대화방 정보"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-icon-muted text-icon-muted"
+            >
+              <RoomInfoIcon className="h-1 w-4" />
+            </button>
+            {roomInfoOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setRoomInfoOpen(false)} />
+                <div className="absolute right-0 top-12 z-20 rounded-xl border border-border bg-topbar p-1 shadow-lg">
                   <button
                     type="button"
-                    onClick={() => handleStartTimePass(pass.id)}
-                    disabled={startingPass === pass.id}
-                    className="rounded-full bg-cta-fill px-2 py-0.5 text-xs text-cta-text disabled:opacity-50"
+                    onClick={() => {
+                      setRoomInfoOpen(false);
+                      if (activeRoomId) handleDeleteRoom(activeRoomId);
+                    }}
+                    disabled={rooms.length <= 1}
+                    className="whitespace-nowrap rounded-lg px-4 py-3 text-sm font-semibold text-bold-text disabled:opacity-40"
                   >
-                    사용하기
+                    대화 삭제
                   </button>
                 </div>
-              ))
+              </>
             )}
           </div>
-        )}
+          <button
+            type="button"
+            onClick={handleNewRoom}
+            aria-label="새 대화"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-cta-fill text-cta-text"
+          >
+            <NewChatIcon className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-0">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-3">
         {!historyLoaded && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
         )}
@@ -714,98 +880,136 @@ function TarotChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="shrink-0 border-t border-border p-4">
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {(Object.keys(SPREADS) as SpreadKey[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setSpread(key)}
-            className={`flex-shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
-              spread === key ? "border-point bg-point-bg text-point" : "border-border text-text"
-            }`}
-          >
-            {SPREADS[key].label} · {SPREADS[key].cost}코인
-          </button>
-        ))}
-      </div>
+      <div className="shrink-0 px-4 pb-4">
+        {timePassActive && activeTimePass && (
+          <div className="mb-2 flex items-center gap-2.5 rounded-2xl bg-chip-fill px-2.5 py-2">
+            <span className="text-sm font-semibold text-icon-muted">시간제 사용중</span>
+            <span className="text-sm font-semibold text-bold-text">
+              남은 시간: {formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)}
+            </span>
+          </div>
+        )}
+        {!timePassActive && timePasses.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {timePasses.map((pass) => (
+              <div
+                key={pass.id}
+                className="flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-point px-3 py-1 text-point"
+              >
+                <span className="text-sm">
+                  {pass.minutes}분권{pass.includesOptions ? "" : " (타로만)"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleStartTimePass(pass.id)}
+                  disabled={startingPass === pass.id}
+                  className="rounded-full bg-cta-fill px-2 py-0.5 text-xs text-cta-text disabled:opacity-50"
+                >
+                  사용하기
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {(hasBirthInfo || hasPartner) && (
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          {hasBirthInfo && (
-            <>
-              <button
-                type="button"
-                onClick={() => setIncludeSaju(!includeSaju)}
-                className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
-                  includeSaju ? "border-point bg-point-bg text-point" : "border-border text-text"
-                }`}
-              >
-                +사주 · {SAJU_ADD_ON_COST}코인
-              </button>
-              <button
-                type="button"
-                onClick={() => setIncludeZiwei(!includeZiwei)}
-                className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
-                  includeZiwei ? "border-point bg-point-bg text-point" : "border-border text-text"
-                }`}
-              >
-                +자미두수 · {ZIWEI_ADD_ON_COST}코인
-              </button>
-            </>
-          )}
-          {hasPartner && (
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-1 rounded-[28px] border border-border bg-surface px-4 py-3"
+        >
+          <input
+            ref={questionInputRef}
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="궁금한 것을 물어보세요"
+            className="min-w-0 flex-1 bg-transparent text-base font-semibold text-bold-text placeholder-placeholder outline-none"
+            disabled={loading}
+          />
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setIncludeCompatibility(!includeCompatibility)}
-              className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
-                includeCompatibility ? "border-point bg-point-bg text-point" : "border-border text-text"
-              }`}
+              onClick={() => setSpreadSheetOpen(true)}
+              className="flex h-10 shrink-0 items-center rounded-full bg-chip-fill px-5 text-sm font-semibold text-bold-text"
             >
-              +궁합 · {COMPATIBILITY_ADD_ON_COST}코인
+              {SPREADS[spread].label}
             </button>
-          )}
-          <span className="whitespace-nowrap text-xs text-text">
-            총 {displayedCost}코인
+            {hasBirthInfo && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIncludeSaju((v) => !v)}
+                  aria-pressed={includeSaju}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                    includeSaju
+                      ? "bg-point-bg border border-point/50 text-point"
+                      : "bg-chip-fill text-icon-muted"
+                  }`}
+                >
+                  <SajuIcon className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncludeZiwei((v) => !v)}
+                  aria-pressed={includeZiwei}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                    includeZiwei
+                      ? "bg-point-bg border border-point/50 text-point"
+                      : "bg-chip-fill text-icon-muted"
+                  }`}
+                >
+                  <ZiweiIcon className="h-5 w-5" />
+                </button>
+              </>
+            )}
+            {hasPartner && (
+              <button
+                type="button"
+                onClick={() => setIncludeCompatibility((v) => !v)}
+                aria-pressed={includeCompatibility}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                  includeCompatibility
+                    ? "bg-point-bg border border-point/50 text-point"
+                    : "bg-chip-fill text-icon-muted"
+                }`}
+              >
+                <CompatibilityIcon className="h-5 w-5" />
+              </button>
+            )}
+            <span className="flex-1" />
+            <button
+              type="submit"
+              disabled={loading}
+              aria-label="질문하기"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text disabled:opacity-50"
+            >
+              <SendIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </form>
+
+        <div className="flex flex-wrap items-center justify-between gap-1 pt-1.5 px-1 text-xs">
+          <div className="flex flex-col gap-0.5">
+            {!hasBirthInfo && (
+              <p className="text-placeholder">
+                <Link href="/me" className="text-point underline">
+                  내 정보
+                </Link>
+                에서 생년월일시를 입력하면 사주/자미두수도 함께 볼 수 있어요.
+              </p>
+            )}
+            {!hasPartner && (
+              <p className="text-placeholder">
+                <Link href="/compatibility" className="text-point underline">
+                  궁합 상대 정보
+                </Link>
+                를 저장하면 궁합도 함께 볼 수 있어요.
+              </p>
+            )}
+          </div>
+          <span className="whitespace-nowrap text-icon-muted">
+            보유 {coins ?? "-"}코인 · 총 {displayedCost}코인
             {spreadCoveredDisplay && <span className="text-point"> (이용권 적용)</span>}
           </span>
         </div>
-      )}
-
-      {!hasBirthInfo && (
-        <p className="pt-2 text-xs text-text">
-          <Link href="/me" className="text-point underline">
-            내 정보
-          </Link>
-          에서 생년월일시를 입력하면 사주/자미두수도 함께 볼 수 있어요.
-        </p>
-      )}
-      {!hasPartner && (
-        <p className="pt-1 text-xs text-text">
-          <Link href="/compatibility" className="text-point underline">
-            궁합 상대 정보
-          </Link>
-          를 저장하면 궁합도 함께 볼 수 있어요.
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex gap-2 pt-2">
-        <input
-          ref={questionInputRef}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="궁금한 것을 물어보세요"
-          className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm text-bold-text outline-none"
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex-shrink-0 whitespace-nowrap rounded-full bg-cta-fill px-4 py-2 text-sm text-cta-text disabled:opacity-50"
-        >
-          질문하기
-        </button>
-      </form>
       </div>
     </div>
   );
