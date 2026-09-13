@@ -84,6 +84,14 @@ export function CloseIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function CheckIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="12" height="10" viewBox="0 0 12 10" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M1 5L4.5 8.5L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function PlusIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -260,6 +268,21 @@ export function InfoCircleIcon(props: SVGProps<SVGSVGElement>) {
       <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.6" />
       <path d="M8 7.2V11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       <circle cx="8" cy="4.7" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+// 표준 "영화표" 모양 글리프 — 피그마 원본 export가 아니라 직접 그린 범용 아이콘(쿼터 소진 이후 예외).
+export function TicketIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path
+        d="M1 6.4C1.99 6.4 2.8 5.5 2.8 4.4C2.8 3.3 1.99 2.4 1 2.4V2C1 1.44772 1.44772 1 2 1H18C18.5523 1 19 1.44772 19 2V2.4C18.01 2.4 17.2 3.3 17.2 4.4C17.2 5.5 18.01 6.4 19 6.4V9.6C18.01 9.6 17.2 10.5 17.2 11.6C17.2 12.7 18.01 13.6 19 13.6V14C19 14.5523 18.5523 15 18 15H2C1.44772 15 1 14.5523 1 14V13.6C1.99 13.6 2.8 12.7 2.8 11.6C2.8 10.5 1.99 9.6 1 9.6V6.4Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M10 2V15" stroke="currentColor" strokeWidth="1.4" strokeDasharray="1.6 1.6" strokeLinecap="round" />
     </svg>
   );
 }

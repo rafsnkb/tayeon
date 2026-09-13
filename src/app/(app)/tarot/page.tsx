@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRooms, type TimePass } from "@/lib/tarot/RoomsContext";
+import { TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
 import {
   SPREADS,
   SAJU_ADD_ON_COST,
@@ -27,7 +28,10 @@ import {
   SpreadThreeIcon,
   SpreadDualIcon,
   SpreadCelticIcon,
+  TicketIcon,
 } from "./icons";
+
+const DEFAULT_ROOM_TITLE = "새 대화";
 
 const SPREAD_ICONS: Record<SpreadKey, (props: { className?: string }) => React.JSX.Element> = {
   one: SpreadOneIcon,
@@ -204,15 +208,6 @@ function CoinIcon({ className = "h-5 w-5" }: { className?: string }) {
   return <img src="/icons/coin.png" alt="" className={className} />;
 }
 
-// 피그마 "HeldTimepass_15/30/60min" 카드의 티어별 배경(성운 텍스처, asset/texture/prizebg_tier_*)과
-// 테두리색 — 15분=파랑, 30/60분=보라/핑크(30·60분은 사주·자미두수·궁합까지 전부 무제한이라는
-// 공통점이 있어 톤을 가깝게 묶음).
-const TIME_PASS_TIER: Record<number, { bg: string; border: string; tagBg: string; tagText: string }> = {
-  15: { bg: "/timepass/tier-15.jpg", border: "#2f8bee", tagBg: "#122337", tagText: "#66b0ff" },
-  30: { bg: "/timepass/tier-30.jpg", border: "#8335d6", tagBg: "#28173b", tagText: "#a04ff8" },
-  60: { bg: "/timepass/tier-60.jpg", border: "#ff007f", tagBg: "#2c1322", tagText: "#ff007f" },
-};
-
 function TimePassCard({ pass, actionLabel, onAction, busy }: {
   pass: TimePass;
   actionLabel?: string;
@@ -384,7 +379,7 @@ function SpreadSelectSheet({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1">
-                      <span className="text-lg font-semibold text-bold-text">{SPREADS[key].label}</span>
+                      <span className="text-lg font-semibold text-bold-text">{SPREADS[key].label} 스프레드</span>
                       {selected && (
                         <span className="shrink-0 rounded-full bg-point px-2 py-0.5 text-xs font-semibold text-white">
                           선택됨
@@ -706,6 +701,7 @@ function TarotChat() {
     (includeCompatibility ? (optionsCoveredDisplay ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
+  const isBlankRoom = (activeRoom?.title ?? DEFAULT_ROOM_TITLE) === DEFAULT_ROOM_TITLE && messages.length === 0;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
@@ -747,65 +743,96 @@ function TarotChat() {
         >
           <MenuIcon className="h-3 w-5" />
         </button>
-        {/* 방 목록은 메뉴 드로어((app)/layout.tsx)에 있음 — 방 이름을 누르면 그 드로어를 연다 */}
-        <button
-          type="button"
-          onClick={openMenu}
-          className="min-w-0 flex-1 truncate text-left text-base font-semibold text-[#dbdbdb]"
-        >
-          {activeRoom?.title ?? "새 대화"}
-        </button>
-        <div className="flex shrink-0 items-center gap-2 pr-4">
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setRoomInfoOpen((v) => !v)}
-              aria-label="대화방 정보"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-icon-muted text-icon-muted"
-            >
-              <RoomInfoIcon className="h-1 w-4" />
-            </button>
-            {roomInfoOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setRoomInfoOpen(false)} />
-                <div className="absolute right-0 top-12 z-20 flex flex-col rounded-xl border border-border bg-topbar p-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRoomInfoOpen(false);
-                      if (activeRoomId) handleRenameRoom(activeRoomId);
-                    }}
-                    className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-bold-text"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                    이름 변경
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRoomInfoOpen(false);
-                      if (activeRoomId) handleDeleteRoom(activeRoomId);
-                    }}
-                    disabled={rooms.length <= 1}
-                    className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-urgent disabled:opacity-40"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                    대화 삭제
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+        {/* 방 목록은 메뉴 드로어((app)/layout.tsx)에 있음 — 방 이름을 누르면 그 드로어를 연다.
+            아직 한 번도 안 쓴 방("새 대화" 기본 제목 그대로)은 피그마 "Screen / Main"처럼 제목 대신
+            타연 워드마크를 중앙에 보여주고, 방 컨트롤(이름변경/삭제/새대화/이용권뱃지)도 감춘다. */}
+        {isBlankRoom ? (
           <button
             type="button"
-            onClick={handleNewRoom}
-            aria-label="새 대화"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-cta-fill text-cta-text"
+            onClick={openMenu}
+            className="flex flex-1 items-center justify-center gap-3 text-xl font-bold"
           >
-            <NewChatIcon className="h-5 w-5" />
+            <span className="text-white">타</span>
+            <span className="-ml-2 text-point">연</span>
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={openMenu}
+              className="min-w-0 flex-1 truncate text-left text-base font-semibold text-[#dbdbdb]"
+            >
+              {activeRoom?.title ?? DEFAULT_ROOM_TITLE}
+            </button>
+            <div className="flex shrink-0 items-center gap-2 pr-4">
+              <button
+                type="button"
+                onClick={handleNewRoom}
+                aria-label="새 대화"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-cta-fill text-cta-text"
+              >
+                <NewChatIcon className="h-5 w-5" />
+              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setRoomInfoOpen((v) => !v)}
+                  aria-label="대화방 정보"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-icon-muted text-icon-muted"
+                >
+                  <RoomInfoIcon className="h-1 w-4" />
+                </button>
+                {roomInfoOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setRoomInfoOpen(false)} />
+                    <div className="absolute right-0 top-12 z-20 flex flex-col rounded-xl border border-border bg-topbar p-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoomInfoOpen(false);
+                          if (activeRoomId) handleRenameRoom(activeRoomId);
+                        }}
+                        className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-bold-text"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                        이름 변경
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoomInfoOpen(false);
+                          if (activeRoomId) handleDeleteRoom(activeRoomId);
+                        }}
+                        disabled={rooms.length <= 1}
+                        className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-urgent disabled:opacity-40"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        대화 삭제
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      {!isBlankRoom && (
+        <div className="flex shrink-0 justify-end px-4 pt-2">
+          <button
+            type="button"
+            onClick={() => (timePasses.length > 0 ? setTimePassListOpen(true) : router.push("/charge"))}
+            aria-label="보유 시간제 이용권"
+            className={`flex h-9 w-9 items-center justify-center rounded-full border ${
+              timePasses.length > 0
+                ? "border-point bg-point-bg text-point"
+                : "border-icon-muted text-icon-muted"
+            }`}
+          >
+            <TicketIcon className="h-4 w-5" />
           </button>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-3">
         {!historyLoaded && (
@@ -934,16 +961,6 @@ function TarotChat() {
               남은 시간: {formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)}
             </span>
           </div>
-        )}
-        {!timePassActive && timePasses.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setTimePassListOpen(true)}
-            className="mb-2 flex w-full items-center justify-between rounded-2xl bg-chip-fill px-3 py-2"
-          >
-            <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
-            <span className="text-sm font-semibold text-point">보유 {timePasses.length}개 · 사용하기</span>
-          </button>
         )}
 
         <form
