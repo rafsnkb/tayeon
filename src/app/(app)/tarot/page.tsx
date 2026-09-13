@@ -2,9 +2,8 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth } from "@/lib/firebase/client";
 import Link from "next/link";
+import { useRooms } from "@/lib/tarot/RoomsContext";
 import {
   SPREADS,
   SAJU_ADD_ON_COST,
@@ -57,18 +56,6 @@ type ChatMessage =
       suggestions?: string[];
     }
   | { role: "error"; text: string };
-
-type Room = { id: string; title: string; updatedAt: string };
-
-type ActiveTimePass = {
-  passId: string;
-  minutes: number;
-  includesOptions: boolean;
-  startedAt: string;
-  expiresAt: string;
-};
-
-type TimePass = { id: string; minutes: number; includesOptions: boolean };
 
 function formatRemaining(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -289,66 +276,6 @@ function SpreadSelectSheet({
   );
 }
 
-/** 피그마 "Screen / MenuOpen"의 최근 대화 리스트(Chatlist_*)를 참고한 대화방 전환 바텀시트 —
- * 원래 디자인은 방 목록을 메뉴 드로어 안에 두지만, 메뉴 드로어는 (app)/layout.tsx에 있고 방 상태는
- * 여기(페이지)에 있어서 이번 패스에서는 우선 여기서 독립된 시트로 제공한다(기능 유지가 목적). */
-function RoomListSheet({
-  rooms,
-  activeRoomId,
-  onSelect,
-  onNewRoom,
-  onClose,
-}: {
-  rooms: Room[];
-  activeRoomId: string | null;
-  onSelect: (roomId: string) => void;
-  onNewRoom: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
-      <div
-        className="flex max-h-[70vh] w-full flex-col gap-2 rounded-t-[28px] border border-border bg-topbar p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-1 flex items-center justify-between px-1">
-          <p className="text-lg font-bold text-bold-text">대화방</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            onNewRoom();
-            onClose();
-          }}
-          className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-cta-fill text-sm font-semibold text-cta-text"
-        >
-          <NewChatIcon className="h-4 w-4" />새 대화
-        </button>
-        <div className="flex flex-col gap-1 overflow-y-auto">
-          {rooms.map((room) => (
-            <button
-              key={room.id}
-              type="button"
-              onClick={() => {
-                onSelect(room.id);
-                onClose();
-              }}
-              className={`flex items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold ${
-                room.id === activeRoomId ? "bg-chip-fill text-bold-text" : "text-icon-muted"
-              }`}
-            >
-              <span className="truncate">{room.title}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function TarotPage() {
   return (
     <Suspense fallback={null}>
@@ -360,30 +287,38 @@ export default function TarotPage() {
 function TarotChat() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<User | null>(null);
-  const [coins, setCoins] = useState<number | null>(null);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const {
+    user,
+    coins,
+    setCoins,
+    rooms,
+    activeRoomId,
+    selectRoom,
+    loaded: roomsLoaded,
+    createRoom,
+    deleteRoom,
+    hasBirthInfo,
+    myTimeUnknown,
+    hasPartner,
+    partnerTimeUnknown,
+    activeTimePass,
+    setActiveTimePass,
+    timePasses,
+    setTimePasses,
+  } = useRooms();
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "1");
   const [spread, setSpread] = useState<SpreadKey>("one");
-  const [hasBirthInfo, setHasBirthInfo] = useState(false);
-  const [myTimeUnknown, setMyTimeUnknown] = useState(false);
-  const [hasPartner, setHasPartner] = useState(false);
-  const [partnerTimeUnknown, setPartnerTimeUnknown] = useState(false);
   const [includeSaju, setIncludeSaju] = useState(false);
   const [includeZiwei, setIncludeZiwei] = useState(false);
   const [includeCompatibility, setIncludeCompatibility] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeTimePass, setActiveTimePass] = useState<ActiveTimePass | null>(null);
-  const [timePasses, setTimePasses] = useState<TimePass[]>([]);
   const [startingPass, setStartingPass] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [spreadSheetOpen, setSpreadSheetOpen] = useState(false);
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
-  const [roomListOpen, setRoomListOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
 
@@ -398,50 +333,16 @@ function TarotChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTimePass]);
 
+  // 방 목록은 RoomsContext(레이아웃 레벨)가 불러온다 — 여기서는 URL의 ?room= 파라미터가
+  // 가리키는 방으로 한 번만 맞춰준다(없으면 컨텍스트가 이미 골라둔 기본값을 그대로 씀).
   useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
-      if (!u) return;
-      setUser(u);
-
-      const idToken = await u.getIdToken();
-      const [meRes, roomsRes] = await Promise.all([
-        fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } }),
-        fetch("/api/tarot/rooms", { headers: { Authorization: `Bearer ${idToken}` } }),
-      ]);
-
-      if (meRes.ok) {
-        const data = await meRes.json();
-        setCoins(data.coins);
-        setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
-        setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
-        setHasPartner(Boolean(data.partner?.nickname));
-        setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
-        setActiveTimePass(data.activeTimePass ?? null);
-        setTimePasses(data.timePasses ?? []);
-      }
-
-      let roomList: Room[] = [];
-      if (roomsRes.ok) {
-        const data = await roomsRes.json();
-        roomList = data.rooms;
-      }
-
-      if (roomList.length === 0) {
-        const createRes = await fetch("/api/tarot/rooms", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const created = await createRes.json();
-        roomList = [created];
-      }
-
-      setRooms(roomList);
-      const roomParam = searchParams.get("room");
-      const initialRoomId = roomList.find((r) => r.id === roomParam)?.id ?? roomList[0].id;
-      setActiveRoomId(initialRoomId);
-    });
+    if (!roomsLoaded || rooms.length === 0) return;
+    const roomParam = searchParams.get("room");
+    if (roomParam && rooms.some((r) => r.id === roomParam) && roomParam !== activeRoomId) {
+      selectRoom(roomParam);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [roomsLoaded, rooms]);
 
   // /api/tarot/reading은 응답 전달 전에 네트워크가 끊기면(모바일에서 흔함) 서버는 이미 리딩을
   // 저장·차감까지 마쳤는데 클라이언트만 실패로 보는 상황이 생길 수 있다 — 그 경우를 감지하기 위해
@@ -526,39 +427,14 @@ function TarotChat() {
   }
 
   async function handleNewRoom() {
-    if (!user) return;
-    const idToken = await user.getIdToken();
-    const res = await fetch("/api/tarot/rooms", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
-    });
-    const created: Room = await res.json();
-    setRooms((prev) => [created, ...prev]);
-    setActiveRoomId(created.id);
-    router.replace(`/tarot?room=${created.id}`);
+    const created = await createRoom();
+    if (created) router.replace(`/tarot?room=${created.id}`);
   }
 
   async function handleDeleteRoom(roomId: string) {
-    if (!user || rooms.length <= 1) return;
+    if (rooms.length <= 1) return;
     if (!confirm("이 대화방을 삭제할까요?")) return;
-
-    const idToken = await user.getIdToken();
-    await fetch(`/api/tarot/rooms/${roomId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${idToken}` },
-    });
-
-    const remaining = rooms.filter((r) => r.id !== roomId);
-    setRooms(remaining);
-    if (activeRoomId === roomId) {
-      setActiveRoomId(remaining[0].id);
-      router.replace(`/tarot?room=${remaining[0].id}`);
-    }
-  }
-
-  function handleSelectRoom(roomId: string) {
-    setActiveRoomId(roomId);
-    router.replace(`/tarot?room=${roomId}`);
+    await deleteRoom(roomId);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -695,16 +571,6 @@ function TarotChat() {
           onClose={() => setSpreadSheetOpen(false)}
         />
       )}
-      {roomListOpen && (
-        <RoomListSheet
-          rooms={rooms}
-          activeRoomId={activeRoomId}
-          onSelect={handleSelectRoom}
-          onNewRoom={handleNewRoom}
-          onClose={() => setRoomListOpen(false)}
-        />
-      )}
-
       <div className="relative flex h-16 shrink-0 items-center border-b border-border bg-topbar">
         <button
           type="button"
@@ -714,9 +580,10 @@ function TarotChat() {
         >
           <MenuIcon className="h-3 w-5" />
         </button>
+        {/* 방 목록은 메뉴 드로어((app)/layout.tsx)에 있음 — 방 이름을 누르면 그 드로어를 연다 */}
         <button
           type="button"
-          onClick={() => setRoomListOpen(true)}
+          onClick={openMenu}
           className="min-w-0 flex-1 truncate text-left text-base font-semibold text-[#dbdbdb]"
         >
           {activeRoom?.title ?? "새 대화"}
