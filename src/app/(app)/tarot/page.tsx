@@ -95,7 +95,7 @@ function renderInterpretation(text: string) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       return (
-        <strong key={i} className="font-light text-bold-text">
+        <strong key={i} className="font-semibold text-bold-text">
           {part.slice(2, -2)}
         </strong>
       );
@@ -848,12 +848,12 @@ function TarotChat() {
               )}
               {msg.cards.length > 0 && (
                 <div className="mb-1 flex flex-col items-center gap-1">
-                  <span className="rounded-full border border-border px-3 py-1 text-base font-medium text-text">
+                  <span className="rounded-full border border-border px-3 py-1 text-base font-semibold text-text">
                     {SPREADS[msg.spread].label}
                   </span>
-                  <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 text-sm font-light text-text">
+                  <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
                     {msg.cards.map((c, j) => (
-                      <span key={j} className="rounded-full bg-text px-3 py-1 font-light text-surface">
+                      <span key={j} className="rounded-full bg-text px-3 py-1 font-semibold text-surface">
                         {c.nameKo}
                         {c.reversed ? "(역)" : ""}
                       </span>

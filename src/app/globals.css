@@ -78,7 +78,7 @@
   --color-icon-muted: var(--icon-muted);
   --color-placeholder: var(--placeholder);
   --color-gold: var(--gold);
-  --font-sans: var(--font-esamanru);
+  --font-sans: var(--font-pretendard);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -86,30 +86,30 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 600;
 }
 
 /*
- * 타이포그래피 스케일 (esamanru 3종 웨이트 기준)
- * Light(300): 본문/보조 텍스트 | Medium(500): 카드 제목/탭 라벨/일반 제목 | Bold(700): 큰 타이틀/섹션 헤더/CTA
+ * 타이포그래피 스케일 (Pretendard 2종 웨이트만 사용: SemiBold/Bold, 그 외 웨이트는 로드하지 않음)
+ * SemiBold(600): 본문/보조 텍스트/카드 제목/탭 라벨/일반 제목 | Bold(700): 큰 타이틀/섹션 헤더/CTA
  */
 @utility bodyLarge {
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 600;
   font-size: 1rem;
   line-height: 1.5rem;
 }
 
 @utility bodyMedium {
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.25rem;
 }
 
 @utility bodySmall {
   font-family: var(--font-sans);
-  font-weight: 300;
+  font-weight: 600;
   font-size: 0.75rem;
   line-height: 1rem;
 }
@@ -123,35 +123,35 @@ body {
 
 @utility titleMedium {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 1rem;
   line-height: 1.5rem;
 }
 
 @utility titleSmall {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.25rem;
 }
 
 @utility labelLarge {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.875rem;
   line-height: 1.25rem;
 }
 
 @utility labelMedium {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.75rem;
   line-height: 1rem;
 }
 
 @utility labelSmall {
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.6875rem;
   line-height: 1rem;
 }

@@ -5,13 +5,12 @@ import Script from "next/script";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
-const esamanru = localFont({
+const pretendard = localFont({
   src: [
-    { path: "../../asset/font/esamanru Light.ttf", weight: "300", style: "normal" },
-    { path: "../../asset/font/esamanru Medium.ttf", weight: "500", style: "normal" },
-    { path: "../../asset/font/esamanru Bold.ttf", weight: "700", style: "normal" },
+    { path: "../../asset/font/Pretendard-SemiBold.otf", weight: "600", style: "normal" },
+    { path: "../../asset/font/Pretendard-Bold.otf", weight: "700", style: "normal" },
   ],
-  variable: "--font-esamanru",
+  variable: "--font-pretendard",
   display: "swap",
 });
 
@@ -29,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${esamanru.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${pretendard.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-bg text-text">

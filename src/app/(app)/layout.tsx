@@ -131,21 +131,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
               <div className="flex items-center justify-between px-4 py-1.5">
-                <span className="text-sm font-light text-icon-muted">보유코인</span>
+                <span className="text-sm font-semibold text-icon-muted">보유코인</span>
                 <span className="flex items-center gap-1">
                   <img src="/icons/coin.png" alt="" className="h-5 w-5" />
                   <span className="text-lg font-bold text-gold">{coins ?? "-"}</span>
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-1.5">
-                <span className="text-sm font-light text-icon-muted">시간제 이용권</span>
+                <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
                 <span className="text-sm font-semibold text-white">{timePassLabel}</span>
               </div>
               <div className="mt-2 h-px bg-border" />
             </div>
 
             <div className="flex-1 overflow-y-auto px-2 py-2">
-              <p className="px-2 py-2 text-sm font-light text-icon-muted">최근 대화</p>
+              <p className="px-2 py-2 text-sm font-semibold text-icon-muted">최근 대화</p>
               <div className="flex flex-col gap-1">
                 {rooms.map((room) => (
                   <button
@@ -194,7 +194,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setMoreOpen((v) => !v)}
-                className="flex w-full items-center justify-between px-4 py-3 text-sm font-light text-icon-muted"
+                className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-icon-muted"
               >
                 <span>{nickname ?? "더보기"}</span>
                 <span>{moreOpen ? "접기" : "더보기"}</span>
