@@ -5,16 +5,11 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { JASI_RULE_LABEL, type BirthInfo, type JasiRule } from "@/lib/tarot/birthInfo";
+import { PRIVACY_POLICY_SECTIONS, TERMS_SECTIONS } from "@/lib/legal/content";
 
-const POLICY_CONTENT: Record<"terms" | "privacy", { title: string; body: string }> = {
-  terms: {
-    title: "이용약관",
-    body: "이용약관은 준비 중입니다. 서비스 정식 오픈 전까지 이 내용이 업데이트될 예정입니다.",
-  },
-  privacy: {
-    title: "개인정보처리방침",
-    body: "개인정보처리방침은 준비 중입니다. 서비스 정식 오픈 전까지 이 내용이 업데이트될 예정입니다.",
-  },
+const POLICY_SECTIONS: Record<"terms" | "privacy", { title: string; sections: typeof TERMS_SECTIONS }> = {
+  terms: { title: "이용약관", sections: TERMS_SECTIONS },
+  privacy: { title: "개인정보처리방침", sections: PRIVACY_POLICY_SECTIONS },
 };
 
 function PolicyModal({
@@ -24,12 +19,21 @@ function PolicyModal({
   policy: "terms" | "privacy";
   onClose: () => void;
 }) {
-  const { title, body } = POLICY_CONTENT[policy];
+  const { title, sections } = POLICY_SECTIONS[policy];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 rounded-2xl bg-surface p-6">
         <h2 className="text-lg font-bold text-bold-text">{title}</h2>
-        <p className="flex-1 overflow-y-auto text-sm text-text">{body}</p>
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-4">
+            {sections.map((section) => (
+              <div key={section.title}>
+                <h3 className="mb-1 text-sm font-bold text-bold-text">{section.title}</h3>
+                <p className="whitespace-pre-wrap text-sm text-text">{section.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
         <button
           onClick={onClose}
           className="self-end rounded-full bg-cta-fill px-5 py-2 text-sm text-cta-text"

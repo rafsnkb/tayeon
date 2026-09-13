@@ -30,6 +30,16 @@ type SearchedUser = {
   };
 };
 
+type StatsSummary = {
+  totalUsers: number;
+  genderCounts: Record<string, number>;
+  ageBracketCounts: Record<string, number>;
+  totalChargedReadings: number;
+  topicCounts: Record<string, number>;
+};
+
+const GENDER_LABEL: Record<string, string> = { male: "남성", female: "여성", 미상: "미상" };
+
 type Status = "loading" | "unauthenticated" | "forbidden" | "ok";
 
 // admin/은 타연 본체와 완전히 분리된 별도 앱이라 src/lib/tarot/pricing.ts를 import하지 않음 —
@@ -40,6 +50,41 @@ const TIME_PASS_TIERS = [
   { label: "60분권 (전부 포함)", minutes: 60, includesOptions: true, priceWon: 35900 },
 ] as const;
 
+function StatsBreakdown({
+  title,
+  counts,
+  labelMap,
+  unit = "명",
+}: {
+  title: string;
+  counts: Record<string, number>;
+  labelMap?: Record<string, string>;
+  unit?: string;
+}) {
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return (
+    <div className="space-y-1">
+      <p className="font-medium text-zinc-700">{title}</p>
+      {total === 0 ? (
+        <p className="text-zinc-400">데이터 없음</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {entries.map(([key, count]) => (
+            <li key={key} className="flex justify-between text-zinc-600">
+              <span>{labelMap?.[key] ?? key}</span>
+              <span>
+                {count}
+                {unit} ({((count / total) * 100).toFixed(1)}%)
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function AdminHome() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
@@ -49,6 +94,10 @@ export default function AdminHome() {
   const [results, setResults] = useState<SearchedUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  const [stats, setStats] = useState<StatsSummary | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   const [grantAmount, setGrantAmount] = useState<Record<string, string>>({});
   const [grantReason, setGrantReason] = useState<Record<string, string>>({});
@@ -91,6 +140,26 @@ export default function AdminHome() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  async function handleLoadStats() {
+    if (!user) return;
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/admin/stats/summary", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setStatsError(body.error ?? "통계를 불러오지 못했습니다.");
+        return;
+      }
+      setStats((await res.json()) as StatsSummary);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -337,6 +406,37 @@ export default function AdminHome() {
           로그아웃 ({user?.email})
         </button>
       </header>
+
+      <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-zinc-700">
+            통계 (성별ㆍ연령대ㆍ질문 주제 — 전부 집계 수치이며 개별 유저와 연결해서 보여주지 않음)
+          </h2>
+          <button
+            onClick={handleLoadStats}
+            disabled={statsLoading}
+            className="rounded border border-zinc-300 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            {statsLoading ? "불러오는 중..." : stats ? "새로고침" : "통계 불러오기"}
+          </button>
+        </div>
+        {statsError && <p className="text-sm text-red-600">{statsError}</p>}
+        {stats && (
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
+            <StatsBreakdown
+              title={`성별 (가입자 ${stats.totalUsers}명)`}
+              counts={stats.genderCounts}
+              labelMap={GENDER_LABEL}
+            />
+            <StatsBreakdown title="연령대" counts={stats.ageBracketCounts} />
+            <StatsBreakdown
+              title={`질문 주제 (유료 리딩 ${stats.totalChargedReadings}건)`}
+              counts={stats.topicCounts}
+              unit="건"
+            />
+          </div>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-zinc-700">유저 검색 (UID 또는 닉네임)</h2>

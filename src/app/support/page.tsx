@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from "@/lib/company";
+
 export default function SupportPage() {
   return (
     <main className="mx-auto max-w-2xl p-8">
@@ -6,8 +8,8 @@ export default function SupportPage() {
         문의사항은 이메일로 접수해주세요.
       </p>
       <p className="mt-2">
-        <a href="mailto:admin@rafraum.com" className="text-point underline">
-          admin@rafraum.com
+        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-point underline">
+          {SUPPORT_EMAIL}
         </a>
       </p>
     </main>

@@ -6,6 +6,15 @@ import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
+import {
+  COMPANY_NAME_EN,
+  COMPANY_NAME_KO,
+  CEO_NAME,
+  BUSINESS_REGISTRATION_NUMBER,
+  MAIL_ORDER_BUSINESS_NUMBER,
+  COMPANY_ADDRESS,
+  SUPPORT_EMAIL,
+} from "@/lib/company";
 
 const NAV_ITEMS = [
   { href: "/tarot", label: "타로 보기" },
@@ -118,9 +127,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             <div className="mt-auto flex flex-col gap-2 border-t border-border px-4 py-4 text-xs text-text">
               <p>
-                라프라움(Rafraum) | 대표: 이정희 | 사업자등록번호: 277-19-02371 | 통신판매업신고번호: 기입예정
+                {COMPANY_NAME_KO}({COMPANY_NAME_EN}) | 대표: {CEO_NAME} | 사업자등록번호:{" "}
+                {BUSINESS_REGISTRATION_NUMBER} | 통신판매업신고번호: {MAIL_ORDER_BUSINESS_NUMBER}
                 <br />
-                주소: 서울특별시 송파구 거마로20길 18, 507호 | 이메일: admin@rafraum.com
+                주소: {COMPANY_ADDRESS} | 이메일: {SUPPORT_EMAIL}
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link href="/privacy" onClick={() => setMenuOpen(false)} className="text-point underline">
