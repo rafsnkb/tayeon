@@ -38,7 +38,7 @@ function ListRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-12 w-full items-center gap-2 text-left"
+      className="flex w-full items-center gap-3 py-4 text-left"
     >
       <span
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-bg ${
@@ -61,7 +61,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="flex flex-col gap-2">
       <p className="px-1 text-base font-semibold text-icon-muted">{title}</p>
-      <div className="flex flex-col divide-y divide-border rounded-[32px] border border-border bg-topbar px-4">
+      <div className="flex flex-col divide-y divide-border rounded-[32px] border border-border bg-topbar px-6">
         {children}
       </div>
     </div>
@@ -110,7 +110,7 @@ export default function MyPage() {
               <button
                 type="button"
                 onClick={openAccountInfo}
-                className="flex shrink-0 items-center gap-1.5 rounded-full bg-chip-fill px-3 py-1.5 text-sm font-semibold text-[#dcdee3]"
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-cta-fill px-3 py-1.5 text-sm font-semibold text-cta-text"
               >
                 <SearchIcon className="h-3.5 w-3.5" />
                 계정정보
