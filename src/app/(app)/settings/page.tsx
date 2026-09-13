@@ -9,6 +9,7 @@ import { JASI_RULE_LABEL, type JasiRule } from "@/lib/tarot/birthInfo";
 import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import ConfirmModal from "@/components/ConfirmModal";
+import { CheckIcon } from "../tarot/icons";
 
 const PORTRAITS: Record<ToneKey, string> = {
   warm: "/portraits/warm.jpg",
@@ -67,8 +68,7 @@ function SegmentGroup<T extends string | boolean>({
 }
 
 /** 피그마 "Screen / Setting" — 원래 /me에 흩어져 있던 AI 말투/역방향 카드/진태양시/자시법/
- * 다크모드/탈퇴하기를 한 화면으로 모은 새 설정 페이지. "시스템 설정"(OS 따라가기) 다크모드
- * 옵션은 현재 theme.ts가 라이트/다크 2단만 지원해서 이번 패스에선 뺐음. */
+ * 다크모드/탈퇴하기를 한 화면으로 모은 새 설정 페이지. */
 export default function SettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -156,6 +156,11 @@ export default function SettingsPage() {
                       }`}
                     >
                       <img src={PORTRAITS[key]} alt="" className="h-full w-full object-cover" />
+                      {tone === key && (
+                        <span className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-point text-white">
+                          <CheckIcon className="h-2.5 w-3" />
+                        </span>
+                      )}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-sm font-semibold ${
@@ -219,6 +224,7 @@ export default function SettingsPage() {
               <p className="text-sm font-semibold text-icon-muted">라이트/다크 모드</p>
               <SegmentGroup
                 options={[
+                  { value: "system", label: "시스템 설정" },
                   { value: "light", label: "라이트" },
                   { value: "dark", label: "다크" },
                 ]}
