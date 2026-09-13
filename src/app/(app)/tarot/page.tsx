@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useRooms } from "@/lib/tarot/RoomsContext";
+import { useRooms, type TimePass } from "@/lib/tarot/RoomsContext";
 import {
   SPREADS,
   SAJU_ADD_ON_COST,
@@ -204,6 +204,140 @@ function CoinIcon({ className = "h-5 w-5" }: { className?: string }) {
   return <img src="/icons/coin.png" alt="" className={className} />;
 }
 
+// 피그마 "HeldTimepass_15/30/60min" 카드의 티어별 배경(성운 텍스처, asset/texture/prizebg_tier_*)과
+// 테두리색 — 15분=파랑, 30/60분=보라/핑크(30·60분은 사주·자미두수·궁합까지 전부 무제한이라는
+// 공통점이 있어 톤을 가깝게 묶음).
+const TIME_PASS_TIER: Record<number, { bg: string; border: string; tagBg: string; tagText: string }> = {
+  15: { bg: "/timepass/tier-15.jpg", border: "#2f8bee", tagBg: "#122337", tagText: "#66b0ff" },
+  30: { bg: "/timepass/tier-30.jpg", border: "#8335d6", tagBg: "#28173b", tagText: "#a04ff8" },
+  60: { bg: "/timepass/tier-60.jpg", border: "#ff007f", tagBg: "#2c1322", tagText: "#ff007f" },
+};
+
+function TimePassCard({ pass, actionLabel, onAction, busy }: {
+  pass: TimePass;
+  actionLabel?: string;
+  onAction?: () => void;
+  busy?: boolean;
+}) {
+  const tier = TIME_PASS_TIER[pass.minutes] ?? TIME_PASS_TIER[15];
+  return (
+    <div
+      className="relative flex h-20 items-center gap-2 overflow-hidden rounded-[32px] border bg-cover bg-center px-4"
+      style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}
+    >
+      <div className="absolute inset-0 bg-[#19191d]/70" />
+      <div className="relative flex flex-1 flex-col gap-1">
+        <span className="text-2xl font-bold text-white">{pass.minutes}분 무제한</span>
+        <span
+          className="w-fit rounded-full px-2 py-0.5 text-sm font-semibold"
+          style={{ backgroundColor: tier.tagBg, color: tier.tagText }}
+        >
+          {pass.includesOptions ? "타로+사주+자미두수+궁합 무제한" : "타로만 무제한"}
+        </span>
+      </div>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          disabled={busy}
+          className="relative shrink-0 rounded-2xl bg-point px-5 py-3 text-base font-bold text-white disabled:opacity-60"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 피그마 "Screen / HeldTimepassListModal" — 보유한 시간제 이용권을 카드로 나열, 사용하기를
+ * 누르면 확인 모달(HeldTimepassUseModal)로 넘어간다. */
+function HeldTimepassListModal({
+  timePasses,
+  onSelect,
+  onClose,
+}: {
+  timePasses: TimePass[];
+  onSelect: (pass: TimePass) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="flex max-h-[70vh] w-full flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 p-1">
+          <div className="w-5" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-bold text-white">보유 시간제 이용권</p>
+            <p className="text-sm font-semibold text-icon-muted">사용할 시간제 이용권을 선택하세요</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-white">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 overflow-y-auto">
+          {timePasses.map((pass) => (
+            <TimePassCard
+              key={pass.id}
+              pass={pass}
+              actionLabel="사용하기"
+              onAction={() => onSelect(pass)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 피그마 "Screen / HeldTimepassUseModal" — 실제로 활성화되면 즉시 시간 차감이 시작된다는 걸
+ * 한 번 더 확인시키는 모달. */
+function HeldTimepassUseModal({
+  pass,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  pass: TimePass;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="flex w-full flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 p-1">
+          <div className="w-5" />
+          <p className="flex-1 text-center text-lg font-bold text-white">시간제 이용권 사용하기</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-white">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="text-center text-sm font-semibold text-icon-muted">선택한 시간제 이용권</p>
+        <TimePassCard pass={pass} />
+        <p className="text-center text-base font-semibold text-white">
+          선택한 시간제 이용권을 사용하시겠어요?
+        </p>
+        <p className="text-center text-sm font-semibold text-urgent">
+          시간제 이용권은 사용하기를 누른 순간부터 시간 차감이 시작되며, 브라우저를 닫아도 멈추지 않습니다.
+        </p>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={busy}
+          className="h-12 w-full rounded-2xl bg-point text-lg font-semibold text-white disabled:opacity-60"
+        >
+          사용하기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** 피그마 "Screen / SpreadSelect"의 List_Spread — 스프레드 4종을 설명+가격과 함께 고르는 바텀시트 */
 function SpreadSelectSheet({
   spread,
@@ -322,6 +456,8 @@ function TarotChat() {
   const [now, setNow] = useState(() => Date.now());
   const [spreadSheetOpen, setSpreadSheetOpen] = useState(false);
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
+  const [timePassListOpen, setTimePassListOpen] = useState(false);
+  const [timePassToUse, setTimePassToUse] = useState<TimePass | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
 
@@ -581,6 +717,27 @@ function TarotChat() {
           onClose={() => setSpreadSheetOpen(false)}
         />
       )}
+      {timePassListOpen && (
+        <HeldTimepassListModal
+          timePasses={timePasses}
+          onSelect={(pass) => {
+            setTimePassListOpen(false);
+            setTimePassToUse(pass);
+          }}
+          onClose={() => setTimePassListOpen(false)}
+        />
+      )}
+      {timePassToUse && (
+        <HeldTimepassUseModal
+          pass={timePassToUse}
+          busy={startingPass === timePassToUse.id}
+          onConfirm={async () => {
+            await handleStartTimePass(timePassToUse.id);
+            setTimePassToUse(null);
+          }}
+          onClose={() => setTimePassToUse(null)}
+        />
+      )}
       <div className="relative flex h-16 shrink-0 items-center border-b border-border bg-topbar">
         <button
           type="button"
@@ -779,26 +936,14 @@ function TarotChat() {
           </div>
         )}
         {!timePassActive && timePasses.length > 0 && (
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            {timePasses.map((pass) => (
-              <div
-                key={pass.id}
-                className="flex flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-point px-3 py-1 text-point"
-              >
-                <span className="text-sm">
-                  {pass.minutes}분권{pass.includesOptions ? "" : " (타로만)"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleStartTimePass(pass.id)}
-                  disabled={startingPass === pass.id}
-                  className="rounded-full bg-cta-fill px-2 py-0.5 text-xs text-cta-text disabled:opacity-50"
-                >
-                  사용하기
-                </button>
-              </div>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => setTimePassListOpen(true)}
+            className="mb-2 flex w-full items-center justify-between rounded-2xl bg-chip-fill px-3 py-2"
+          >
+            <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
+            <span className="text-sm font-semibold text-point">보유 {timePasses.length}개 · 사용하기</span>
+          </button>
         )}
 
         <form

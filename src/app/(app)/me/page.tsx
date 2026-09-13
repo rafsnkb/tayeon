@@ -80,6 +80,18 @@ export default function MyPage() {
   const { user, nickname, profileImage, coins, activeTimePass, timePasses } = useRooms();
   const [accountInfoOpen, setAccountInfoOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null);
+
+  async function openAccountInfo() {
+    setAccountInfoOpen(true);
+    if (!user) return;
+    const idToken = await user.getIdToken();
+    const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
+    if (res.ok) {
+      const data = await res.json();
+      setTermsAgreedAt(data.termsAgreedAt ?? null);
+    }
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
@@ -97,7 +109,7 @@ export default function MyPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setAccountInfoOpen(true)}
+                onClick={openAccountInfo}
                 className="flex shrink-0 items-center gap-1.5 rounded-full bg-chip-fill px-3 py-1.5 text-sm font-semibold text-[#dcdee3]"
               >
                 <SearchIcon className="h-3.5 w-3.5" />
@@ -179,8 +191,18 @@ export default function MyPage() {
             </div>
             <div className="flex flex-col gap-3 text-sm">
               <div className="flex items-center justify-between">
+                <span className="text-icon-muted">아이디</span>
+                <span className="font-semibold text-white">카카오 로그인</span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="text-icon-muted">UID</span>
                 <span className="font-semibold text-white">{user?.uid ?? "-"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-icon-muted">가입일</span>
+                <span className="font-semibold text-white">
+                  {termsAgreedAt ? new Date(termsAgreedAt).toLocaleString("ko-KR") : "-"}
+                </span>
               </div>
             </div>
             <p className="mt-4 text-xs text-icon-muted">
