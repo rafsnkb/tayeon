@@ -12,8 +12,19 @@ function formatWon(won: number) {
   return `₩${won.toLocaleString("ko-KR")}`;
 }
 
-// 피그마 카드 테두리가 상품 등급이 올라갈수록 청록→파랑→보라→마젠타로 옮겨가는 그라디언트.
-const COIN_BORDER = ["#2f8bee", "#2f8bee", "#3f7de0", "#6a5fd6", "#8335d6", "#a52fc4", "#ff007f"];
+// 피그마 카드 테두리가 가격대별로 2개씩 짝지어 청록→파랑→보라→핑크로 올라간다
+// (asset/Screen/Buy - Coin.png 픽셀 샘플링으로 확인, 2026-09-14) — 텍스처 등급 짝(COIN_TEXTURE)과
+// 정확히 같은 경계라, 시간제 이용권 티어 색(TIME_PASS_TIER)을 그대로 재사용하고 청록만 추가한다.
+const COIN_TEAL = "#2fe0c8";
+const COIN_BORDER = [
+  COIN_TEAL,
+  COIN_TEAL,
+  TIME_PASS_TIER[15].border,
+  TIME_PASS_TIER[15].border,
+  TIME_PASS_TIER[30].border,
+  TIME_PASS_TIER[30].border,
+  TIME_PASS_TIER[60].border,
+];
 // 코인 상품 7종이 성운 텍스처 4장을 가격대별로 나눠 쓴다(1,100/3,500→tier4, 6,000/14,000→tier3,
 // 40,000/65,000→tier2, 135,000→tier1 — 사용자가 직접 지정한 매핑, 2026-09-14).
 const COIN_TEXTURE = [
@@ -66,7 +77,7 @@ export default function ChargePage() {
                         {pkg.coins.toLocaleString("ko-KR")} 코인
                       </p>
                       {bonus > 0 && (
-                        <p className="text-sm font-semibold text-icon-muted">
+                        <p className="text-sm font-semibold" style={{ color }}>
                           {pkg.priceWon.toLocaleString("ko-KR")}+보너스 {bonus.toLocaleString("ko-KR")}
                         </p>
                       )}
