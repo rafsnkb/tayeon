@@ -120,7 +120,7 @@ export default function MyPage() {
       <SubPageTopBar title="마이 페이지" />
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <Section title="계정">
             <div className="flex items-center gap-3 py-4">
               <span className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-chip-fill">

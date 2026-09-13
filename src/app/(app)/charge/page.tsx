@@ -39,7 +39,7 @@ export default function ChargePage() {
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <SubPageTopBar title="코인ㆍ이용권 구입" />
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           {notice && (
             <div className="rounded-2xl border border-point bg-point-bg p-3 text-center text-sm text-point">
               곧 만나보실 수 있어요. 조금만 기다려주세요!
@@ -135,7 +135,7 @@ export default function ChargePage() {
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
-        <div className="flex overflow-hidden rounded-full bg-chip-fill">
+        <div className="mx-auto flex w-full max-w-2xl overflow-hidden rounded-full bg-chip-fill">
           <button
             type="button"
             onClick={() => setTab("coin")}

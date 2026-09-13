@@ -87,9 +87,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
   // 서브페이지(/me, /settings, /charge 등)는 사이드바 없이 단순 중앙정렬 — hori.chat의 /terms,
   // /support와 동일한 원칙(위 isMainRoute 주석 참고). 사이드바+플렉스로 관련 복잡한 폭 계산이
   // 전혀 필요 없어서 별도의 단순한 트리로 일찍 반환한다.
+  // 여기서는 폭을 아예 제한하지 않는다 — hori.chat 실측(/terms): 상단바(SubPageTopBar 해당)는
+  // 뷰포트 폭 그대로(풀블리드), 그 아래 본문만 max-w-5xl(960px)로 중앙정렬됨. 상단바까지 같이
+  // 좁혀버리면 다시 "탑바가 잘려 보인다"는 문제가 재현되므로(2026-09-14), 각 서브페이지가 자기
+  // 본문 영역에만 개별적으로 폭을 건다.
   if (!isMainRoute) {
     return (
-      <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col overflow-hidden">
+      <div className="flex h-dvh w-full flex-col overflow-hidden">
         {children}
       </div>
     );

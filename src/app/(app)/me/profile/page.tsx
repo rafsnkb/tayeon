@@ -115,7 +115,7 @@ export default function MyProfilePage() {
     <form onSubmit={handleSave} className="flex h-full flex-col overflow-hidden bg-bg">
       <SubPageTopBar title="내 프로필 관리" />
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
             <FieldLabel>닉네임 (변경 가능)</FieldLabel>
             <input
@@ -185,7 +185,7 @@ export default function MyProfilePage() {
         <button
           type="submit"
           disabled={!canSave || saving}
-          className={`h-12 w-full rounded-2xl text-lg font-semibold ${
+          className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
             canSave ? "bg-point text-white" : "bg-chip-fill text-placeholder"
           } disabled:opacity-60`}
         >

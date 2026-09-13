@@ -56,7 +56,7 @@ export default function UsageHistoryPage() {
         ) : entries.length === 0 ? (
           <p className="pt-8 text-center text-sm text-icon-muted">아직 사용 내역이 없어요.</p>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
             {entries.map((e, i) => (
               <div key={i} className="flex flex-col gap-1.5">
                 <p className="px-1 text-sm text-icon-muted">{formatDateTime(e.createdAt)}</p>

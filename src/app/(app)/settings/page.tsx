@@ -138,7 +138,7 @@ export default function SettingsPage() {
     <div className="flex h-full flex-col overflow-hidden bg-bg">
       <SubPageTopBar title="설정" />
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <SectionPanel title="상담 설정">
             <div>
               <p className="text-sm font-semibold text-icon-muted">상담가 선택</p>
@@ -248,7 +248,7 @@ export default function SettingsPage() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="h-12 w-full rounded-2xl bg-point text-lg font-semibold text-white disabled:opacity-60"
+          className="mx-auto block h-12 w-full max-w-2xl rounded-2xl bg-point text-lg font-semibold text-white disabled:opacity-60"
         >
           저장하기
         </button>
