@@ -329,11 +329,19 @@ export async function POST(req: NextRequest) {
     );
 
     try {
+      const today = new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        weekday: "long",
+      }).format(new Date());
       const { stable, volatile } = buildTarotSystemPrompt(spread, drawnCards, tone, {
         sajuBlock: sajuBlock || undefined,
         ziweiBlock: ziweiBlock || undefined,
         compatibilityBlock,
         recentlyUsedCards,
+        today,
       });
 
       async function generate() {
@@ -365,10 +373,12 @@ export async function POST(req: NextRequest) {
             : rawInterpretation;
 
         // Safety net for when the model should have used NO_CHARGE_MARKER but didn't (e.g. writes
-        // a full reading built around the wrong spread/cards, mimicked from history): the system
-        // prompt mandates every drawn card be named, so require a majority of the actually-drawn
-        // cards to appear — not just one, which a wrong-structure hallucination can satisfy by
-        // coincidence (e.g. naming 10 cards for a 5-card spread has good odds of overlapping 1-2).
+        // a full reading built around the wrong spread/cards, mimicked from history), AND for the
+        // "절대 규칙" that every drawn card must be covered: require every one of the actually-drawn
+        // cards to appear, not just a majority (2026-09-14 — a majority threshold let a real
+        // multi-card reading through that silently skipped one position's card entirely, since
+        // 2-of-3 already cleared the old bar; tightening to "all" makes a skipped card trigger the
+        // existing retry loop below instead of shipping an incomplete, still-charged reading).
         // This safety net is a model slip-up, not user abuse, so it must not carry the suspension
         // warning either — see flaggedForAbuse below.
         const mentionedDrawnCardCount = drawnCards.filter((d) =>
@@ -377,7 +387,7 @@ export async function POST(req: NextRequest) {
         const cardsOk =
           !markedNoCharge &&
           !markedGuidance &&
-          mentionedDrawnCardCount >= Math.ceil(drawnCards.length / 2);
+          mentionedDrawnCardCount === drawnCards.length;
 
         // Same idea for the saju/ziwei add-ons: the user paid extra for them, so if the option was
         // requested but the response shows no sign of touching it, it was silently dropped and

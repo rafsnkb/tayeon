@@ -126,6 +126,7 @@ function buildVolatileSystemPrompt(
     ziweiBlock?: string;
     compatibilityBlock?: string;
     recentlyUsedCards?: string[];
+    today?: string;
   }
 ): string {
   const positions = SPREAD_POSITIONS[spread];
@@ -162,7 +163,11 @@ function buildVolatileSystemPrompt(
     .filter(Boolean)
     .join("\n\n");
 
-  return `## 스프레드: ${SPREADS[spread].label}
+  const todayBlock = extras?.today
+    ? `## 오늘 날짜\n오늘은 ${extras.today}입니다. 사주/자미두수를 근거로 특정 시기(월운, 세운, "몇 월부터 몇 월 사이" 같은 기간 등)를 언급할 때는 반드시 이 오늘 날짜를 기준으로 그 시기가 이미 지났는지, 지금 한창 진행 중인지, 아직 오지 않았는지를 판단해서 명시하세요. 이미 지나갔거나 끝나가는 시기를 마치 아직 오지 않은 미래처럼("~한 시기가 올 거예요") 말하지 마세요 — 지난 시기라면 "그 시기는 이미 지나갔다/끝나가는 시점이다"라고, 진행 중이라면 "지금이 바로 그 시기다"라고 분명히 짚어주세요.\n\n`
+    : "";
+
+  return `${todayBlock}## 스프레드: ${SPREADS[spread].label}
 ${
   spread === "dual"
     ? "\n이 스프레드는 질문자가 두 가지 선택지 중 하나를 고민할 때 쓰입니다. 질문에서 비교 대상이 되는 두 선택지(A/B)를 파악해서, '선택지 A'/'선택지 B' 포지션에는 각각 무엇을 가리키는지 명시하며 해석하세요(예: '이직 vs 현재 회사 유지'라면 A=이직, B=현재 회사 유지처럼). 질문에 선택지가 두 개로 명확히 구분되지 않는다면, 질문 내용을 근거로 가장 타당한 두 갈래로 나누어 해석하세요 — 예를 들어 '어느 정도까지 가능할까?' 같은 정도를 묻는 질문이라면 A=더 적극적/진전된 쪽, B=더 조심스럽고 제한적인 쪽처럼 스스로 두 극단을 설정하세요. **정보가 부족하다는 이유로 배경 설명을 되묻거나 카드를 다시 뽑아도 되는지 확인하는 것은 절대 금지이며, 반드시 이번에 주어진 카드로 즉시 두 갈래 해석을 완성해야 합니다.** 마지막 '종합 조언' 포지션에서는 둘 중 어느 쪽이 더 카드 흐름상 긍정적인지 판단을 회피하지 말고 조언하세요.\n"
@@ -187,6 +192,7 @@ export function buildTarotSystemPrompt(
     ziweiBlock?: string;
     compatibilityBlock?: string;
     recentlyUsedCards?: string[];
+    today?: string;
   }
 ): { stable: string; volatile: string } {
   return {
