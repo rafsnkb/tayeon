@@ -78,6 +78,13 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
 }
 
+type CalendarMode = "solar" | "lunar" | "lunarLeap";
+
+function toCalendarMode(calendarType: BirthInfo["calendarType"], isLeapMonth: boolean): CalendarMode {
+  if (calendarType === "solar") return "solar";
+  return isLeapMonth ? "lunarLeap" : "lunar";
+}
+
 /** 피그마 "Screen / Join" — 자시법/진태양시는 화면에 없어서(설정 화면으로 옮겨간 듯) 뺐고, 저장 시엔
  * 기본값(일반/미보정)으로 채워서 보낸다. 생년월일시는 기존처럼 선택 입력 유지(가입 시 건너뛰고
  * 나중에 /me/profile에서 채울 수 있음). */
@@ -91,11 +98,12 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [openPolicy, setOpenPolicy] = useState<"terms" | "privacy" | null>(null);
 
-  const [calendarType, setCalendarType] = useState<BirthInfo["calendarType"]>("solar");
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("solar");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
   const [gender, setGender] = useState<BirthInfo["gender"] | "">("");
+  const [birthPlace, setBirthPlace] = useState("");
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -115,11 +123,12 @@ export default function SignupPage() {
 
         const info = data.birthInfo as BirthInfo | null;
         if (info) {
-          setCalendarType(info.calendarType);
+          setCalendarMode(toCalendarMode(info.calendarType, info.isLeapMonth));
           setBirthDate(info.birthDate ?? "");
           setBirthTime(info.birthTime ?? "");
           setTimeUnknown(info.timeUnknown);
           setGender(info.gender);
+          setBirthPlace(info.birthPlace ?? "");
         }
       }
     });
@@ -151,13 +160,15 @@ export default function SignupPage() {
           nickname: nickname.trim(),
           birthInfo: birthInfoStarted
             ? {
-                calendarType,
+                calendarType: calendarMode === "solar" ? "solar" : "lunar",
+                isLeapMonth: calendarMode === "lunarLeap",
                 birthDate,
                 birthTime,
                 timeUnknown,
                 jasiRule: "midnight",
                 useTrueSolarTime: false,
                 gender,
+                birthPlace,
               }
             : undefined,
         }),
@@ -217,9 +228,10 @@ export default function SignupPage() {
               options={[
                 { value: "solar" as const, label: "양력" },
                 { value: "lunar" as const, label: "음력" },
+                { value: "lunarLeap" as const, label: "음력(윤달)" },
               ]}
-              value={calendarType}
-              onChange={setCalendarType}
+              value={calendarMode}
+              onChange={setCalendarMode}
             />
           </div>
 
@@ -251,11 +263,25 @@ export default function SignupPage() {
               options={[
                 { value: "female" as const, label: "여성" },
                 { value: "male" as const, label: "남성" },
+                { value: "unspecified" as const, label: "선택안함" },
               ]}
               value={gender || "female"}
               onChange={setGender}
             />
           </div>
+
+          <label className="flex flex-col gap-1">
+            <FieldLabel>출생지 (선택)</FieldLabel>
+            <input
+              value={birthPlace}
+              onChange={(e) => setBirthPlace(e.target.value)}
+              placeholder="태어난 도시를 알려주세요"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+            />
+            <span className="pt-1 text-xs font-semibold text-icon-muted">
+              출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요
+            </span>
+          </label>
 
           <p className="text-xs text-icon-muted">
             생년월일시는 지금 건너뛰고 나중에 내 프로필 관리에서 입력할 수 있어요.

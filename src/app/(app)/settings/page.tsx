@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { TONES, type ToneKey } from "@/lib/tarot/tone";
-import { JASI_RULE_LABEL, type JasiRule } from "@/lib/tarot/birthInfo";
+import { JASI_RULE_SHORT_LABEL, JASI_RULE_DESCRIPTION, type JasiRule } from "@/lib/tarot/birthInfo";
 import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -80,6 +80,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  // 피그마의 "저장하기" 버튼은 아무것도 안 바꾸면 비활성 상태 — 처음 불러온 값을 저장해뒀다가
+  // 현재 값과 비교해서 뭔가 바뀐 경우에만 버튼을 활성화한다(2026-09-14).
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -93,9 +96,21 @@ export default function SettingsPage() {
         setUseReversedCards(data.useReversedCards);
         setUseTrueSolarTime(Boolean(data.birthInfo?.useTrueSolarTime));
         setJasiRule(data.birthInfo?.jasiRule ?? "midnight");
+        setInitialSnapshot(
+          JSON.stringify([
+            data.tone,
+            data.useReversedCards,
+            Boolean(data.birthInfo?.useTrueSolarTime),
+            data.birthInfo?.jasiRule ?? "midnight",
+          ])
+        );
       }
     });
   }, []);
+
+  const isDirty =
+    initialSnapshot !== null &&
+    initialSnapshot !== JSON.stringify([tone, useReversedCards, useTrueSolarTime, jasiRule]);
 
   async function handleSave() {
     if (!user || saving) return;
@@ -157,8 +172,8 @@ export default function SettingsPage() {
                     >
                       <img src={PORTRAITS[key]} alt="" className="h-full w-full object-cover" />
                       {tone === key && (
-                        <span className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center rounded-full bg-point text-white">
-                          <CheckIcon className="h-2.5 w-3" />
+                        <span className="absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full bg-point text-white">
+                          <CheckIcon className="h-3.5 w-4" />
                         </span>
                       )}
                     </span>
@@ -206,15 +221,15 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-semibold text-icon-muted">자시법</p>
               <SegmentGroup
-                options={(Object.keys(JASI_RULE_LABEL) as JasiRule[]).map((key) => ({
+                options={(Object.keys(JASI_RULE_SHORT_LABEL) as JasiRule[]).map((key) => ({
                   value: key,
-                  label: key === "midnight" ? "일반" : key === "jasi" ? "야자시론" : "조자시/야자시",
+                  label: JASI_RULE_SHORT_LABEL[key],
                 }))}
                 value={jasiRule}
                 onChange={setJasiRule}
               />
               <p className="mt-2 rounded-2xl bg-bg px-3 py-3 text-center text-sm font-semibold text-icon-muted">
-                {JASI_RULE_LABEL[jasiRule]}
+                {JASI_RULE_DESCRIPTION[jasiRule]}
               </p>
             </div>
           </SectionPanel>
@@ -247,8 +262,10 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
-          className="mx-auto block h-12 w-full max-w-2xl rounded-2xl bg-point text-lg font-semibold text-white disabled:opacity-60"
+          disabled={saving || !isDirty}
+          className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
+            isDirty ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+          } disabled:opacity-60`}
         >
           저장하기
         </button>

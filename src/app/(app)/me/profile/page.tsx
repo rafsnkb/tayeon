@@ -39,20 +39,27 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
 }
 
-/** 피그마 "Screen / MyProfile" — 기존 /me에 있던 생년월일시 폼을 그대로 가져오되(백엔드 데이터
- * 구조는 안 바꿈 — 음력 윤달/출생지는 BirthInfo 타입에 없어서 이번 패스에선 뺌), 닉네임 수정만
- * 새로 추가함(피그마엔 있는데 기존엔 가입 후 수정할 방법이 없었음 — /api/user/birth-info가
- * 선택적 nickname도 같이 받도록 확장). */
+type CalendarMode = "solar" | "lunar" | "lunarLeap";
+
+function toCalendarMode(calendarType: BirthInfo["calendarType"], isLeapMonth: boolean): CalendarMode {
+  if (calendarType === "solar") return "solar";
+  return isLeapMonth ? "lunarLeap" : "lunar";
+}
+
+/** 피그마 "Screen / MyProfile" — 기존 /me에 있던 생년월일시 폼을 그대로 가져오고, 닉네임 수정
+ * (피그마엔 있는데 기존엔 가입 후 수정할 방법이 없었음), 음력 윤달/출생지/성별 "선택안함"까지
+ * 전부 반영(2026-09-14 — BirthInfo 타입에 이 필드들을 추가하면서 같이 뚫음). */
 export default function MyProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [nickname, setNickname] = useState("");
-  const [calendarType, setCalendarType] = useState<BirthInfo["calendarType"]>("solar");
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("solar");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
   const [jasiRule, setJasiRule] = useState<JasiRule>("midnight");
   const [useTrueSolarTime, setUseTrueSolarTime] = useState(false);
   const [gender, setGender] = useState<BirthInfo["gender"] | "">("");
+  const [birthPlace, setBirthPlace] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,13 +74,14 @@ export default function MyProfilePage() {
         setNickname(data.nickname ?? "");
         const info = data.birthInfo as BirthInfo | null;
         if (info) {
-          setCalendarType(info.calendarType);
+          setCalendarMode(toCalendarMode(info.calendarType, info.isLeapMonth));
           setBirthDate(info.birthDate ?? "");
           setBirthTime(info.birthTime ?? "");
           setTimeUnknown(info.timeUnknown);
           setJasiRule(info.jasiRule);
           setUseTrueSolarTime(Boolean(info.useTrueSolarTime));
           setGender(info.gender);
+          setBirthPlace(info.birthPlace ?? "");
         }
       }
     });
@@ -91,13 +99,15 @@ export default function MyProfilePage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           nickname,
-          calendarType,
+          calendarType: calendarMode === "solar" ? "solar" : "lunar",
+          isLeapMonth: calendarMode === "lunarLeap",
           birthDate,
           birthTime,
           timeUnknown,
           jasiRule,
           useTrueSolarTime,
           gender,
+          birthPlace,
         }),
       });
       if (!res.ok) {
@@ -138,9 +148,10 @@ export default function MyProfilePage() {
               options={[
                 { value: "solar", label: "양력" },
                 { value: "lunar", label: "음력" },
+                { value: "lunarLeap", label: "음력(윤달)" },
               ]}
-              value={calendarType}
-              onChange={setCalendarType}
+              value={calendarMode}
+              onChange={setCalendarMode}
             />
           </div>
 
@@ -172,11 +183,25 @@ export default function MyProfilePage() {
               options={[
                 { value: "female", label: "여성" },
                 { value: "male", label: "남성" },
+                { value: "unspecified", label: "선택안함" },
               ]}
               value={gender || "female"}
               onChange={setGender}
             />
           </div>
+
+          <label className="flex flex-col gap-1">
+            <FieldLabel>출생지 (선택)</FieldLabel>
+            <input
+              value={birthPlace}
+              onChange={(e) => setBirthPlace(e.target.value)}
+              placeholder="태어난 도시를 알려주세요"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+            />
+            <span className="pt-1 text-xs font-semibold text-icon-muted">
+              출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요
+            </span>
+          </label>
 
           {error && <p className="text-sm text-urgent">{error}</p>}
         </div>

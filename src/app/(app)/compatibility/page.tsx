@@ -11,7 +11,16 @@ type Partner = {
   birthTime: string | null;
   gender: "male" | "female" | "unspecified";
   calendarType: "solar" | "lunar";
+  isLeapMonth?: boolean;
+  birthPlace?: string | null;
 };
+
+type CalendarMode = "solar" | "lunar" | "lunarLeap";
+
+function toCalendarMode(calendarType: Partner["calendarType"], isLeapMonth?: boolean): CalendarMode {
+  if (calendarType === "solar") return "solar";
+  return isLeapMonth ? "lunarLeap" : "lunar";
+}
 
 function ToggleGroup<T extends string>({
   options,
@@ -53,11 +62,12 @@ export default function CompatibilityPage() {
   const [user, setUser] = useState<User | null>(null);
   const [hasPartner, setHasPartner] = useState(false);
   const [nickname, setNickname] = useState("");
-  const [calendarType, setCalendarType] = useState<Partner["calendarType"]>("solar");
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("solar");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
   const [gender, setGender] = useState<Partner["gender"]>("unspecified");
+  const [birthPlace, setBirthPlace] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,11 +85,12 @@ export default function CompatibilityPage() {
         if (partner) {
           setHasPartner(true);
           setNickname(partner.nickname);
-          setCalendarType(partner.calendarType);
+          setCalendarMode(toCalendarMode(partner.calendarType, partner.isLeapMonth));
           setBirthDate(partner.birthDate ?? "");
           setBirthTime(partner.birthTime ?? "");
           setTimeUnknown(!partner.birthTime);
           setGender(partner.gender);
+          setBirthPlace(partner.birthPlace ?? "");
         }
       }
     });
@@ -97,10 +108,12 @@ export default function CompatibilityPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           nickname: nickname.trim(),
-          calendarType,
+          calendarType: calendarMode === "solar" ? "solar" : "lunar",
+          isLeapMonth: calendarMode === "lunarLeap",
           birthDate: birthDate || null,
           birthTime: timeUnknown ? null : birthTime || null,
           gender,
+          birthPlace,
         }),
       });
       const data = await res.json();
@@ -130,6 +143,8 @@ export default function CompatibilityPage() {
       setBirthTime("");
       setTimeUnknown(false);
       setGender("unspecified");
+      setCalendarMode("solar");
+      setBirthPlace("");
     } finally {
       setSubmitting(false);
     }
@@ -162,9 +177,10 @@ export default function CompatibilityPage() {
               options={[
                 { value: "solar" as const, label: "양력" },
                 { value: "lunar" as const, label: "음력" },
+                { value: "lunarLeap" as const, label: "음력(윤달)" },
               ]}
-              value={calendarType}
-              onChange={setCalendarType}
+              value={calendarMode}
+              onChange={setCalendarMode}
             />
           </div>
 
@@ -202,6 +218,19 @@ export default function CompatibilityPage() {
               onChange={setGender}
             />
           </div>
+
+          <label className="flex flex-col gap-1">
+            <FieldLabel>출생지 (선택)</FieldLabel>
+            <input
+              value={birthPlace}
+              onChange={(e) => setBirthPlace(e.target.value)}
+              placeholder="태어난 도시를 알려주세요"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+            />
+            <span className="pt-1 text-xs font-semibold text-icon-muted">
+              출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요
+            </span>
+          </label>
 
           {error && <p className="text-sm text-urgent">{error}</p>}
 

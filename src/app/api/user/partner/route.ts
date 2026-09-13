@@ -28,13 +28,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { nickname, birthDate, birthTime, gender, calendarType } = (await req.json()) as {
-    nickname?: string;
-    birthDate?: string;
-    birthTime?: string;
-    gender?: "male" | "female" | "unspecified";
-    calendarType?: "solar" | "lunar";
-  };
+  const { nickname, birthDate, birthTime, gender, calendarType, isLeapMonth, birthPlace } =
+    (await req.json()) as {
+      nickname?: string;
+      birthDate?: string;
+      birthTime?: string;
+      gender?: "male" | "female" | "unspecified";
+      calendarType?: "solar" | "lunar";
+      isLeapMonth?: boolean;
+      birthPlace?: string;
+    };
 
   const trimmedNickname = nickname?.trim();
   if (!trimmedNickname) {
@@ -49,6 +52,8 @@ export async function POST(req: NextRequest) {
         birthTime: birthTime || null,
         gender: gender ?? "unspecified",
         calendarType: calendarType === "lunar" ? "lunar" : "solar",
+        isLeapMonth: calendarType === "lunar" && Boolean(isLeapMonth),
+        birthPlace: typeof birthPlace === "string" && birthPlace.trim() ? birthPlace.trim() : null,
         savedAt: new Date().toISOString(),
       },
     },

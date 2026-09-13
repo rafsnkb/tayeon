@@ -16,18 +16,20 @@ export async function POST(req: NextRequest) {
   if (!body.birthDate) {
     return NextResponse.json({ error: "생년월일을 입력해주세요." }, { status: 400 });
   }
-  if (body.gender !== "male" && body.gender !== "female") {
+  if (body.gender !== "male" && body.gender !== "female" && body.gender !== "unspecified") {
     return NextResponse.json({ error: "성별을 선택해주세요." }, { status: 400 });
   }
 
   const birthInfo: BirthInfo = {
     calendarType: body.calendarType === "lunar" ? "lunar" : "solar",
+    isLeapMonth: body.calendarType === "lunar" && Boolean(body.isLeapMonth),
     birthDate: body.birthDate,
     birthTime: body.timeUnknown ? null : body.birthTime || null,
     timeUnknown: Boolean(body.timeUnknown),
     jasiRule: JASI_RULES.includes(body.jasiRule as JasiRule) ? (body.jasiRule as JasiRule) : "midnight",
     gender: body.gender,
     useTrueSolarTime: Boolean(body.useTrueSolarTime),
+    birthPlace: typeof body.birthPlace === "string" && body.birthPlace.trim() ? body.birthPlace.trim() : null,
   };
 
   const update: Record<string, unknown> = { birthInfo };

@@ -2,9 +2,13 @@ import { astro } from "iztro";
 import type { GenderName } from "iztro/lib/i18n";
 import type { BirthInfo } from "@/lib/tarot/birthInfo";
 
+// iztro(자미두수 라이브러리)는 성별을 필수로 받고 "중립" 옵션이 없음(manseryeok의 사주 대운과
+// 달리 명궁/신궁 산출 자체에 관여) — "선택안함"은 남성으로 대체해서 계산한다(완벽한 해법은
+// 아니지만 iztro API 제약상 불가피한 근사치, 2026-09-14).
 const GENDER_LABEL: Record<BirthInfo["gender"], GenderName> = {
   male: "남성",
   female: "여자",
+  unspecified: "남성",
 };
 
 /** 00:00 기준 13개 시진 구간의 timeIndex. 0=00:00~01:00 ... 12=23:00~24:00 */

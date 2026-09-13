@@ -28,12 +28,13 @@ export async function POST(req: NextRequest) {
     if (!birthInfo.birthDate) {
       return NextResponse.json({ error: "생년월일을 입력해주세요." }, { status: 400 });
     }
-    if (birthInfo.gender !== "male" && birthInfo.gender !== "female") {
+    if (birthInfo.gender !== "male" && birthInfo.gender !== "female" && birthInfo.gender !== "unspecified") {
       return NextResponse.json({ error: "성별을 선택해주세요." }, { status: 400 });
     }
     birthInfoUpdate = {
       birthInfo: {
         calendarType: birthInfo.calendarType === "lunar" ? "lunar" : "solar",
+        isLeapMonth: birthInfo.calendarType === "lunar" && Boolean(birthInfo.isLeapMonth),
         birthDate: birthInfo.birthDate,
         birthTime: birthInfo.timeUnknown ? null : birthInfo.birthTime || null,
         timeUnknown: Boolean(birthInfo.timeUnknown),
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
           : "midnight",
         gender: birthInfo.gender,
         useTrueSolarTime: Boolean(birthInfo.useTrueSolarTime),
+        birthPlace:
+          typeof birthInfo.birthPlace === "string" && birthInfo.birthPlace.trim()
+            ? birthInfo.birthPlace.trim()
+            : null,
       },
     };
   }
