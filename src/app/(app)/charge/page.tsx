@@ -25,6 +25,19 @@ const COIN_BORDER = [
   TIME_PASS_TIER[30].border,
   TIME_PASS_TIER[60].border,
 ];
+// "N+보너스 M" 알약 배경 — 전부 같은 검정이 아니라 카드 테두리 색조를 따라 은은하게 짙어짐
+// (asset/Screen/Buy - Coin.png 6곳 픽셀 샘플링으로 확인, 2026-09-15: 청록 rgb(35,54,78)/
+// 파랑 rgb(25,50,73)/보라 rgb(41,36,67)/핑크 rgb(57,32,57) — 티어별 tagBg와 계열이 같아 재사용).
+const COIN_TEAL_BONUS_BG = "#23364e";
+const COIN_BONUS_BG = [
+  COIN_TEAL_BONUS_BG,
+  COIN_TEAL_BONUS_BG,
+  TIME_PASS_TIER[15].tagBg,
+  TIME_PASS_TIER[15].tagBg,
+  TIME_PASS_TIER[30].tagBg,
+  TIME_PASS_TIER[30].tagBg,
+  TIME_PASS_TIER[60].tagBg,
+];
 // 코인 상품 7종이 성운 텍스처 4장을 가격대별로 나눠 쓴다(1,100/3,500→tier4, 6,000/14,000→tier3,
 // 40,000/65,000→tier2, 135,000→tier1 — 사용자가 직접 지정한 매핑, 2026-09-14).
 const COIN_TEXTURE = [
@@ -62,13 +75,14 @@ export default function ChargePage() {
               {COIN_PACKAGES.map((pkg, i) => {
                 const bonus = pkg.coins - pkg.priceWon;
                 const color = COIN_BORDER[i % COIN_BORDER.length];
+                const bonusBg = COIN_BONUS_BG[i % COIN_BONUS_BG.length];
                 const bg = COIN_TEXTURE[i % COIN_TEXTURE.length];
                 return (
                   <button
                     key={pkg.priceWon}
                     type="button"
                     onClick={handlePurchaseClick}
-                    className="relative flex items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left"
+                    className="relative flex h-20 items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left"
                     style={{ borderColor: color, backgroundImage: `url(${bg})` }}
                   >
                     <div className="absolute inset-0 bg-[#19191d]/70" />
@@ -77,7 +91,10 @@ export default function ChargePage() {
                         {pkg.coins.toLocaleString("ko-KR")} 코인
                       </p>
                       {bonus > 0 && (
-                        <p className="text-sm font-semibold" style={{ color }}>
+                        <p
+                          className="mt-1 inline-block rounded-full px-3 py-1 text-sm font-semibold"
+                          style={{ color, backgroundColor: bonusBg }}
+                        >
                           {pkg.priceWon.toLocaleString("ko-KR")}+보너스 {bonus.toLocaleString("ko-KR")}
                         </p>
                       )}

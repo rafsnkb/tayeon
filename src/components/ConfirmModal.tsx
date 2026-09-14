@@ -20,19 +20,20 @@ export default function ConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-[28px] border border-border bg-[#2a2c31] p-5"
+        className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-lg font-bold text-white">{title}</p>
+        <div className="mb-9 flex items-center justify-between">
+          <div className="w-5" />
+          <p className="flex-1 text-center text-lg font-bold text-white">{title}</p>
           <button type="button" onClick={onClose} aria-label="닫기" className="text-white">
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
-        <p className="mb-5 whitespace-pre-line text-center text-sm font-semibold text-icon-muted">
+        <p className="mb-7 whitespace-pre-line text-center text-sm font-semibold text-icon-muted">
           {description}
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={onClose}

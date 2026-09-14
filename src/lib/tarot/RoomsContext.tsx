@@ -30,6 +30,7 @@ type RoomsContextValue = {
   user: User | null;
   nickname: string | null;
   profileImage: string | null;
+  email: string | null;
   coins: number | null;
   setCoins: Dispatch<SetStateAction<number | null>>;
   hasBirthInfo: boolean;
@@ -49,6 +50,9 @@ type RoomsContextValue = {
   deleteRoom: (roomId: string) => Promise<void>;
   renameRoom: (roomId: string, title: string) => Promise<void>;
   refreshMe: () => Promise<void>;
+  pendingReadingRoomIds: Set<string>;
+  markReadingPending: (roomId: string) => void;
+  markReadingDone: (roomId: string) => void;
 };
 
 const RoomsContext = createContext<RoomsContextValue | null>(null);
@@ -57,6 +61,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
   const [coins, setCoins] = useState<number | null>(null);
   const [hasBirthInfo, setHasBirthInfo] = useState(false);
   const [myTimeUnknown, setMyTimeUnknown] = useState(false);
@@ -68,6 +73,26 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  // 리딩 요청(handleSubmit)이 "어느 방에" 진행 중인지 — TarotChat 로컬 state가 아니라 여기 두는
+  // 이유: 로딩 중에 다른 페이지로 이동했다가 돌아오면 TarotChat이 통째로 재마운트되는데, 그
+  // 새 인스턴스가 "이 방은 아직 리딩이 안 끝났다"를 알 방법이 로컬 state로는 없어서 방금 물어본
+  // 질문+답변이 사라진 것처럼 보이는 버그가 있었음(2026-09-14, 사용자 리포트: 로딩 중 이용권
+  // 버튼 눌러서 /charge로 이동 후 뒤로가기하면 방금 대화가 없어진 것처럼 보임). 실제로는 서버가
+  // 리딩 저장·코인 차감까지 다 끝내지만(원래 컴포넌트 인스턴스가 죽어도 fetch 자체는 안 끊김),
+  // 새로 마운트된 인스턴스가 "언제 다시 히스토리를 조회해야 하는지" 알 방법이 없어서 생긴 문제.
+  const [pendingReadingRoomIds, setPendingReadingRoomIds] = useState<Set<string>>(new Set());
+
+  const markReadingPending = useCallback((roomId: string) => {
+    setPendingReadingRoomIds((prev) => new Set(prev).add(roomId));
+  }, []);
+  const markReadingDone = useCallback((roomId: string) => {
+    setPendingReadingRoomIds((prev) => {
+      if (!prev.has(roomId)) return prev;
+      const next = new Set(prev);
+      next.delete(roomId);
+      return next;
+    });
+  }, []);
 
   const selectRoom = useCallback((roomId: string) => setActiveRoomId(roomId), []);
 
@@ -79,6 +104,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setNickname(data.nickname);
     setProfileImage(data.profileImage ?? null);
+    setEmail(data.email ?? null);
     setCoins(data.coins);
     setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
     setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
@@ -108,6 +134,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         const data = await meRes.json();
         setNickname(data.nickname);
         setProfileImage(data.profileImage ?? null);
+        setEmail(data.email ?? null);
         setCoins(data.coins);
         setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
         setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
@@ -188,6 +215,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         user,
         nickname,
         profileImage,
+        email,
         coins,
         setCoins,
         hasBirthInfo,
@@ -207,6 +235,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         deleteRoom,
         renameRoom,
         refreshMe,
+        pendingReadingRoomIds,
+        markReadingPending,
+        markReadingDone,
       }}
     >
       {children}

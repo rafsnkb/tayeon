@@ -147,7 +147,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-sm font-semibold text-icon-muted">보유코인</span>
               <span className="flex items-center gap-1">
                 <img src="/icons/coin.png" alt="" className="h-5 w-5" />
-                <span className="text-lg font-bold text-gold">{coins ?? "-"}</span>
+                <span className="text-lg font-bold text-gold">
+                  {coins !== null ? coins.toLocaleString("ko-KR") : "-"}
+                </span>
               </span>
             </div>
             <div className="flex items-center justify-between px-4 py-1.5">
@@ -219,18 +221,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* hori.chat은 사이드바가 나타나는 폭(~1200px) 전까지 헤더/본문이 전부 풀블리드로 화면을
-          꽉 채운다 — 여기서 max-w를 걸면 모바일도 아니고 데스크탑도 아닌 중간 폭(예: 900px)에서
-          탑바·하단바가 좁은 칼럼 안에 갇혀 양옆에 빈 검은 배경만 남는 문제가 있었다
-          (2026-09-14, 사용자 피드백: "탑바/하단바가 잘려있다"). 사이드바가 뜨는 xl부터만 폭을
-          제한하고 가운데 정렬한다 — 바깥 div(flex-1)가 사이드바 옆 남는 공간을 전부 차지하고,
-          안쪽 div가 그 안에서 max-w로 잡힌 뒤 중앙 정렬된다. flex-1과 mx-auto를 같은 요소에
-          같이 걸면 flex-grow가 auto 마진보다 먼저 공간을 다 먹어버려서 오른쪽에만 빈 공간이
-          남는 버그가 있었음(2026-09-14, 재현 확인 후 수정). */}
-      <div className="flex w-full flex-1 flex-col overflow-hidden xl:items-center">
-        <div className="flex h-full w-full flex-1 flex-col overflow-hidden xl:max-w-4xl">
-          {children}
-        </div>
+      {/* 사이드바 옆 남는 공간은 여기서 전부 채운다(풀블리드) — hori.chat처럼 탑바/컴포저 배경은
+          화면 끝까지, 그 안의 실제 콘텐츠만 중앙정렬하는 2단 구조는 /tarot 자신(TarotChat)이
+          내부적으로 처리한다(서브페이지들이 각자 mx-auto max-w-2xl을 거는 것과 같은 패턴).
+          예전엔 이 wrapper에 xl:max-w-4xl을 걸어서 /tarot의 탑바까지 통째로 좁아졌었음
+          (2026-09-14 발견, 사용자 피드백: "상단바가 왜 안 고쳐지냐") — 제거함. */}
+      <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
+        {children}
       </div>
     </div>
   );

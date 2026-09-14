@@ -8,16 +8,18 @@ import { BackIcon } from "@/app/(app)/tarot/icons";
 export default function SubPageTopBar({ title }: { title: string }) {
   const router = useRouter();
   return (
-    <div className="relative flex h-16 shrink-0 items-center justify-center border-b border-border bg-topbar">
-      <button
-        type="button"
-        onClick={() => router.back()}
-        aria-label="뒤로가기"
-        className="absolute left-0 flex h-16 w-16 items-center justify-center text-white"
-      >
-        <BackIcon className="h-5 w-2.5" />
-      </button>
-      <span className="text-xl font-semibold text-white">{title}</span>
+    <div className="flex h-16 shrink-0 items-center justify-center border-b border-border bg-topbar">
+      <div className="relative mx-auto flex h-full w-full max-w-2xl items-center justify-center">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="뒤로가기"
+          className="absolute left-0 flex h-16 items-center text-white"
+        >
+          <BackIcon className="h-5 w-2.5" />
+        </button>
+        <span className="text-xl font-semibold text-white">{title}</span>
+      </div>
     </div>
   );
 }

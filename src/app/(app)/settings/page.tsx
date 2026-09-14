@@ -19,12 +19,19 @@ const PORTRAITS: Record<ToneKey, string> = {
 };
 
 // 피그마엔 이름표(루미/그레모라/셀레네아/모리)+설명 문구가 있었지만, 현재 실제 페르소나 정의
-// (src/lib/tarot/tone.ts)와 어긋나는 구버전 문구였음 — 실제 label에서 이름/설명을 그대로 뽑아 쓴다.
+// (src/lib/tarot/tone.ts)와 어긋나는 구버전 문구였음 — 이름은 label에서 뽑고, 설명은 사용자가
+// 직접 확정한 문구를 따로 둔다(2026-09-15).
 function toneName(key: ToneKey): string {
   return TONES[key].label.split(" · ")[0];
 }
+const TONE_DESCRIPTIONS: Record<ToneKey, string> = {
+  warm: "밝고 순수한 스타일",
+  direct: "시크+팩폭으로 냉정하게 분석해주는 스타일",
+  mystical: "신비롭고 잔잔한 스타일",
+  friendly: "편안한 친구 스타일",
+};
 function toneDescription(key: ToneKey): string {
-  return TONES[key].label.split(" · ")[1] ?? "";
+  return TONE_DESCRIPTIONS[key];
 }
 
 function SectionPanel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -157,7 +164,7 @@ export default function SettingsPage() {
           <SectionPanel title="상담 설정">
             <div>
               <p className="text-sm font-semibold text-icon-muted">상담가 선택</p>
-              <div className="flex gap-3 overflow-x-auto pt-2">
+              <div className="flex justify-center gap-4 pt-2">
                 {(Object.keys(TONES) as ToneKey[]).map((key) => (
                   <button
                     key={key}
@@ -165,14 +172,16 @@ export default function SettingsPage() {
                     onClick={() => setTone(key)}
                     className="flex shrink-0 flex-col items-center gap-2"
                   >
-                    <span
-                      className={`relative h-[72px] w-[72px] overflow-hidden rounded-full border-2 ${
-                        tone === key ? "border-point" : "border-white/50"
-                      }`}
-                    >
-                      <img src={PORTRAITS[key]} alt="" className="h-full w-full object-cover" />
+                    <span className="relative">
+                      <span
+                        className={`block h-[72px] w-[72px] overflow-hidden rounded-full border-2 ${
+                          tone === key ? "border-point" : "border-border"
+                        }`}
+                      >
+                        <img src={PORTRAITS[key]} alt="" className="h-full w-full object-cover" />
+                      </span>
                       {tone === key && (
-                        <span className="absolute right-0 top-0 flex h-7 w-7 items-center justify-center rounded-full bg-point text-white">
+                        <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-point text-white">
                           <CheckIcon className="h-3.5 w-4" />
                         </span>
                       )}
@@ -247,15 +256,16 @@ export default function SettingsPage() {
                 onChange={handleToggleTheme}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setDeleteConfirmOpen(true)}
-              disabled={deleting}
-              className="self-start text-sm font-semibold text-urgent disabled:opacity-50"
-            >
-              탈퇴하기
-            </button>
           </SectionPanel>
+
+          <button
+            type="button"
+            onClick={() => setDeleteConfirmOpen(true)}
+            disabled={deleting}
+            className="self-center text-sm font-semibold text-urgent disabled:opacity-50"
+          >
+            탈퇴하기
+          </button>
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">

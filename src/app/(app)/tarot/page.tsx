@@ -167,7 +167,7 @@ function DualPathLayout({ cards }: { cards: TarotCardInfo[] }) {
 
 function WelcomePopup({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-w-sm flex-col gap-3 rounded-2xl bg-surface p-6">
         <h2 className="text-lg font-bold text-bold-text">타연에 오신 걸 환영해요</h2>
         <ul className="list-disc pl-5 text-sm text-text">
@@ -256,9 +256,9 @@ function HeldTimepassListModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
-        className="flex max-h-[70vh] w-full flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
+        className="flex max-h-[70vh] w-full xl:mx-auto xl:max-w-4xl flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 p-1">
@@ -300,9 +300,9 @@ function HeldTimepassUseModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
-        className="flex w-full flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
+        className="flex w-full xl:mx-auto xl:max-w-4xl flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 p-1">
@@ -344,9 +344,9 @@ function SpreadSelectSheet({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
-        className="w-full rounded-t-[28px] border border-border bg-topbar p-4"
+        className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-2 flex items-center gap-3 p-3">
@@ -407,6 +407,164 @@ function SpreadSelectSheet({
   );
 }
 
+/** 피그마 "Screen / SpreadSelect"(사주·자미두수 추가 시트, 궁합 추가 시트)가 공용으로 쓰는
+ * on/off 스위치 — 기존 코드베이스엔 세그먼트 버튼(ToggleGroup)만 있고 iOS류 스위치가 없어서 신설. */
+function Switch({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      disabled={disabled}
+      className={`relative h-7 w-[72px] shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+        checked ? "bg-point" : "bg-icon-muted"
+      }`}
+    >
+      <span
+        className={`absolute left-0 top-0.5 h-6 w-6 rounded-full transition-transform ${
+          checked ? "translate-x-11 bg-white" : "translate-x-1 bg-cta-fill"
+        }`}
+      />
+    </button>
+  );
+}
+
+/** 피그마 "Screen / SpreadSelect"(2번째 프레임) — 사주 아이콘/자미두수 아이콘을 누르면 곧바로
+ * 토글되는 대신, 설명+비용+스위치가 있는 바텀시트를 먼저 보여준다. */
+function SajuZiweiSheet({
+  includeSaju,
+  includeZiwei,
+  onToggleSaju,
+  onToggleZiwei,
+  ziweiDisabled,
+  onClose,
+}: {
+  includeSaju: boolean;
+  includeZiwei: boolean;
+  onToggleSaju: () => void;
+  onToggleZiwei: () => void;
+  ziweiDisabled: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-1 flex items-center gap-3 p-1">
+          <div className="w-5" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-bold leading-tight text-bold-text">사주ㆍ자미두수 해석 추가</p>
+            <p className="text-sm font-semibold leading-tight text-icon-muted">
+              타로에 사주ㆍ자미두수 정보를 추가해서 심층 분석
+            </p>
+            <p className="text-sm font-semibold leading-tight text-urgent [word-break:keep-all]">
+              사주를 추가하려면 생년월일 정보가, 자미두수를 추가하려면 태어난 시간 정보가 필요합니다
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-1 rounded-2xl bg-border/40 p-2">
+          <div className="flex items-center gap-3 rounded-lg p-1">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
+              <SajuIcon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1">
+                <span className="text-base font-semibold text-bold-text">사주 해석 추가</span>
+                <CoinIcon className="h-4 w-4" />
+                <span className="text-sm font-semibold text-gold">{SAJU_ADD_ON_COST}</span>
+              </span>
+              <span className="block text-sm font-semibold text-icon-muted">타로+사주 조합으로 심층 분석</span>
+            </span>
+            <Switch checked={includeSaju} onChange={onToggleSaju} />
+          </div>
+          <div className="h-px bg-border" />
+          <div className="flex items-center gap-3 rounded-lg p-1">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
+              <ZiweiIcon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1">
+                <span className="text-base font-semibold text-bold-text">자미두수 해석 추가</span>
+                <CoinIcon className="h-4 w-4" />
+                <span className="text-sm font-semibold text-gold">{ZIWEI_ADD_ON_COST}</span>
+              </span>
+              <span className="block text-sm font-semibold text-icon-muted">타로+자미두수 조합으로 심층 분석</span>
+            </span>
+            <Switch checked={includeZiwei} onChange={onToggleZiwei} disabled={ziweiDisabled} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 피그마 "Screen / SpreadSelect"(3번째 프레임) — 궁합 아이콘도 위 사주·자미두수 시트와 같은
+ * 패턴으로 설명+비용+스위치 바텀시트를 거친다. */
+function CompatibilitySheet({
+  includeCompatibility,
+  onToggle,
+  onClose,
+}: {
+  includeCompatibility: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-1 flex items-center gap-3 p-1">
+          <div className="w-5" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-bold leading-tight text-bold-text">궁합 해석 추가</p>
+            <p className="text-sm font-semibold leading-tight text-icon-muted">
+              타로와 사주ㆍ자미두수 정보를 기반으로 궁합까지
+            </p>
+            <p className="text-xs font-semibold leading-tight text-urgent [word-break:keep-all]">
+              궁합 해석을 추가하려면 상대방 프로필 정보가 필요합니다
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-1 rounded-2xl bg-border/40 p-2">
+          <div className="flex items-center gap-3 rounded-lg p-1">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
+              <CompatibilityIcon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1">
+                <span className="text-base font-semibold text-bold-text">궁합 해석 추가</span>
+                <CoinIcon className="h-4 w-4" />
+                <span className="text-sm font-semibold text-gold">{COMPATIBILITY_ADD_ON_COST}</span>
+              </span>
+              <span className="block text-sm font-semibold text-icon-muted">상대방과의 궁합을 더 자세하게 분석</span>
+            </span>
+            <Switch checked={includeCompatibility} onChange={onToggle} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TarotPage() {
   return (
     <Suspense fallback={null}>
@@ -437,6 +595,9 @@ function TarotChat() {
     setActiveTimePass,
     timePasses,
     setTimePasses,
+    pendingReadingRoomIds,
+    markReadingPending,
+    markReadingDone,
   } = useRooms();
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "1");
@@ -450,15 +611,22 @@ function TarotChat() {
   const [startingPass, setStartingPass] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [spreadSheetOpen, setSpreadSheetOpen] = useState(false);
+  const [sajuZiweiSheetOpen, setSajuZiweiSheetOpen] = useState(false);
+  const [compatibilitySheetOpen, setCompatibilitySheetOpen] = useState(false);
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
   const [timePassListOpen, setTimePassListOpen] = useState(false);
   const [timePassToUse, setTimePassToUse] = useState<TimePass | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
+  // 이 방에서 진행 중인 리딩 요청이 있는지 — 이 인스턴스가 직접 시작했든(loading), 로딩 중
+  // 페이지 이동 후 돌아와서 다른(재마운트 전) 인스턴스가 시작한 걸 뒤늦게 알게 됐든
+  // (isRoomPending) 상관없이 UI는 동일하게 "응답 대기 중"으로 보여줘야 한다.
+  const isRoomPending = Boolean(activeRoomId && pendingReadingRoomIds.has(activeRoomId));
+  const showLoading = loading || isRoomPending;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, loading]);
+  }, [messages, showLoading]);
 
   useEffect(() => {
     if (!activeTimePass || new Date(activeTimePass.expiresAt).getTime() <= now) return;
@@ -534,6 +702,35 @@ function TarotChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeRoomId]);
 
+  // 방금 물어본 질문이 이 방에서 서버 응답을 기다리는 중인지는 RoomsContext(레이아웃 레벨,
+  // 재마운트에 영향 안 받음)로 추적한다 — 로딩 중에 다른 페이지로 이동했다가 돌아오면 이
+  // TarotChat 인스턴스는 통째로 재마운트되어 로컬 loading/messages state가 초기화되는데,
+  // 그 사이 서버는 리딩 저장·코인 차감을 끝냈을 수 있다. 아무 데도 그 사실을 확인할 방법이
+  // 없으면 방금 물어본 질문+답변이 그냥 사라진 것처럼 보인다(2026-09-14, 사용자 리포트).
+  const startedHereRef = useRef<Set<string>>(new Set());
+  const prevPendingRef = useRef<{ roomId: string | null; pending: boolean }>({
+    roomId: null,
+    pending: false,
+  });
+  useEffect(() => {
+    if (!activeRoomId) return;
+    const prev = prevPendingRef.current;
+    if (!isRoomPending && prev.roomId === activeRoomId && prev.pending) {
+      if (startedHereRef.current.has(activeRoomId)) {
+        // 이 인스턴스가 직접 시작한 요청 — handleSubmit이 이미 setMessages로 결과를 반영했다.
+        startedHereRef.current.delete(activeRoomId);
+      } else {
+        // 다른(아마 이미 언마운트된) 인스턴스가 시작한 요청이 방금 끝남 — 히스토리를 다시
+        // 불러와서 반영한다.
+        fetchRoomHistory(activeRoomId).then((history) => {
+          if (history) setMessages(history);
+        });
+      }
+    }
+    prevPendingRef.current = { roomId: activeRoomId, pending: isRoomPending };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRoomPending, activeRoomId]);
+
   async function handleStartTimePass(passId: string) {
     if (!user || startingPass) return;
     setStartingPass(passId);
@@ -581,7 +778,7 @@ function TarotChat() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = question.trim();
-    if (!trimmed || loading || !user || !activeRoomId) return;
+    if (!trimmed || showLoading || !user || !activeRoomId) return;
 
     if (includeZiwei && myTimeUnknown) {
       setMessages((prev) => [
@@ -607,6 +804,8 @@ function TarotChat() {
     setMessages((prev) => [...prev, { role: "user", text: trimmed }]);
     setQuestion("");
     setLoading(true);
+    startedHereRef.current.add(activeRoomId);
+    markReadingPending(activeRoomId);
 
     try {
       const idToken = await user.getIdToken();
@@ -686,6 +885,7 @@ function TarotChat() {
       }
     } finally {
       setLoading(false);
+      markReadingDone(activeRoomId);
     }
   }
 
@@ -704,13 +904,30 @@ function TarotChat() {
   const isBlankRoom = (activeRoom?.title ?? DEFAULT_ROOM_TITLE) === DEFAULT_ROOM_TITLE && messages.length === 0;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
+    <div className="relative flex h-full flex-col overflow-hidden bg-bg">
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
       {spreadSheetOpen && (
         <SpreadSelectSheet
           spread={spread}
           onSelect={setSpread}
           onClose={() => setSpreadSheetOpen(false)}
+        />
+      )}
+      {sajuZiweiSheetOpen && (
+        <SajuZiweiSheet
+          includeSaju={includeSaju}
+          includeZiwei={includeZiwei}
+          onToggleSaju={() => setIncludeSaju((v) => !v)}
+          onToggleZiwei={() => setIncludeZiwei((v) => !v)}
+          ziweiDisabled={myTimeUnknown}
+          onClose={() => setSajuZiweiSheetOpen(false)}
+        />
+      )}
+      {compatibilitySheetOpen && (
+        <CompatibilitySheet
+          includeCompatibility={includeCompatibility}
+          onToggle={() => setIncludeCompatibility((v) => !v)}
+          onClose={() => setCompatibilitySheetOpen(false)}
         />
       )}
       {timePassListOpen && (
@@ -735,6 +952,7 @@ function TarotChat() {
         />
       )}
       <div className="relative flex h-16 shrink-0 items-center border-b border-border bg-topbar">
+        <div className="flex h-full w-full items-center xl:mx-auto xl:max-w-4xl xl:pl-4">
         <button
           type="button"
           onClick={openMenu}
@@ -816,9 +1034,10 @@ function TarotChat() {
             </div>
           </>
         )}
+        </div>
       </div>
       {!isBlankRoom && (
-        <div className="flex shrink-0 justify-end px-4 pt-2">
+        <div className="mx-auto flex w-full shrink-0 justify-end px-4 pt-2 xl:max-w-4xl">
           <button
             type="button"
             onClick={() => (timePasses.length > 0 ? setTimePassListOpen(true) : router.push("/charge"))}
@@ -834,7 +1053,7 @@ function TarotChat() {
         </div>
       )}
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 pt-3">
+      <div className="mx-auto flex w-full flex-1 flex-col gap-3 overflow-y-auto p-4 pt-3 xl:max-w-4xl">
         {!historyLoaded && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
         )}
@@ -878,7 +1097,7 @@ function TarotChat() {
                   <span className="rounded-full border border-border px-3 py-1 text-base font-semibold text-text">
                     {SPREADS[msg.spread].label}
                   </span>
-                  <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
+                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
                     {msg.cards.map((c, j) => (
                       <span key={j} className="rounded-full bg-text px-3 py-1 font-semibold text-surface">
                         {c.nameKo}
@@ -945,7 +1164,7 @@ function TarotChat() {
             </div>
           );
         })}
-        {loading && (
+        {showLoading && (
           <div className="self-start rounded-2xl bg-surface px-4 py-3 text-text">
             카드를 뽑고 해석하는 중...
           </div>
@@ -953,7 +1172,7 @@ function TarotChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="shrink-0 px-4 pb-4">
+      <div className="mx-auto w-full shrink-0 px-4 pb-4 xl:max-w-4xl">
         {timePassActive && activeTimePass && (
           <div className="mb-2 flex items-center gap-2.5 rounded-2xl bg-chip-fill px-2.5 py-2">
             <span className="text-sm font-semibold text-icon-muted">시간제 사용중</span>
@@ -973,7 +1192,7 @@ function TarotChat() {
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="궁금한 것을 물어보세요"
             className="min-w-0 flex-1 bg-transparent text-base font-semibold text-bold-text placeholder-placeholder outline-none"
-            disabled={loading}
+            disabled={showLoading}
           />
           <div className="flex items-center gap-2.5">
             <button
@@ -987,7 +1206,7 @@ function TarotChat() {
               <>
                 <button
                   type="button"
-                  onClick={() => setIncludeSaju((v) => !v)}
+                  onClick={() => setSajuZiweiSheetOpen(true)}
                   aria-pressed={includeSaju}
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                     includeSaju
@@ -999,7 +1218,7 @@ function TarotChat() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIncludeZiwei((v) => !v)}
+                  onClick={() => setSajuZiweiSheetOpen(true)}
                   aria-pressed={includeZiwei}
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                     includeZiwei
@@ -1014,7 +1233,7 @@ function TarotChat() {
             {hasPartner && (
               <button
                 type="button"
-                onClick={() => setIncludeCompatibility((v) => !v)}
+                onClick={() => setCompatibilitySheetOpen(true)}
                 aria-pressed={includeCompatibility}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                   includeCompatibility
@@ -1028,7 +1247,7 @@ function TarotChat() {
             <span className="flex-1" />
             <button
               type="submit"
-              disabled={loading}
+              disabled={showLoading}
               aria-label="질문하기"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text disabled:opacity-50"
             >
@@ -1057,7 +1276,8 @@ function TarotChat() {
             )}
           </div>
           <span className="whitespace-nowrap text-icon-muted">
-            보유 {coins ?? "-"}코인 · 총 {displayedCost}코인
+            보유 {coins !== null ? coins.toLocaleString("ko-KR") : "-"}코인 · 총{" "}
+            {displayedCost.toLocaleString("ko-KR")}코인
             {spreadCoveredDisplay && <span className="text-point"> (이용권 적용)</span>}
           </span>
         </div>

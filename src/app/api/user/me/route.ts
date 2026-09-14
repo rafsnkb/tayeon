@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     nickname: data?.nickname ?? null,
     profileImage: data?.profileImage ?? null,
+    email: data?.email ?? null,
     termsAgreedAt: data?.termsAgreedAt ?? null,
     coins: data?.coins ?? 0,
     tone: data?.tone ?? DEFAULT_TONE,

@@ -50,11 +50,15 @@ export async function GET(req: NextRequest) {
   const profile = (await profileRes.json()) as {
     id: number;
     properties?: { nickname?: string; profile_image?: string };
+    kakao_account?: { email?: string; is_email_valid?: boolean; is_email_verified?: boolean };
   };
 
   const uid = `kakao:${profile.id}`;
   const nickname = profile.properties?.nickname ?? null;
   const profileImage = profile.properties?.profile_image ?? null;
+  // 카카오 디벨로퍼스에서 이메일 동의항목을 활성화해야 오고, 동의를 안 했거나 이메일이 없는
+  // 카카오 계정이면 이번 로그인 응답에 아예 안 실려온다(2026-09-15) — 그 경우 기존 값 유지.
+  const email = profile.kakao_account?.email ?? null;
 
   const userRef = adminDb.collection("users").doc(uid);
   const existing = await userRef.get();
@@ -68,6 +72,7 @@ export async function GET(req: NextRequest) {
       kakaoId: profile.id,
       ...(nickname !== null ? { nickname } : {}),
       ...(profileImage !== null ? { profileImage } : {}),
+      ...(email !== null ? { email } : {}),
       updatedAt: new Date().toISOString(),
     },
     { merge: true }

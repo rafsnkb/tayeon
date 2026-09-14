@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
@@ -73,6 +73,25 @@ function ComingSoon() {
 }
 
 // 완벽한 UA 파싱은 아니고, 계정정보 모달의 "접속환경" 표시용 대략적인 추정치.
+// 계정정보 모달 "가입일"/"최근 로그인" — 피그마는 0패딩 24시간제(YYYY.MM.DD HH:mm:ss)인데
+// toLocaleString("ko-KR") 기본값은 "2026. 1. 10. 오전 9:00:00"처럼 패딩 없는 12시간제로 나와서 다름.
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(
+    d.getMinutes()
+  )}:${pad(d.getSeconds())}`;
+}
+
+// 마이페이지 "시간제 이용권" 카운트다운 — /tarot 컴포저의 "mm:ss" 표기와 달리
+// 피그마 "MyPage"는 "58분 42초" 식 한글 표기.
+function formatRemainingKo(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}분 ${s}초`;
+}
+
 function describeEnvironment(): string {
   if (typeof navigator === "undefined") return "-";
   const ua = navigator.userAgent;
@@ -99,10 +118,17 @@ function describeEnvironment(): string {
  * 목적지 없이 안내만 띄움. */
 export default function MyPage() {
   const router = useRouter();
-  const { user, nickname, profileImage, coins, activeTimePass, timePasses } = useRooms();
+  const { user, nickname, profileImage, email, coins, activeTimePass, timePasses } = useRooms();
   const [accountInfoOpen, setAccountInfoOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!activeTimePass) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [activeTimePass]);
 
   async function openAccountInfo() {
     setAccountInfoOpen(true);
@@ -128,6 +154,7 @@ export default function MyPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-lg font-semibold text-[#dcdee3]">{nickname ?? "-"}</p>
+                <p className="truncate text-sm font-semibold text-icon-muted">{email ?? "카카오 로그인"}</p>
               </div>
               <button
                 type="button"
@@ -139,33 +166,41 @@ export default function MyPage() {
               </button>
             </div>
             <div className="flex items-center justify-between py-3">
-              <span className="flex items-center gap-1.5">
-                <img src="/icons/coin.png" alt="" className="h-5 w-5" />
-                <span className="text-lg font-bold text-gold">{coins ?? "-"}</span>
+              <span className="text-sm font-semibold text-icon-muted">보유코인</span>
+              <span className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5">
+                  <img src="/icons/coin.png" alt="" className="h-5 w-5" />
+                  <span className="text-lg font-bold text-gold">
+                    {coins !== null ? coins.toLocaleString("ko-KR") : "-"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/charge")}
+                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
+                >
+                  충전
+                </button>
               </span>
-              <button
-                type="button"
-                onClick={() => router.push("/charge")}
-                className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
-              >
-                충전
-              </button>
             </div>
             <div className="flex items-center justify-between py-3">
-              <span className="text-base font-semibold text-white">
-                {activeTimePass
-                  ? "시간제 이용권 사용중"
-                  : timePasses.length > 0
-                    ? `보유 이용권 ${timePasses.length}개`
-                    : "보유 이용권 없음"}
+              <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
+              <span className="flex items-center gap-3">
+                <span className="text-lg font-bold text-white">
+                  {activeTimePass
+                    ? formatRemainingKo(new Date(activeTimePass.expiresAt).getTime() - now)
+                    : timePasses.length > 0
+                      ? `보유 ${timePasses.length}개`
+                      : "없음"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => router.push("/charge")}
+                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
+                >
+                  구입
+                </button>
               </span>
-              <button
-                type="button"
-                onClick={() => router.push("/charge")}
-                className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
-              >
-                구입
-              </button>
             </div>
             <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={ComingSoon} />
           </Section>
@@ -202,44 +237,45 @@ export default function MyPage() {
           onClick={() => setAccountInfoOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-[32px] border border-border bg-[#2a2c31] p-4"
+            className="w-full max-w-sm rounded-[32px] border border-border bg-topbar p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-lg font-bold text-white">계정 정보</p>
+              <div className="w-5" />
+              <p className="flex-1 text-center text-lg font-bold text-white">계정 정보</p>
               <button type="button" onClick={() => setAccountInfoOpen(false)} aria-label="닫기" className="text-white">
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex flex-col gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">아이디</span>
-                <span className="font-semibold text-white">카카오 로그인</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">UID</span>
-                <span className="font-semibold text-white">{user?.uid ?? "-"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">가입일</span>
-                <span className="font-semibold text-white">
-                  {termsAgreedAt ? new Date(termsAgreedAt).toLocaleString("ko-KR") : "-"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">최근 로그인</span>
-                <span className="font-semibold text-white">
-                  {user?.metadata.lastSignInTime
-                    ? new Date(user.metadata.lastSignInTime).toLocaleString("ko-KR")
-                    : "-"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">접속환경</span>
-                <span className="font-semibold text-white">{describeEnvironment()}</span>
+            <div className="rounded-2xl bg-border p-4">
+              <div className="flex flex-col gap-[28px] text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-icon-muted">아이디</span>
+                  <span className="font-semibold text-white">{email ?? "카카오 로그인"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-icon-muted">UID</span>
+                  <span className="font-semibold text-white">{user?.uid ?? "-"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-icon-muted">가입일</span>
+                  <span className="font-semibold text-white">
+                    {termsAgreedAt ? formatDateTime(termsAgreedAt) : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-icon-muted">최근 로그인</span>
+                  <span className="font-semibold text-white">
+                    {user?.metadata.lastSignInTime ? formatDateTime(user.metadata.lastSignInTime) : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-icon-muted">접속환경</span>
+                  <span className="font-semibold text-white">{describeEnvironment()}</span>
+                </div>
               </div>
             </div>
-            <p className="mt-4 text-xs text-icon-muted">
+            <p className="mt-4 text-center text-xs text-icon-muted">
               고객센터 문의 시 현재 화면을 캡처하여 같이 보내주시면 빠르게 도움을 드릴 수 있습니다.
             </p>
           </div>

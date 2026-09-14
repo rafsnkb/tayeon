@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import ConfirmModal from "@/components/ConfirmModal";
 
 type Partner = {
   nickname: string;
@@ -55,12 +56,12 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
 }
 
-/** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 전부 선택 입력이고
- * "삭제하기"가 추가로 있음. 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을
- * 보여주고 기존 값으로 미리 채워두는 방식이라 그에 맞춰 단순화함. */
+/** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 전부 선택 입력.
+ * 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을 보여주고 기존 값으로
+ * 미리 채워두는 방식이라 그에 맞춰 단순화함. 피그마엔 "삭제하기" 버튼도 있었지만 사용자
+ * 요청으로 제거함(2026-09-15). */
 export default function CompatibilityPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [hasPartner, setHasPartner] = useState(false);
   const [nickname, setNickname] = useState("");
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("solar");
   const [birthDate, setBirthDate] = useState("");
@@ -70,6 +71,8 @@ export default function CompatibilityPage() {
   const [birthPlace, setBirthPlace] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -83,7 +86,6 @@ export default function CompatibilityPage() {
         const data = await res.json();
         const partner = data.partner as Partner | null;
         if (partner) {
-          setHasPartner(true);
           setNickname(partner.nickname);
           setCalendarMode(toCalendarMode(partner.calendarType, partner.isLeapMonth));
           setBirthDate(partner.birthDate ?? "");
@@ -121,23 +123,20 @@ export default function CompatibilityPage() {
         setError(data.error ?? "저장에 실패했어요.");
         return;
       }
-      setHasPartner(true);
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleDelete() {
-    if (!user || submitting) return;
-    if (!confirm("저장된 상대 정보를 삭제할까요?")) return;
-    setSubmitting(true);
+  async function handleReset() {
+    if (!user || resetting) return;
+    setResetting(true);
     try {
       const idToken = await user.getIdToken();
       await fetch("/api/user/partner", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${idToken}` },
       });
-      setHasPartner(false);
       setNickname("");
       setBirthDate("");
       setBirthTime("");
@@ -145,8 +144,9 @@ export default function CompatibilityPage() {
       setGender("unspecified");
       setCalendarMode("solar");
       setBirthPlace("");
+      setResetConfirmOpen(false);
     } finally {
-      setSubmitting(false);
+      setResetting(false);
     }
   }
 
@@ -233,30 +233,38 @@ export default function CompatibilityPage() {
           </label>
 
           {error && <p className="text-sm text-urgent">{error}</p>}
-
-          {hasPartner && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={submitting}
-              className="self-start text-sm font-semibold text-urgent disabled:opacity-50"
-            >
-              삭제하기
-            </button>
-          )}
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
-        <button
-          type="submit"
-          disabled={!nickname.trim() || submitting}
-          className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            nickname.trim() ? "bg-point text-white" : "bg-chip-fill text-placeholder"
-          } disabled:opacity-60`}
-        >
-          저장하기
-        </button>
+        <div className="mx-auto flex w-full max-w-2xl gap-2">
+          <button
+            type="button"
+            onClick={() => setResetConfirmOpen(true)}
+            className="h-12 flex-1 rounded-2xl bg-urgent text-lg font-semibold text-white"
+          >
+            초기화
+          </button>
+          <button
+            type="submit"
+            disabled={!nickname.trim() || submitting}
+            className={`h-12 flex-[2] rounded-2xl text-lg font-semibold ${
+              nickname.trim() ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            } disabled:opacity-60`}
+          >
+            저장하기
+          </button>
+        </div>
       </div>
+      {resetConfirmOpen && (
+        <ConfirmModal
+          title="상대 프로필 초기화"
+          description="상대 프로필이 모두 지워집니다."
+          confirmLabel="초기화"
+          busy={resetting}
+          onConfirm={handleReset}
+          onClose={() => setResetConfirmOpen(false)}
+        />
+      )}
     </form>
   );
 }

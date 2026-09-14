@@ -3,6 +3,9 @@ function getKakaoAuthorizeUrl() {
     client_id: process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!,
     redirect_uri: process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!,
     response_type: "code",
+    // 계정정보 모달/마이페이지에 실제 카카오 이메일을 보여주려면 명시적으로 요청해야 함
+    // (카카오 디벨로퍼스 콘솔에서 이메일 동의항목이 "선택 동의"면 scope 없인 안 옴, 2026-09-15).
+    scope: "account_email",
   });
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
