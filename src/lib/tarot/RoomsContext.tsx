@@ -49,6 +49,7 @@ type RoomsContextValue = {
   createRoom: () => Promise<Room | null>;
   deleteRoom: (roomId: string) => Promise<void>;
   renameRoom: (roomId: string, title: string) => Promise<void>;
+  setRoomTitleLocal: (roomId: string, title: string) => void;
   refreshMe: () => Promise<void>;
   pendingReadingRoomIds: Set<string>;
   markReadingPending: (roomId: string) => void;
@@ -209,6 +210,14 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  // 방의 첫 리딩이 성공하면 서버(/api/tarot/reading)가 Firestore 방 제목을 "새 대화"에서 질문
+  // 앞부분으로 직접 바꾸는데, 이 컨텍스트의 rooms는 최초 로그인 시 한 번만 불러온 로컬 상태라
+  // 그 변경이 반영되지 않고 있었다(2026-09-15) — API 재호출 없이 로컬 상태만 서버와 같은 값으로
+  // 맞춰준다(src/app/(app)/tarot/page.tsx의 handleSubmit이 첫 메시지일 때만 호출).
+  const setRoomTitleLocal = useCallback((roomId: string, title: string) => {
+    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, title } : r)));
+  }, []);
+
   return (
     <RoomsContext.Provider
       value={{
@@ -234,6 +243,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         createRoom,
         deleteRoom,
         renameRoom,
+        setRoomTitleLocal,
         refreshMe,
         pendingReadingRoomIds,
         markReadingPending,

@@ -82,6 +82,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/tarot?room=${roomId}`);
   }
 
+  function handleGoCharge() {
+    setMenuOpen(false);
+    router.push("/charge");
+  }
+
   if (!authChecked || !user) return null;
 
   // 서브페이지(/me, /settings, /charge 등)는 사이드바 없이 단순 중앙정렬 — hori.chat의 /terms,
@@ -128,14 +133,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <div className="shrink-0">
           <div className={`flex h-16 items-center px-4 ${sidebarCollapsed ? "xl:justify-center xl:px-0" : "justify-between"}`}>
             <span className={`text-2xl font-bold ${sidebarCollapsed ? "xl:hidden" : ""}`}>
-              <span className="text-white">타</span>
+              <span className="text-bold-text">타</span>
               <span className="text-point">연</span>
             </span>
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
               aria-label={sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
-              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-icon-muted hover:bg-[#26272c] xl:flex"
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-icon-muted hover:bg-chip-fill hover:text-white xl:flex"
             >
               <ChevronRightIcon
                 className={`h-3 w-2 transition-transform ${sidebarCollapsed ? "" : "rotate-180"}`}
@@ -145,16 +150,34 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <div className={sidebarCollapsed ? "xl:hidden" : ""}>
             <div className="flex items-center justify-between px-4 py-1.5">
               <span className="text-sm font-semibold text-icon-muted">보유코인</span>
-              <span className="flex items-center gap-1">
-                <img src="/icons/coin.png" alt="" className="h-5 w-5" />
-                <span className="text-lg font-bold text-gold">
-                  {coins !== null ? coins.toLocaleString("ko-KR") : "-"}
+              <span className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <img src="/icons/coin.png" alt="" className="h-5 w-5" />
+                  <span className="text-lg font-bold text-bold-text dark:text-gold">
+                    {coins !== null ? coins.toLocaleString("ko-KR") : "-"}
+                  </span>
                 </span>
+                <button
+                  type="button"
+                  onClick={handleGoCharge}
+                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
+                >
+                  충전
+                </button>
               </span>
             </div>
             <div className="flex items-center justify-between px-4 py-1.5">
               <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
-              <span className="text-sm font-semibold text-white">{timePassLabel}</span>
+              <span className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-bold-text">{timePassLabel}</span>
+                <button
+                  type="button"
+                  onClick={handleGoCharge}
+                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
+                >
+                  구입
+                </button>
+              </span>
             </div>
           </div>
           <div className="mt-2 h-px bg-border" />
@@ -181,11 +204,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   onClick={() => handleSelectRoom(room.id)}
                   className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold ${
                     room.id === activeRoomId
-                      ? "bg-[#40424a] text-bold-text"
-                      : "text-[#dcdee3] hover:bg-[#26272c]"
+                      ? "bg-chip-fill text-white"
+                      : "text-bold-text hover:bg-chip-fill hover:text-white"
                   }`}
                 >
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-bold-text" />
                   <span className="truncate">{room.title}</span>
                 </button>
               ))}

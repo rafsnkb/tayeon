@@ -24,7 +24,7 @@ function ToggleGroup<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
             value === opt.value
-              ? "bg-point-bg border border-point/50 text-point"
+              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -132,7 +132,7 @@ export default function MyProfilePage() {
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="당신을 뭐라고 부를까요?"
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none placeholder-placeholder"
             />
           </label>
 
@@ -142,7 +142,7 @@ export default function MyProfilePage() {
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none"
             />
             <ToggleGroup
               options={[
@@ -162,7 +162,7 @@ export default function MyProfilePage() {
               value={birthTime}
               onChange={(e) => setBirthTime(e.target.value)}
               disabled={timeUnknown}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none disabled:opacity-40"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none disabled:opacity-40"
             />
             <label className="flex items-center gap-2 pt-2 text-sm text-icon-muted">
               <input
@@ -196,7 +196,7 @@ export default function MyProfilePage() {
               value={birthPlace}
               onChange={(e) => setBirthPlace(e.target.value)}
               placeholder="태어난 도시를 알려주세요"
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none placeholder-placeholder"
             />
             <span className="pt-1 text-xs font-semibold text-icon-muted">
               출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요

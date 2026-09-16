@@ -35,7 +35,7 @@ const GUIDANCE_NO_COMPATIBILITY: Record<ToneKey, (nickname: string) => string> =
   warm: (nickname) =>
     `${nickname}님과의 궁합을 정확히 보고 싶으신 거죠? 지금은 상대방 사주 정보가 없어서 마음까지 깊이 헤아리기가 어려워요. 메뉴의 궁합 상대 정보에서 생년월일을 저장하고 +궁합 옵션을 함께 켜주시면, 두 분의 흐름을 더 정성껏 봐드릴게요.`,
   direct: (nickname) =>
-    `지금 상태로는 ${nickname}님과의 궁합까진 못 봐요. 메뉴 궁합 상대 정보에 생년월일 넣고 +궁합 옵션 켜세요 — 그래야 제대로 나옵니다.`,
+    `지금 상태로는 ${nickname}이랑 궁합까진 못 봐. 메뉴 궁합 상대 정보에 생년월일부터 넣고 +궁합 옵션 켜 — 그래야 제대로 나와.`,
   mystical: (nickname) =>
     `${nickname}님과의 인연을 온전히 읽으려면, 그 분의 운명이 새겨진 생년월일이 필요합니다. 메뉴의 궁합 상대 정보에 기록을 남기고 +궁합의 문을 함께 열어주세요. 그때 비로소 두 분을 잇는 실이 보일 거예요.`,
   friendly: (nickname) =>
@@ -296,7 +296,9 @@ export async function POST(req: NextRequest) {
       includeCompatibility && partner
         ? `상대방 별명: ${partner.nickname}${
             partnerBirthInfo
-              ? ""
+              ? partnerSajuResult || partnerZiweiResult
+                ? ` (상대방의 사주/자미두수 계산 결과가 위 "## 사주/자미두수 계산 결과" 섹션에 "### ${partner.nickname}의 사주" 또는 "### ${partner.nickname}의 자미두수"로 이미 포함되어 있습니다 — 궁합 상대 정보가 없다거나 부족하다고 판단해서 안내 문구를 쓰지 마세요, 반드시 카드+사주/자미두수를 통합한 정상적인 궁합 해석을 제공하세요.)`
+                : ""
               : " (생년월일 또는 성별 정보 없음 — 사주/자미두수 계산 불가, 카드로만 관계를 해석할 것)"
           }`
         : undefined;
@@ -364,12 +366,26 @@ export async function POST(req: NextRequest) {
         // GUIDANCE_MARKER is for cases that aren't the user's fault (e.g. missing +궁합 option) and
         // shows only a quiet notice. Keep them distinguishable end-to-end so the frontend can tell
         // them apart (src/app/(app)/tarot/page.tsx).
-        const markedNoCharge = rawInterpretation.startsWith(NO_CHARGE_MARKER);
-        const markedGuidance = !markedNoCharge && rawInterpretation.startsWith(GUIDANCE_MARKER);
+        // Detect the marker anywhere in the text, not just at position 0 (2026-09-15): empirically,
+        // the model sometimes writes the guidance sentence first and only remembers to append the
+        // marker at the very end instead of leading with it. A strict startsWith() missed that case
+        // entirely, so it fell through to the generic "malformed reading" bucket (no charge, but no
+        // clear guidance message either — reads as a half-finished answer to the user). When the
+        // marker isn't at index 0, treat the text before it as the actual guidance message.
+        const noChargeIdx = rawInterpretation.indexOf(NO_CHARGE_MARKER);
+        const guidanceIdx = rawInterpretation.indexOf(GUIDANCE_MARKER);
+        const markedNoCharge = noChargeIdx !== -1;
+        const markedGuidance = !markedNoCharge && guidanceIdx !== -1;
         const strippedInterpretation = markedNoCharge
-          ? rawInterpretation.slice(NO_CHARGE_MARKER.length).trimStart()
+          ? (noChargeIdx === 0
+              ? rawInterpretation.slice(NO_CHARGE_MARKER.length)
+              : rawInterpretation.slice(0, noChargeIdx)
+            ).trim()
           : markedGuidance
-            ? rawInterpretation.slice(GUIDANCE_MARKER.length).trimStart()
+            ? (guidanceIdx === 0
+                ? rawInterpretation.slice(GUIDANCE_MARKER.length)
+                : rawInterpretation.slice(0, guidanceIdx)
+              ).trim()
             : rawInterpretation;
 
         // Safety net for when the model should have used NO_CHARGE_MARKER but didn't (e.g. writes
@@ -381,8 +397,16 @@ export async function POST(req: NextRequest) {
         // existing retry loop below instead of shipping an incomplete, still-charged reading).
         // This safety net is a model slip-up, not user abuse, so it must not carry the suspension
         // warning either — see flaggedForAbuse below.
-        const mentionedDrawnCardCount = drawnCards.filter((d) =>
-          strippedInterpretation.includes(d.card.nameKo)
+        // Match on nameKo OR nameEn (2026-09-15): under heavy combined load (celtic + saju + ziwei +
+        // compatibility + history), the model occasionally writes a card heading using the English
+        // name given in the prompt (e.g. "Queen of Cups") instead of the Korean one, even though the
+        // rest of the reading is complete and correct — requiring nameKo only turned these into
+        // false "no charge" cases for otherwise-valid readings. Both forms are values we handed the
+        // model ourselves for this exact card, so accepting either isn't exploitable.
+        const mentionedDrawnCardCount = drawnCards.filter(
+          (d) =>
+            strippedInterpretation.includes(d.card.nameKo) ||
+            strippedInterpretation.includes(d.card.nameEn)
         ).length;
         const cardsOk =
           !markedNoCharge &&
@@ -547,8 +571,10 @@ export async function POST(req: NextRequest) {
       });
 
       const roomUpdate: Record<string, unknown> = { updatedAt: now };
+      let newRoomTitle: string | undefined;
       if (roomSnap.data()?.title === "새 대화" && recentSnap.empty) {
-        roomUpdate.title = question.slice(0, 24);
+        newRoomTitle = question.slice(0, 24);
+        roomUpdate.title = newRoomTitle;
       }
       await roomRef.update(roomUpdate);
 
@@ -568,6 +594,10 @@ export async function POST(req: NextRequest) {
         ziweiFree,
         timePassApplied: cardsOk && spreadCovered,
         suggestions,
+        // 방의 첫 리딩이면 서버가 방금 갱신한 제목을 함께 내려준다 — 프론트가 이걸로 로컬 rooms
+        // 상태를 즉시 갱신해야 탑바 제목이 새로고침 없이 바로 바뀐다(2026-09-15, 그전엔 rooms
+        // 목록이 로그인 시 한 번만 불러와져서 여기서 바뀐 제목이 반영 안 되고 있었음).
+        roomTitle: newRoomTitle,
       });
     } catch (error) {
       if (error instanceof Anthropic.APIError) {

@@ -6,6 +6,7 @@ import {
   BUSINESS_REGISTRATION_NUMBER,
   MAIL_ORDER_BUSINESS_NUMBER,
   COMPANY_ADDRESS,
+  COMPANY_PHONE,
   SUPPORT_EMAIL,
 } from "@/lib/company";
 
@@ -23,7 +24,7 @@ export function CompanyFooter() {
         <br />
         {COMPANY_ADDRESS}
         <br />
-        {SUPPORT_EMAIL}
+        {COMPANY_PHONE} | {SUPPORT_EMAIL}
       </p>
       <p>Copyright {COMPANY_NAME_EN} Inc. 2026.</p>
       <p className="flex flex-wrap items-center justify-center gap-x-2">

@@ -23,12 +23,12 @@ function PolicyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 rounded-[28px] border border-border bg-topbar p-6">
-        <h2 className="text-lg font-bold text-white">{title}</h2>
+        <h2 className="text-lg font-bold text-bold-text">{title}</h2>
         <div className="flex-1 overflow-y-auto">
           <div className="flex flex-col gap-4">
             {sections.map((section) => (
               <div key={section.title}>
-                <h3 className="mb-1 text-sm font-bold text-white">{section.title}</h3>
+                <h3 className="mb-1 text-sm font-bold text-bold-text">{section.title}</h3>
                 <p className="whitespace-pre-wrap text-sm text-icon-muted">{section.body}</p>
               </div>
             ))}
@@ -63,7 +63,7 @@ function ToggleGroup<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
             value === opt.value
-              ? "bg-point-bg border border-point/50 text-point"
+              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -199,7 +199,7 @@ export default function SignupPage() {
 
       <div className="flex h-16 shrink-0 items-center justify-center">
         <span className="text-2xl font-bold">
-          <span className="text-white">타</span>
+          <span className="text-bold-text">타</span>
           <span className="text-point">연</span>
         </span>
       </div>
@@ -212,7 +212,7 @@ export default function SignupPage() {
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               placeholder="당신을 뭐라고 부를까요?"
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none placeholder-placeholder"
             />
           </label>
 
@@ -222,7 +222,7 @@ export default function SignupPage() {
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none"
             />
             <ToggleGroup
               options={[
@@ -242,7 +242,7 @@ export default function SignupPage() {
               value={birthTime}
               onChange={(e) => setBirthTime(e.target.value)}
               disabled={timeUnknown}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none disabled:opacity-40"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none disabled:opacity-40"
             />
             <label className="flex items-center gap-2 pt-2 text-sm text-icon-muted">
               <input
@@ -276,7 +276,7 @@ export default function SignupPage() {
               value={birthPlace}
               onChange={(e) => setBirthPlace(e.target.value)}
               placeholder="태어난 도시를 알려주세요"
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-white outline-none placeholder-placeholder"
+              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none placeholder-placeholder"
             />
             <span className="pt-1 text-xs font-semibold text-icon-muted">
               출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요

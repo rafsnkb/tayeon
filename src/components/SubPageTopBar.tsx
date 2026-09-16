@@ -14,11 +14,11 @@ export default function SubPageTopBar({ title }: { title: string }) {
           type="button"
           onClick={() => router.back()}
           aria-label="뒤로가기"
-          className="absolute left-0 flex h-16 items-center text-white"
+          className="absolute left-0 flex h-16 items-center text-bold-text"
         >
           <BackIcon className="h-5 w-2.5" />
         </button>
-        <span className="text-xl font-semibold text-white">{title}</span>
+        <span className="text-xl font-semibold text-bold-text">{title}</span>
       </div>
     </div>
   );

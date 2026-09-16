@@ -8,6 +8,7 @@ import { useRooms } from "@/lib/tarot/RoomsContext";
 import { CompanyFooter } from "@/components/CompanyFooter";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { PAYMENT_BONUS_REWARD_TIERS } from "@/lib/tarot/pricing";
 import {
   SearchIcon,
   InvitePersonIcon,
@@ -42,15 +43,15 @@ function ListRow({
     >
       <span
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-bg ${
-          danger ? "text-urgent" : "text-white"
+          danger ? "text-urgent" : "text-icon-muted"
         }`}
       >
         {icon}
       </span>
-      <span className={`flex-1 text-base font-semibold ${danger ? "text-urgent" : "text-[#dcdee3]"}`}>
+      <span className={`flex-1 text-base font-semibold ${danger ? "text-urgent" : "text-icon-muted"}`}>
         {label}
       </span>
-      <span className="text-white">
+      <span className="text-icon-muted">
         <ChevronRightIcon className="h-4 w-2" />
       </span>
     </button>
@@ -92,6 +93,20 @@ function formatRemainingKo(ms: number): string {
   return `${m}분 ${s}초`;
 }
 
+function formatWonShort(won: number): string {
+  return `${(won / 10_000).toLocaleString("ko-KR")}만원`;
+}
+
+// RewardInfoModal의 "리워드 지급 비율" 표 — pricing.ts의 PAYMENT_BONUS_REWARD_TIERS를 그대로
+// 표시용 행으로 변환한다(마지막 구간은 0원 이상이 아니라 "그 위 구간 미만"으로 표기).
+const REWARD_TIER_ROWS = PAYMENT_BONUS_REWARD_TIERS.map((tier, i) => ({
+  rate: tier.rate,
+  label:
+    i === PAYMENT_BONUS_REWARD_TIERS.length - 1
+      ? `${formatWonShort(PAYMENT_BONUS_REWARD_TIERS[i - 1].minWon)} 미만`
+      : `${formatWonShort(tier.minWon)} 이상`,
+}));
+
 function describeEnvironment(): string {
   if (typeof navigator === "undefined") return "-";
   const ua = navigator.userAgent;
@@ -114,8 +129,8 @@ function describeEnvironment(): string {
 }
 
 /** 피그마 "Screen / MyPage" — 예전엔 /me가 바로 생년월일시 폼이었는데, 이제는 다른 설정 화면들로
- * 가는 허브. 공지사항/친구초대는 사용자가 애초에 "이 두 화면은 안 만들어뒀다"고 한 항목이라
- * 목적지 없이 안내만 띄움. */
+ * 가는 허브. 공지사항은 사용자가 애초에 "안 만들어뒀다"고 한 항목이라 목적지 없이 안내만 띄움
+ * (친구초대는 /invite로 연결됨, 2026-09-16). */
 export default function MyPage() {
   const router = useRouter();
   const { user, nickname, profileImage, email, coins, activeTimePass, timePasses } = useRooms();
@@ -123,12 +138,28 @@ export default function MyPage() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [rewardInfoOpen, setRewardInfoOpen] = useState(false);
+  const [bonusReward, setBonusReward] = useState<{
+    month: number;
+    totalWon: number;
+    rate: number;
+    projectedCoins: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!activeTimePass) return;
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [activeTimePass]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/user/bonus-reward", { headers: { Authorization: `Bearer ${idToken}` } });
+      if (res.ok) setBonusReward(await res.json());
+    })();
+  }, [user]);
 
   async function openAccountInfo() {
     setAccountInfoOpen(true);
@@ -153,7 +184,7 @@ export default function MyPage() {
                 {profileImage && <img src={profileImage} alt="" className="h-full w-full object-cover" />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-lg font-semibold text-[#dcdee3]">{nickname ?? "-"}</p>
+                <p className="truncate text-lg font-semibold text-bold-text">{nickname ?? "-"}</p>
                 <p className="truncate text-sm font-semibold text-icon-muted">{email ?? "카카오 로그인"}</p>
               </div>
               <button
@@ -170,7 +201,7 @@ export default function MyPage() {
               <span className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5">
                   <img src="/icons/coin.png" alt="" className="h-5 w-5" />
-                  <span className="text-lg font-bold text-gold">
+                  <span className="text-lg font-bold text-bold-text dark:text-gold">
                     {coins !== null ? coins.toLocaleString("ko-KR") : "-"}
                   </span>
                 </span>
@@ -186,7 +217,7 @@ export default function MyPage() {
             <div className="flex items-center justify-between py-3">
               <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
               <span className="flex items-center gap-3">
-                <span className="text-lg font-bold text-white">
+                <span className="text-lg font-bold text-bold-text">
                   {activeTimePass
                     ? formatRemainingKo(new Date(activeTimePass.expiresAt).getTime() - now)
                     : timePasses.length > 0
@@ -202,13 +233,29 @@ export default function MyPage() {
                 </button>
               </span>
             </div>
-            <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={ComingSoon} />
+            <div className="flex items-center justify-between py-3">
+              <button
+                type="button"
+                onClick={() => setRewardInfoOpen(true)}
+                className="flex items-center gap-1.5 text-sm font-semibold text-icon-muted"
+              >
+                {bonusReward ? `${bonusReward.month}월 보너스 리워드` : "이번 달 보너스 리워드"}
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text dark:bg-bg dark:text-bold-text">
+                  <SearchIcon className="h-2.5 w-2.5" />
+                </span>
+              </button>
+              <span className="text-lg font-bold text-bold-text">
+                {bonusReward ? `${bonusReward.projectedCoins.toLocaleString("ko-KR")}코인 예정` : "-"}
+              </span>
+            </div>
+            <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={() => router.push("/invite")} />
           </Section>
 
           <Section title="코인ㆍ이용권 구입">
             <ListRow icon={<CartIcon className="h-5 w-5" />} label="코인ㆍ이용권 구입" onClick={() => router.push("/charge")} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
-            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="사용 내역" onClick={() => router.push("/usage-history")} />
+            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="코인 내역" onClick={() => router.push("/usage-history")} />
+            <ListRow icon={<CardIcon className="h-4 w-5" />} label="자동충전 카드 관리" onClick={() => router.push("/billing")} />
           </Section>
 
           <Section title="프로필">
@@ -242,8 +289,8 @@ export default function MyPage() {
           >
             <div className="mb-3 flex items-center justify-between">
               <div className="w-5" />
-              <p className="flex-1 text-center text-lg font-bold text-white">계정 정보</p>
-              <button type="button" onClick={() => setAccountInfoOpen(false)} aria-label="닫기" className="text-white">
+              <p className="flex-1 text-center text-lg font-bold text-bold-text">계정 정보</p>
+              <button type="button" onClick={() => setAccountInfoOpen(false)} aria-label="닫기" className="text-bold-text">
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
@@ -251,33 +298,92 @@ export default function MyPage() {
               <div className="flex flex-col gap-[28px] text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">아이디</span>
-                  <span className="font-semibold text-white">{email ?? "카카오 로그인"}</span>
+                  <span className="font-semibold text-bold-text">{email ?? "카카오 로그인"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">UID</span>
-                  <span className="font-semibold text-white">{user?.uid ?? "-"}</span>
+                  <span className="font-semibold text-bold-text">{user?.uid ?? "-"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">가입일</span>
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-bold-text">
                     {termsAgreedAt ? formatDateTime(termsAgreedAt) : "-"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">최근 로그인</span>
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-bold-text">
                     {user?.metadata.lastSignInTime ? formatDateTime(user.metadata.lastSignInTime) : "-"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">접속환경</span>
-                  <span className="font-semibold text-white">{describeEnvironment()}</span>
+                  <span className="font-semibold text-bold-text">{describeEnvironment()}</span>
                 </div>
               </div>
             </div>
             <p className="mt-4 text-center text-xs text-icon-muted">
               고객센터 문의 시 현재 화면을 캡처하여 같이 보내주시면 빠르게 도움을 드릴 수 있습니다.
             </p>
+          </div>
+        </div>
+      )}
+
+      {rewardInfoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setRewardInfoOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-[32px] border border-border bg-topbar p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="w-5" />
+              <p className="flex-1 text-center text-lg font-bold text-bold-text">보너스 리워드 안내</p>
+              <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-bold-text">
+                <CloseIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-center text-sm font-semibold text-icon-muted">
+              월별 코인ㆍ이용권 결제금액(VAT 제외)에 따라
+              <br />
+              리워드 코인을 지급해 드립니다.
+            </p>
+            <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-border p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-icon-muted">
+                  {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
+                </span>
+                <span className="font-semibold text-bold-text">
+                  {(bonusReward?.totalWon ?? 0).toLocaleString("ko-KR")}원
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-icon-muted">
+                  {bonusReward ? `${bonusReward.month}월 예상 리워드` : "이번 달 예상 리워드"}
+                </span>
+                <span className="font-bold text-gold">
+                  {(bonusReward?.projectedCoins ?? 0).toLocaleString("ko-KR")}코인
+                </span>
+              </div>
+            </div>
+            <p className="mb-2 text-center text-sm font-bold text-bold-text">리워드 지급 비율</p>
+            <div className="mb-3 overflow-hidden rounded-2xl border border-border">
+              <div className="grid grid-cols-2 bg-border px-4 py-2 text-xs font-semibold text-icon-muted">
+                <span>당월 결제금액</span>
+                <span className="text-right">리워드 비율</span>
+              </div>
+              {REWARD_TIER_ROWS.map((row) => (
+                <div key={row.label} className="grid grid-cols-2 border-t border-border px-4 py-2.5 text-sm">
+                  <span className="font-semibold text-bold-text">{row.label}</span>
+                  <span className="text-right font-bold text-point">
+                    {Number((row.rate * 100).toFixed(2))}%
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-xs text-icon-muted">보너스 리워드 코인은 매월 5일에 지급됩니다.</p>
           </div>
         </div>
       )}

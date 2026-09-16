@@ -2,9 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import PortOne, { PaymentPayMethod } from "@portone/browser-sdk/v2";
 import { COIN_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
+import { listCoinProductIds, listTimePassProductIds } from "@/lib/payment/products";
 import { TIER_TEXTURE, TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { CompanyFooter } from "@/components/CompanyFooter";
+import { buildPortoneCustomer } from "@/lib/payment/customer";
+import { useRooms } from "@/lib/tarot/RoomsContext";
+
+// pricing.ts 배열과 같은 순서로 productId를 매핑한다(둘 다 COIN_PACKAGES/TIME_PASS_PACKAGES를
+// 그대로 순회해서 만들어지므로 인덱스가 항상 일치한다 — src/lib/payment/products.ts 참고).
+const COIN_PRODUCT_IDS = listCoinProductIds().map((p) => p.productId);
+const TIME_PASS_PRODUCT_IDS = listTimePassProductIds().map((p) => p.productId);
 
 type Tab = "coin" | "time";
 
@@ -50,13 +60,79 @@ const COIN_TEXTURE = [
   TIER_TEXTURE[1],
 ];
 
-/** 피그마 "Screen / Buy - Coin". 실제 구매 기능은 포트원 연동 전이라 여전히 안내만 뜸(기존 동작 유지). */
+/** 피그마 "Screen / Buy - Coin". 포트원 V2 결제창을 직접 호출해 코인/시간제 이용권을 구매한다. */
 export default function ChargePage() {
   const [tab, setTab] = useState<Tab>("coin");
-  const [notice, setNotice] = useState(false);
+  const [notice, setNotice] = useState<{ type: "info" | "error"; message: string } | null>(null);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const { user, email, nickname, refreshMe } = useRooms();
 
-  function handlePurchaseClick() {
-    setNotice(true);
+  async function handlePurchase(productId: string) {
+    if (!user || purchasingId) return;
+    setPurchasingId(productId);
+    setNotice(null);
+    try {
+      const idToken = await user.getIdToken();
+
+      // 1. 서버에 결제 준비를 요청 — 금액/주문명은 서버가 pricing.ts 기준으로 정해서 내려준다.
+      const prepareRes = await fetch("/api/payment/prepare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ productId }),
+      });
+      if (!prepareRes.ok) {
+        setNotice({ type: "error", message: "결제 준비에 실패했어요. 잠시 후 다시 시도해주세요." });
+        return;
+      }
+      const prepared = await prepareRes.json();
+
+      // 2. 포트원 V2 결제창 호출(KG이니시스). channelKey만으로 PG가 결정되므로 이 로직 자체는
+      // PG사가 바뀌어도 그대로 유지된다 — .env.local의 채널 키만 교체하면 된다.
+      const payment = await PortOne.requestPayment({
+        storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID!,
+        channelKey: process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY!,
+        paymentId: prepared.paymentId,
+        orderName: prepared.orderName,
+        totalAmount: prepared.totalAmount,
+        currency: prepared.currency,
+        payMethod: PaymentPayMethod.CARD,
+        customData: prepared.customData,
+        customer: buildPortoneCustomer({ uid: user.uid, email, nickname }),
+      });
+      if (!payment) {
+        // redirectUrl 지정 시에만 undefined가 반환된다(리디렉션 방식) — 이 페이지는 사용하지 않음.
+        setNotice({ type: "error", message: "결제 응답을 받지 못했어요." });
+        return;
+      }
+      if (payment.code !== undefined) {
+        // 사용자가 결제창을 닫았거나 PG 단계에서 실패한 경우 — 아직 지급 전이라 서버 상태 변경 없음.
+        setNotice({ type: "error", message: payment.message ?? "결제가 취소됐어요." });
+        return;
+      }
+
+      // 3. 서버에 완료 처리 요청 — 실제 지급은 서버가 포트원에 재조회해서 검증한 뒤에만 이뤄진다.
+      // (브라우저가 여기서 끊겨도 /api/payment/webhook이 같은 로직으로 지급을 보장한다.)
+      const completeRes = await fetch("/api/payment/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ paymentId: payment.paymentId }),
+      });
+      const completed = await completeRes.json();
+      if (completeRes.ok && completed.status === "PAID") {
+        await refreshMe();
+        setNotice({ type: "info", message: "결제가 완료됐어요!" });
+      } else {
+        setNotice({
+          type: "error",
+          message: completed.error ?? "결제 확인에 실패했어요. 고객센터로 문의해주세요.",
+        });
+      }
+    } catch (error) {
+      console.error("[charge] 결제 실패", error);
+      setNotice({ type: "error", message: "결제 중 오류가 발생했어요." });
+    } finally {
+      setPurchasingId(null);
+    }
   }
 
   return (
@@ -65,8 +141,14 @@ export default function ChargePage() {
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           {notice && (
-            <div className="rounded-2xl border border-point bg-point-bg p-3 text-center text-sm text-point">
-              곧 만나보실 수 있어요. 조금만 기다려주세요!
+            <div
+              className={`rounded-2xl border p-3 text-center text-sm ${
+                notice.type === "error"
+                  ? "border-urgent bg-urgent/10 text-urgent"
+                  : "border-point bg-point-bg text-point"
+              }`}
+            >
+              {notice.message}
             </div>
           )}
 
@@ -77,12 +159,14 @@ export default function ChargePage() {
                 const color = COIN_BORDER[i % COIN_BORDER.length];
                 const bonusBg = COIN_BONUS_BG[i % COIN_BONUS_BG.length];
                 const bg = COIN_TEXTURE[i % COIN_TEXTURE.length];
+                const productId = COIN_PRODUCT_IDS[i];
                 return (
                   <button
                     key={pkg.priceWon}
                     type="button"
-                    onClick={handlePurchaseClick}
-                    className="relative flex h-20 items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left"
+                    onClick={() => handlePurchase(productId)}
+                    disabled={purchasingId !== null}
+                    className="relative flex h-20 items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left disabled:opacity-60"
                     style={{ borderColor: color, backgroundImage: `url(${bg})` }}
                   >
                     <div className="absolute inset-0 bg-[#19191d]/70" />
@@ -110,14 +194,16 @@ export default function ChargePage() {
 
           {tab === "time" && (
             <div className="flex flex-col gap-3">
-              {TIME_PASS_PACKAGES.map((pkg) => {
+              {TIME_PASS_PACKAGES.map((pkg, i) => {
                 const tier = TIME_PASS_TIER[pkg.minutes] ?? TIME_PASS_TIER[15];
+                const productId = TIME_PASS_PRODUCT_IDS[i];
                 return (
                   <button
                     key={pkg.priceWon}
                     type="button"
-                    onClick={handlePurchaseClick}
-                    className="relative flex items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left"
+                    onClick={() => handlePurchase(productId)}
+                    disabled={purchasingId !== null}
+                    className="relative flex items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left disabled:opacity-60"
                     style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}
                   >
                     <div className="absolute inset-0 bg-[#19191d]/70" />
@@ -160,6 +246,9 @@ export default function ChargePage() {
               을 확인해주세요.
             </li>
           </ul>
+          {/* PG(KG이니시스) 입점심사 요건: 사업자정보가 메인 화면뿐 아니라 결제 페이지에도
+              상시 노출돼야 함(help.portone.io/content/requirements) — 기존엔 /me에만 있었음. */}
+          <CompanyFooter />
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
@@ -168,7 +257,7 @@ export default function ChargePage() {
             type="button"
             onClick={() => setTab("coin")}
             className={`h-14 flex-1 text-base font-semibold ${
-              tab === "coin" ? "bg-point text-white" : "text-icon-muted"
+              tab === "coin" ? "bg-point text-white" : "text-white"
             }`}
           >
             코인
@@ -177,7 +266,7 @@ export default function ChargePage() {
             type="button"
             onClick={() => setTab("time")}
             className={`h-14 flex-1 text-base font-semibold ${
-              tab === "time" ? "bg-point text-white" : "text-icon-muted"
+              tab === "time" ? "bg-point text-white" : "text-white"
             }`}
           >
             이용권

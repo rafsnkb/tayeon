@@ -25,8 +25,8 @@ export default function ConfirmModal({
       >
         <div className="mb-9 flex items-center justify-between">
           <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-white">{title}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-white">
+          <p className="flex-1 text-center text-lg font-bold text-bold-text">{title}</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>

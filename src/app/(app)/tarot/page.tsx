@@ -13,6 +13,7 @@ import {
   type SpreadKey,
 } from "@/lib/tarot/pricing";
 import { openMenu } from "@/lib/ui/menuBus";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   MenuIcon,
   SendIcon,
@@ -47,7 +48,7 @@ type ChatMessage =
   | {
       role: "assistant";
       text: string;
-      spread: SpreadKey;
+      spread: SpreadKey | null;
       cards: TarotCardInfo[];
       includeSaju: boolean;
       includeZiwei: boolean;
@@ -60,6 +61,9 @@ type ChatMessage =
       flaggedForAbuse?: boolean;
       timePassApplied?: boolean;
       suggestions?: string[];
+      /** 방을 처음 열었을 때 캐릭터가 먼저 건네는 인사말(실제 리딩 아님) — 카드/스프레드 표시,
+       * "코인 차감 안됨" 안내 등 리딩 전용 UI를 이 메시지에는 붙이지 않기 위한 구분용 플래그. */
+      isGreeting?: boolean;
     }
   | { role: "error"; text: string };
 
@@ -264,10 +268,10 @@ function HeldTimepassListModal({
         <div className="flex items-center gap-3 p-1">
           <div className="w-5" />
           <div className="flex-1 text-center">
-            <p className="text-lg font-bold text-white">보유 시간제 이용권</p>
+            <p className="text-lg font-bold text-bold-text">보유 시간제 이용권</p>
             <p className="text-sm font-semibold text-icon-muted">사용할 시간제 이용권을 선택하세요</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-white">
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
@@ -307,14 +311,14 @@ function HeldTimepassUseModal({
       >
         <div className="flex items-center gap-3 p-1">
           <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-white">시간제 이용권 사용하기</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-white">
+          <p className="flex-1 text-center text-lg font-bold text-bold-text">시간제 이용권 사용하기</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
         <p className="text-center text-sm font-semibold text-icon-muted">선택한 시간제 이용권</p>
         <TimePassCard pass={pass} />
-        <p className="text-center text-base font-semibold text-white">
+        <p className="text-center text-base font-semibold text-bold-text">
           선택한 시간제 이용권을 사용하시겠어요?
         </p>
         <p className="text-center text-sm font-semibold text-urgent">
@@ -328,6 +332,94 @@ function HeldTimepassUseModal({
         >
           사용하기
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** 피그마 "Screen / NoHeldTimepassModal" — 보유 시간제 이용권 배지를 눌렀는데 보유한 이용권이
+ * 없을 때(HeldTimepassListModal 대신) 뜨는, 화면 중앙에 뜨는 안내 모달. */
+function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onGoCharge: () => void }) {
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-6 flex items-center gap-3 p-1">
+          <div className="w-5" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-bold text-bold-text">보유 시간제 이용권</p>
+            <p className="text-sm font-semibold text-icon-muted">사용할 시간제 이용권을 선택하세요</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-6 text-center text-base font-semibold text-bold-text">보유한 시간제 이용권이 없습니다.</p>
+        <button
+          type="button"
+          onClick={onGoCharge}
+          className="h-12 w-full rounded-2xl bg-point text-lg font-semibold text-white"
+        >
+          구입하러 가기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 피그마 "Screen / ChatroomNameEdit" — 대화방 이름 변경. 기존엔 브라우저 기본 prompt()를 썼음. */
+function RenameRoomModal({
+  initialTitle,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  initialTitle: string;
+  busy: boolean;
+  onConfirm: (title: string) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(initialTitle);
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <div className="w-5" />
+          <p className="flex-1 text-center text-lg font-bold text-bold-text">채팅방 이름 변경</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-3 text-center text-sm font-semibold text-icon-muted">변경할 이름을 입력해주세요</p>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="채팅방 이름 입력"
+          autoFocus
+          className="mb-6 h-12 w-full rounded-2xl bg-bg px-4 text-base text-bold-text placeholder-placeholder outline-none"
+        />
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-12 flex-1 rounded-2xl bg-chip-fill text-base font-semibold text-white"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={() => title.trim() && onConfirm(title.trim())}
+            disabled={busy || !title.trim()}
+            className="h-12 flex-1 rounded-2xl bg-point text-base font-semibold text-white disabled:opacity-60"
+          >
+            저장하기
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -587,6 +679,7 @@ function TarotChat() {
     createRoom,
     deleteRoom,
     renameRoom,
+    setRoomTitleLocal,
     hasBirthInfo,
     myTimeUnknown,
     hasPartner,
@@ -615,7 +708,11 @@ function TarotChat() {
   const [compatibilitySheetOpen, setCompatibilitySheetOpen] = useState(false);
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
   const [timePassListOpen, setTimePassListOpen] = useState(false);
+  const [noTimePassModalOpen, setNoTimePassModalOpen] = useState(false);
   const [timePassToUse, setTimePassToUse] = useState<TimePass | null>(null);
+  const [renameModalRoomId, setRenameModalRoomId] = useState<string | null>(null);
+  const [deleteModalRoomId, setDeleteModalRoomId] = useState<string | null>(null);
+  const [roomActionBusy, setRoomActionBusy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
   // 이 방에서 진행 중인 리딩 요청이 있는지 — 이 인스턴스가 직접 시작했든(loading), 로딩 중
@@ -636,7 +733,13 @@ function TarotChat() {
   }, [activeTimePass]);
 
   // 방 목록은 RoomsContext(레이아웃 레벨)가 불러온다 — 여기서는 URL의 ?room= 파라미터가
-  // 가리키는 방으로 한 번만 맞춰준다(없으면 컨텍스트가 이미 골라둔 기본값을 그대로 씀).
+  // 가리키는 방으로 맞춰준다(없으면 컨텍스트가 이미 골라둔 기본값을 그대로 씀).
+  // 이 effect가 searchParams에 의존하지 않던 버전에서는(2026-09-15 발견) "새 대화" 버튼을 누르면
+  // createRoom()이 activeRoomId를 새 방으로 먼저 바꾸고 → rooms 배열이 바뀌어 이 effect가 다시
+  // 실행되는데, 그 시점엔 router.replace/push가 아직 URL을 못 바꿔서 searchParams가 옛 방 id를
+  // 그대로 들고 있었음 — 그래서 방금 바뀐 activeRoomId를 옛 방으로 도로 되돌려버리는 경쟁 상태가
+  // 있었다(새 방은 생성되지만 화면은 옛 방에 그대로 머무는 버그). searchParams를 의존성에 추가하면
+  // URL이 뒤늦게 갱신될 때 이 effect가 한 번 더 실행되어 activeRoomId를 다시 새 방으로 맞춰준다.
   useEffect(() => {
     if (!roomsLoaded || rooms.length === 0) return;
     const roomParam = searchParams.get("room");
@@ -644,7 +747,7 @@ function TarotChat() {
       selectRoom(roomParam);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomsLoaded, rooms]);
+  }, [roomsLoaded, rooms, searchParams]);
 
   // /api/tarot/reading은 응답 전달 전에 네트워크가 끊기면(모바일에서 흔함) 서버는 이미 리딩을
   // 저장·차감까지 마쳤는데 클라이언트만 실패로 보는 상황이 생길 수 있다 — 그 경우를 감지하기 위해
@@ -658,8 +761,9 @@ function TarotChat() {
     if (!res.ok) return null;
     const data = await res.json();
     const readings = data.readings as {
-      question: string;
-      spread: SpreadKey;
+      isGreeting?: boolean;
+      question: string | null;
+      spread: SpreadKey | null;
       cards: TarotCardInfo[];
       includeSaju: boolean;
       includeZiwei: boolean;
@@ -671,9 +775,8 @@ function TarotChat() {
       flaggedForAbuse: boolean;
       suggestions: string[];
     }[];
-    return readings.flatMap((r) => [
-      { role: "user", text: r.question },
-      {
+    return readings.flatMap((r): ChatMessage[] => {
+      const assistantMsg: ChatMessage = {
         role: "assistant",
         text: r.interpretation,
         spread: r.spread,
@@ -686,8 +789,11 @@ function TarotChat() {
         guidanceOnly: r.guidanceOnly,
         flaggedForAbuse: r.flaggedForAbuse,
         suggestions: r.suggestions,
-      },
-    ]);
+        isGreeting: r.isGreeting,
+      };
+      // 인사말은 사용자의 질문 없이 캐릭터가 먼저 건네는 말이라 "user" 말풍선 없이 단독으로 넣는다.
+      return r.isGreeting ? [assistantMsg] : [{ role: "user", text: r.question ?? "" }, assistantMsg];
+    });
   }
 
   useEffect(() => {
@@ -762,17 +868,26 @@ function TarotChat() {
     if (created) router.replace(`/tarot?room=${created.id}`);
   }
 
-  async function handleDeleteRoom(roomId: string) {
-    if (rooms.length <= 1) return;
-    if (!confirm("이 대화방을 삭제할까요?")) return;
-    await deleteRoom(roomId);
+  async function confirmDeleteRoom() {
+    if (!deleteModalRoomId) return;
+    setRoomActionBusy(true);
+    try {
+      await deleteRoom(deleteModalRoomId);
+      setDeleteModalRoomId(null);
+    } finally {
+      setRoomActionBusy(false);
+    }
   }
 
-  async function handleRenameRoom(roomId: string) {
-    const current = rooms.find((r) => r.id === roomId);
-    const next = prompt("새 대화방 이름을 입력해주세요.", current?.title ?? "");
-    if (!next || !next.trim()) return;
-    await renameRoom(roomId, next);
+  async function confirmRenameRoom(title: string) {
+    if (!renameModalRoomId) return;
+    setRoomActionBusy(true);
+    try {
+      await renameRoom(renameModalRoomId, title);
+      setRenameModalRoomId(null);
+    } finally {
+      setRoomActionBusy(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -835,6 +950,7 @@ function TarotChat() {
       }
 
       setCoins(data.remainingCoins);
+      if (data.roomTitle) setRoomTitleLocal(activeRoomId, data.roomTitle);
       setMessages((prev) => [
         ...prev,
         {
@@ -951,6 +1067,33 @@ function TarotChat() {
           onClose={() => setTimePassToUse(null)}
         />
       )}
+      {noTimePassModalOpen && (
+        <NoHeldTimepassModal
+          onClose={() => setNoTimePassModalOpen(false)}
+          onGoCharge={() => {
+            setNoTimePassModalOpen(false);
+            router.push("/charge");
+          }}
+        />
+      )}
+      {renameModalRoomId && (
+        <RenameRoomModal
+          initialTitle={rooms.find((r) => r.id === renameModalRoomId)?.title ?? ""}
+          busy={roomActionBusy}
+          onConfirm={confirmRenameRoom}
+          onClose={() => setRenameModalRoomId(null)}
+        />
+      )}
+      {deleteModalRoomId && (
+        <ConfirmModal
+          title="채팅방 삭제"
+          description={"채팅방을 삭제하시겠어요?\n삭제된 대화는 복구가 불가능합니다."}
+          confirmLabel="삭제하기"
+          busy={roomActionBusy}
+          onConfirm={confirmDeleteRoom}
+          onClose={() => setDeleteModalRoomId(null)}
+        />
+      )}
       <div className="relative flex h-16 shrink-0 items-center border-b border-border bg-topbar">
         <div className="flex h-full w-full items-center xl:mx-auto xl:max-w-4xl xl:pl-4">
         <button
@@ -970,7 +1113,7 @@ function TarotChat() {
             onClick={openMenu}
             className="flex flex-1 items-center justify-center gap-3 text-xl font-bold"
           >
-            <span className="text-white">타</span>
+            <span className="text-bold-text">타</span>
             <span className="-ml-2 text-point">연</span>
           </button>
         ) : (
@@ -978,7 +1121,7 @@ function TarotChat() {
             <button
               type="button"
               onClick={openMenu}
-              className="min-w-0 flex-1 truncate text-left text-base font-semibold text-[#dbdbdb]"
+              className="min-w-0 flex-1 truncate text-center text-base font-semibold text-bold-text"
             >
               {activeRoom?.title ?? DEFAULT_ROOM_TITLE}
             </button>
@@ -1008,7 +1151,7 @@ function TarotChat() {
                         type="button"
                         onClick={() => {
                           setRoomInfoOpen(false);
-                          if (activeRoomId) handleRenameRoom(activeRoomId);
+                          if (activeRoomId) setRenameModalRoomId(activeRoomId);
                         }}
                         className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-bold-text"
                       >
@@ -1019,7 +1162,7 @@ function TarotChat() {
                         type="button"
                         onClick={() => {
                           setRoomInfoOpen(false);
-                          if (activeRoomId) handleDeleteRoom(activeRoomId);
+                          if (activeRoomId) setDeleteModalRoomId(activeRoomId);
                         }}
                         disabled={rooms.length <= 1}
                         className="flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-left text-sm font-semibold text-urgent disabled:opacity-40"
@@ -1036,44 +1179,59 @@ function TarotChat() {
         )}
         </div>
       </div>
-      {!isBlankRoom && (
-        <div className="mx-auto flex w-full shrink-0 justify-end px-4 pt-2 xl:max-w-4xl">
-          <button
-            type="button"
-            onClick={() => (timePasses.length > 0 ? setTimePassListOpen(true) : router.push("/charge"))}
-            aria-label="보유 시간제 이용권"
-            className={`flex h-9 w-9 items-center justify-center rounded-full border ${
-              timePasses.length > 0
-                ? "border-point bg-point-bg text-point"
-                : "border-icon-muted text-icon-muted"
-            }`}
-          >
-            <TicketIcon className="h-4 w-5" />
-          </button>
-        </div>
-      )}
-
-      <div className="mx-auto flex w-full flex-1 flex-col gap-3 overflow-y-auto p-4 pt-3 xl:max-w-4xl">
+      {/* 메시지 스크롤 영역(2026-09-15 재구성): 이용권 배지가 원래 스크롤 영역 "위"에 자기 줄을
+          따로 차지하고 있어서, 실제로 스크롤 가능한 영역의 높이가 배지 줄 높이만큼 줄어들어 있었음
+          — 실사용 중 발견된 "말풍선 상단이 배지 높이만큼 잘려 보인다"는 문제가 바로 이거였음(스크롤을
+          아무리 올려도 그 잘린 부분은 배지 줄 뒤에 가려서 애초에 스크롤 영역 자체에 포함이 안 됨).
+          배지를 별도 줄로 빼는 대신 스크롤 영역 위에 떠 있는 오버레이로 바꿔서, 스크롤 영역 자체는
+          탑바 바로 아래부터 끝까지 전부 차지하도록 수정. 배지 아래로 콘텐츠가 자연스럽게 지나가도록
+          상단 페이드(그라데이션 마스크)도 함께 적용. */}
+      <div className="relative min-h-0 flex-1">
+        {!isBlankRoom && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 mx-auto flex w-full justify-end px-4 pt-2 xl:max-w-4xl">
+            <button
+              type="button"
+              onClick={() => (timePasses.length > 0 ? setTimePassListOpen(true) : setNoTimePassModalOpen(true))}
+              aria-label="보유 시간제 이용권"
+              className={`pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border ${
+                timePasses.length > 0
+                  ? "border-point bg-point-bg text-point"
+                  : "border-icon-muted text-icon-muted"
+              }`}
+            >
+              <TicketIcon className="h-4 w-5" />
+            </button>
+          </div>
+        )}
+        <div
+          className={`mx-auto flex h-full w-full flex-col gap-3 overflow-y-auto p-4 xl:max-w-4xl ${
+            isBlankRoom ? "pt-3" : "pt-14"
+          }`}
+          style={{
+            WebkitMaskImage: "linear-gradient(to bottom, transparent, black 24px)",
+            maskImage: "linear-gradient(to bottom, transparent, black 24px)",
+          }}
+        >
         {!historyLoaded && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
         )}
         {messages.map((msg, i) => {
           if (msg.role === "user") {
             return (
-              <div key={i} className="self-end rounded-2xl bg-point px-4 py-2 text-white">
+              <div key={i} className="animate-fade-in self-end rounded-2xl bg-point px-4 py-2 text-white">
                 {msg.text}
               </div>
             );
           }
           if (msg.role === "error") {
             return (
-              <div key={i} className="self-start rounded-2xl bg-urgent/10 px-4 py-2 text-urgent">
+              <div key={i} className="animate-fade-in self-start rounded-2xl bg-urgent/10 px-4 py-2 text-urgent">
                 {msg.text}
               </div>
             );
           }
           return (
-            <div key={i} className="flex w-full flex-col items-start">
+            <div key={i} className="animate-fade-in flex w-full flex-col items-start">
               <div className="max-w-[85%] rounded-2xl bg-surface px-4 py-3">
               {msg.cards.some((c) => c.id) && (
                 <div className="mb-2 flex justify-center">
@@ -1092,7 +1250,7 @@ function TarotChat() {
                   )}
                 </div>
               )}
-              {msg.cards.length > 0 && (
+              {msg.cards.length > 0 && msg.spread && (
                 <div className="mb-1 flex flex-col items-center gap-1">
                   <span className="rounded-full border border-border px-3 py-1 text-base font-semibold text-text">
                     {SPREADS[msg.spread].label}
@@ -1114,7 +1272,7 @@ function TarotChat() {
               )}
               <div className="whitespace-pre-wrap">{renderInterpretation(msg.text)}</div>
               </div>
-              {!msg.charged && !msg.guidanceOnly && (
+              {!msg.isGreeting && !msg.charged && !msg.guidanceOnly && (
                 <div className="mt-1 w-full text-xs">
                   <p className="px-1 text-text">해당 답변은 코인 차감이 되지 않습니다.</p>
                   {msg.flaggedForAbuse && (
@@ -1165,18 +1323,19 @@ function TarotChat() {
           );
         })}
         {showLoading && (
-          <div className="self-start rounded-2xl bg-surface px-4 py-3 text-text">
+          <div className="animate-fade-in self-start rounded-2xl bg-surface px-4 py-3 text-text">
             카드를 뽑고 해석하는 중...
           </div>
         )}
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       <div className="mx-auto w-full shrink-0 px-4 pb-4 xl:max-w-4xl">
         {timePassActive && activeTimePass && (
           <div className="mb-2 flex items-center gap-2.5 rounded-2xl bg-chip-fill px-2.5 py-2">
-            <span className="text-sm font-semibold text-icon-muted">시간제 사용중</span>
-            <span className="text-sm font-semibold text-bold-text">
+            <span className="text-sm font-semibold text-white">시간제 사용중</span>
+            <span className="text-sm font-semibold text-white">
               남은 시간: {formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)}
             </span>
           </div>
@@ -1198,7 +1357,7 @@ function TarotChat() {
             <button
               type="button"
               onClick={() => setSpreadSheetOpen(true)}
-              className="flex h-10 shrink-0 items-center rounded-full bg-chip-fill px-5 text-sm font-semibold text-bold-text"
+              className="flex h-10 shrink-0 items-center rounded-full bg-chip-fill px-5 text-sm font-semibold text-white"
             >
               {SPREADS[spread].label}
             </button>
@@ -1210,8 +1369,8 @@ function TarotChat() {
                   aria-pressed={includeSaju}
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                     includeSaju
-                      ? "bg-point-bg border border-point/50 text-point"
-                      : "bg-chip-fill text-icon-muted"
+                      ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+                      : "bg-chip-fill text-white"
                   }`}
                 >
                   <SajuIcon className="h-5 w-5" />
@@ -1222,8 +1381,8 @@ function TarotChat() {
                   aria-pressed={includeZiwei}
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                     includeZiwei
-                      ? "bg-point-bg border border-point/50 text-point"
-                      : "bg-chip-fill text-icon-muted"
+                      ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+                      : "bg-chip-fill text-white"
                   }`}
                 >
                   <ZiweiIcon className="h-5 w-5" />
@@ -1237,8 +1396,8 @@ function TarotChat() {
                 aria-pressed={includeCompatibility}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                   includeCompatibility
-                    ? "bg-point-bg border border-point/50 text-point"
-                    : "bg-chip-fill text-icon-muted"
+                    ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+                    : "bg-chip-fill text-white"
                 }`}
               >
                 <CompatibilityIcon className="h-5 w-5" />

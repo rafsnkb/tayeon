@@ -40,22 +40,22 @@ const suits: { key: string; nameKo: string }[] = [
 
 const rankMeanings: Record<
   string,
-  { nameKo: string; upright: string; reversed: string }
+  { nameKo: string; nameEn: string; upright: string; reversed: string }
 > = {
-  ace: { nameKo: "에이스", upright: "새로운 기회의 씨앗, 원초적 에너지", reversed: "기회 지연, 잘못된 시작" },
-  "2": { nameKo: "2", upright: "선택의 갈림길, 균형 잡기", reversed: "결정 장애, 불균형" },
-  "3": { nameKo: "3", upright: "협력, 초기 성과, 확장", reversed: "협업 실패, 지연된 성과" },
-  "4": { nameKo: "4", upright: "안정, 휴식, 기반 다지기", reversed: "정체, 불안정한 안정" },
-  "5": { nameKo: "5", upright: "갈등, 경쟁, 시련", reversed: "갈등 해소, 회피" },
-  "6": { nameKo: "6", upright: "조화, 회복, 나눔", reversed: "불균형한 관계, 과거 집착" },
-  "7": { nameKo: "7", upright: "인내, 도전, 재평가", reversed: "포기, 자신감 상실" },
-  "8": { nameKo: "8", upright: "빠른 진전, 움직임", reversed: "지연, 정체" },
-  "9": { nameKo: "9", upright: "거의 다다른 성취, 경계심", reversed: "불안, 과도한 방어" },
-  "10": { nameKo: "10", upright: "완성, 결실, 다음 단계로의 전환", reversed: "부담, 과잉, 마무리 지연" },
-  page: { nameKo: "페이지", upright: "배움의 시작, 호기심, 메시지", reversed: "미숙함, 경솔한 판단" },
-  knight: { nameKo: "나이트", upright: "행동, 추진력, 모험", reversed: "성급함, 방향성 부족" },
-  queen: { nameKo: "퀸", upright: "성숙한 이해, 포용력, 직관적 통찰", reversed: "감정 기복, 과도한 통제" },
-  king: { nameKo: "킹", upright: "숙련된 리더십, 책임감, 통제력", reversed: "권위 남용, 경직됨" },
+  ace: { nameKo: "에이스", nameEn: "Ace", upright: "새로운 기회의 씨앗, 원초적 에너지", reversed: "기회 지연, 잘못된 시작" },
+  "2": { nameKo: "2", nameEn: "Two", upright: "선택의 갈림길, 균형 잡기", reversed: "결정 장애, 불균형" },
+  "3": { nameKo: "3", nameEn: "Three", upright: "협력, 초기 성과, 확장", reversed: "협업 실패, 지연된 성과" },
+  "4": { nameKo: "4", nameEn: "Four", upright: "안정, 휴식, 기반 다지기", reversed: "정체, 불안정한 안정" },
+  "5": { nameKo: "5", nameEn: "Five", upright: "갈등, 경쟁, 시련", reversed: "갈등 해소, 회피" },
+  "6": { nameKo: "6", nameEn: "Six", upright: "조화, 회복, 나눔", reversed: "불균형한 관계, 과거 집착" },
+  "7": { nameKo: "7", nameEn: "Seven", upright: "인내, 도전, 재평가", reversed: "포기, 자신감 상실" },
+  "8": { nameKo: "8", nameEn: "Eight", upright: "빠른 진전, 움직임", reversed: "지연, 정체" },
+  "9": { nameKo: "9", nameEn: "Nine", upright: "거의 다다른 성취, 경계심", reversed: "불안, 과도한 방어" },
+  "10": { nameKo: "10", nameEn: "Ten", upright: "완성, 결실, 다음 단계로의 전환", reversed: "부담, 과잉, 마무리 지연" },
+  page: { nameKo: "페이지", nameEn: "Page", upright: "배움의 시작, 호기심, 메시지", reversed: "미숙함, 경솔한 판단" },
+  knight: { nameKo: "나이트", nameEn: "Knight", upright: "행동, 추진력, 모험", reversed: "성급함, 방향성 부족" },
+  queen: { nameKo: "퀸", nameEn: "Queen", upright: "성숙한 이해, 포용력, 직관적 통찰", reversed: "감정 기복, 과도한 통제" },
+  king: { nameKo: "킹", nameEn: "King", upright: "숙련된 리더십, 책임감, 통제력", reversed: "권위 남용, 경직됨" },
 };
 
 const suitFlavor: Record<string, { upright: string; reversed: string }> = {
@@ -68,7 +68,7 @@ const suitFlavor: Record<string, { upright: string; reversed: string }> = {
 const minorArcana: TarotCard[] = suits.flatMap((suit) =>
   Object.entries(rankMeanings).map(([rankKey, rank]) => ({
     id: `${suit.key}-${rankKey}`,
-    nameEn: `${rankKey === "ace" ? "Ace" : rank.nameKo} of ${suit.key[0].toUpperCase()}${suit.key.slice(1)}`,
+    nameEn: `${rank.nameEn} of ${suit.key[0].toUpperCase()}${suit.key.slice(1)}`,
     nameKo: `${suit.nameKo} ${rank.nameKo}`,
     upright: `${suitFlavor[suit.key].upright} ${rank.upright}`,
     reversed: `${suitFlavor[suit.key].reversed} ${rank.reversed}`,

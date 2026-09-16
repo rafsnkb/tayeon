@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { findUidByReferralCode, grantSignupReferralReward } from "@/lib/referral/code";
 
 const KAKAO_REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!;
 const KAKAO_REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!;
@@ -13,6 +14,8 @@ const APP_ORIGIN = new URL(KAKAO_REDIRECT_URI).origin;
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
+  // /login?ref=CODE로 들어온 경우 getKakaoAuthorizeUrl()이 이 값을 state에 실어 보냄(친구 초대).
+  const referralCode = req.nextUrl.searchParams.get("state");
 
   if (error || !code) {
     return NextResponse.redirect(
@@ -66,6 +69,11 @@ export async function GET(req: NextRequest) {
 
   // 이 로그인의 카카오 응답에 닉네임/프로필사진이 없을 수 있음(동의항목 미획득 등) — 그 경우
   // 기존에 저장된 값을 null로 덮어쓰지 않고 그대로 유지한다.
+  let referredBy: string | null = null;
+  if (isNewUser && referralCode) {
+    referredBy = await findUidByReferralCode(referralCode);
+  }
+
   await userRef.set(
     {
       provider: "kakao",
@@ -73,10 +81,18 @@ export async function GET(req: NextRequest) {
       ...(nickname !== null ? { nickname } : {}),
       ...(profileImage !== null ? { profileImage } : {}),
       ...(email !== null ? { email } : {}),
+      ...(referredBy ? { referredBy } : {}),
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
   );
+
+  // 친구 초대(리퍼럴) 가입 보상 — 신규 유저 본인이 아니라 링크를 공유한 추천인에게 지급된다.
+  if (referredBy) {
+    await grantSignupReferralReward(referredBy, uid).catch((err) => {
+      console.error("[referral] 가입 보상 지급 실패", { referredBy, uid, err });
+    });
+  }
 
   const customToken = await adminAuth.createCustomToken(uid);
 

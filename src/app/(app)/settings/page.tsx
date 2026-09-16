@@ -63,7 +63,7 @@ function SegmentGroup<T extends string | boolean>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-base font-semibold ${
             value === opt.value
-              ? "bg-point-bg border border-point/50 text-point"
+              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -188,7 +188,7 @@ export default function SettingsPage() {
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-sm font-semibold ${
-                        tone === key ? "bg-point text-white" : "bg-chip-fill text-icon-muted"
+                        tone === key ? "bg-point text-white" : "bg-chip-fill text-white"
                       }`}
                     >
                       {toneName(key)}

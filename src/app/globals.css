@@ -14,7 +14,7 @@
   --point-bg: rgba(255, 0, 127, 0.08);
   --cta-fill: #1a0f2e;
   --cta-text: #ffffff;
-  --urgent: #e53935;
+  --urgent: #ec5d59;
   --urgent-text: #ffffff;
   --success: #43a047;
   --success-text: #ffffff;
@@ -22,8 +22,8 @@
   --warning-text: #856404;
   --accent: #7c4dff;
   --topbar: #ffffff;
-  --chip-fill: #f0eaf9;
-  --icon-muted: #9b8fae;
+  --chip-fill: #6b5c84;
+  --icon-muted: #6b5c84;
   --placeholder: #a89bbd;
   --gold: #b8860b;
 }
@@ -198,4 +198,18 @@ body {
 
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--text);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 채팅 말풍선이 새로 나타날 때 쓰는 페이드인 — /tarot 메시지 목록 각 말풍선에 적용 */
+@utility animate-fade-in {
+  animation: fade-in 0.5s ease-out;
 }
