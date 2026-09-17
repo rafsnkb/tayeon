@@ -58,3 +58,7 @@ env:
     secret: KAKAO_CLIENT_SECRET
   - variable: ANTHROPIC_API_KEY
     secret: ANTHROPIC_API_KEY
+  - variable: PG_REVIEW_TEST_ID
+    secret: PG_REVIEW_TEST_ID
+  - variable: PG_REVIEW_TEST_PASSWORD
+    secret: PG_REVIEW_TEST_PASSWORD
