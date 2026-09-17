@@ -8,13 +8,13 @@ import { BackIcon } from "@/app/(app)/tarot/icons";
 export default function SubPageTopBar({ title, onBack }: { title: string; onBack?: () => void }) {
   const router = useRouter();
   return (
-    <div className="flex h-16 shrink-0 items-center justify-center border-b border-border bg-topbar">
+    <div className="app-topbar-glass fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-center border-b border-border">
       <div className="relative mx-auto flex h-full w-full max-w-2xl items-center justify-center">
         <button
           type="button"
           onClick={onBack ?? (() => router.back())}
           aria-label="뒤로가기"
-          className="absolute left-0 flex h-16 items-center text-bold-text"
+          className="absolute left-6 flex h-16 w-8 items-center justify-center text-bold-text"
         >
           <BackIcon className="h-5 w-2.5" />
         </button>

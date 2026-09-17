@@ -9,13 +9,6 @@ import { NewChatIcon, ChevronRightIcon } from "./tarot/icons";
 
 const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
 
-function formatRemaining(ms: number) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoomsProvider>
@@ -34,9 +27,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const {
     user,
     profileImage,
-    countPasses,
-    activeTimePass,
-    timePasses,
     rooms,
     activeRoomId,
     selectRoom,
@@ -44,7 +34,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
     authChecked,
   } = useRooms();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
   // 데스크탑(lg+)에서만 의미 있는 상시 사이드바 접기 상태 — hori.chat 참조(2026-09-14).
   // 모바일 오버레이 드로어(menuOpen)와는 별개 개념.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -65,12 +54,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => onOpenMenu(() => setMenuOpen(true)), []);
 
-  useEffect(() => {
-    if (!activeTimePass) return;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [activeTimePass]);
-
   async function handleNewRoom() {
     const created = await createRoom();
     setMenuOpen(false);
@@ -81,11 +64,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
     selectRoom(roomId);
     setMenuOpen(false);
     router.push(`/tarot?room=${roomId}`);
-  }
-
-  function handleGoCharge() {
-    setMenuOpen(false);
-    router.push("/charge");
   }
 
   if (!authChecked || !user) return null;
@@ -99,17 +77,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
   // 본문 영역에만 개별적으로 폭을 건다.
   if (!isMainRoute) {
     return (
-      <div className="flex h-dvh w-full flex-col overflow-hidden">
+      <div className="flex min-h-dvh w-full flex-col overflow-visible xl:h-dvh xl:overflow-hidden">
         {children}
       </div>
     );
   }
-
-  const timePassLabel = activeTimePass
-    ? `${formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)} 남음`
-    : timePasses.length > 0
-      ? `보유 ${timePasses.length}개`
-      : "보유 이용권 없음";
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden xl:flex-row">
@@ -134,7 +106,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <div className="shrink-0">
           <div className={`flex h-16 items-center px-4 ${sidebarCollapsed ? "xl:justify-center xl:px-0" : "justify-between"}`}>
             <span className={sidebarCollapsed ? "xl:hidden" : ""}>
-              <BrandBi />
+              <BrandBi className="h-7 w-14 translate-y-[2px]" />
             </span>
             <button
               type="button"
@@ -146,38 +118,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
                 className={`h-3 w-2 transition-transform ${sidebarCollapsed ? "" : "rotate-180"}`}
               />
             </button>
-          </div>
-          <div className={sidebarCollapsed ? "xl:hidden" : ""}>
-            <div className="flex items-center justify-between px-4 py-1.5">
-              <span className="text-sm font-semibold text-icon-muted">횟수제 이용권</span>
-              <span className="flex items-center gap-3">
-                <span className="flex items-center gap-1">
-                  <span className="text-lg font-bold text-bold-text dark:text-gold">
-                    {countPasses.length ? `보유 ${countPasses.length}개` : "없음"}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={handleGoCharge}
-                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
-                >
-                  구입
-                </button>
-              </span>
-            </div>
-            <div className="flex items-center justify-between px-4 py-1.5">
-              <span className="text-sm font-semibold text-icon-muted">시간제 이용권</span>
-              <span className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-bold-text">{timePassLabel}</span>
-                <button
-                  type="button"
-                  onClick={handleGoCharge}
-                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
-                >
-                  구입
-                </button>
-              </span>
-            </div>
           </div>
           <div className="mt-2 h-px bg-border" />
           {sidebarCollapsed && (
@@ -207,7 +147,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                       : "text-bold-text hover:bg-chip-fill hover:text-white"
                   }`}
                 >
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-bold-text" />
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-current" />
                   <span className="truncate">{room.title}</span>
                 </button>
               ))}

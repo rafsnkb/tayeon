@@ -5,7 +5,7 @@ export default function TermsPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <SubPageTopBar title="이용약관" />
-      <main className="mx-auto w-full max-w-2xl flex-1 p-4">
+      <main className="mx-auto w-full max-w-2xl flex-1 p-4 pt-20">
         <h1 className="mb-2 text-xl font-bold text-bold-text">이용약관</h1>
         <p className="mb-6 text-sm text-icon-muted">시행일: {TERMS_EFFECTIVE_DATE}</p>
         <div className="flex flex-col gap-6">

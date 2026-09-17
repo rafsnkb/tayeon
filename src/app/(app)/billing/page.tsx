@@ -22,7 +22,6 @@ export default function BillingPage() {
   const { user, email, nickname } = useRooms();
   const [keys, setKeys] = useState<BillingKeyEntry[] | null>(null);
   const [issuing, setIssuing] = useState(false);
-  const [chargingId, setChargingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: "info" | "error"; message: string } | null>(null);
 
   async function loadKeys(idToken: string) {
@@ -93,41 +92,13 @@ export default function BillingPage() {
     }
   }
 
-  // 저장된 빌링키로 결제를 실행하는 예시 — 실제 구독 상품이 생기기 전까지는 고정 금액(1,000원)
-  // 테스트 결제로만 쓴다.
-  async function handleTestCharge(billingKeyId: string) {
-    if (!user || chargingId) return;
-    setChargingId(billingKeyId);
-    setNotice(null);
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/billing/charge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ billingKeyId, amountWon: 1000, orderName: "빌링키 테스트 결제" }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNotice({ type: "info", message: "테스트 결제(1,000원)가 완료됐어요." });
-      } else {
-        setNotice({ type: "error", message: data.error ?? "결제에 실패했어요." });
-      }
-    } catch (error) {
-      console.error("[billing] 테스트 결제 실패", error);
-      setNotice({ type: "error", message: "결제 중 오류가 발생했어요." });
-    } finally {
-      setChargingId(null);
-    }
-  }
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
+    <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="자동충전 카드 관리" />
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <p className="rounded-2xl border border-border bg-topbar p-3 text-xs text-icon-muted">
-            자동충전 기능은 아직 준비 중이에요. 이 화면은 카드 등록과 빌링키 결제 흐름을
-            미리 확인하기 위한 테스트 화면입니다.
+            등록한 카드는 이용권 자동결제에 사용돼요. 자동결제 상품은 이용권 구입 화면에서 선택할 수 있어요.
           </p>
 
           {notice && (
@@ -158,24 +129,13 @@ export default function BillingPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {keys.map((k) => (
-                <div
-                  key={k.id}
-                  className="flex items-center justify-between rounded-[28px] border border-border bg-topbar p-4"
-                >
+                <div key={k.id} className="rounded-[28px] border border-border bg-topbar p-4">
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold text-bold-text">
                       {k.cardLabel ?? "등록된 카드"}
                     </p>
                     <p className="truncate text-sm text-icon-muted">{k.maskedNumber ?? ""}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleTestCharge(k.id)}
-                    disabled={chargingId !== null}
-                    className="shrink-0 rounded-full bg-point px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {chargingId === k.id ? "결제 중..." : "테스트 결제 1,000원"}
-                  </button>
                 </div>
               ))}
             </div>

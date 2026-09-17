@@ -120,8 +120,7 @@ function describeEnvironment(): string {
 }
 
 /** 피그마 "Screen / MyPage" — 예전엔 /me가 바로 생년월일시 폼이었는데, 이제는 다른 설정 화면들로
- * 가는 허브. 공지사항은 사용자가 애초에 "안 만들어뒀다"고 한 항목이라 목적지 없이 안내만 띄움
- * (친구초대는 /invite로 연결됨, 2026-09-16). */
+ * 가는 허브. 친구초대는 /invite로 연결된다. */
 export default function MyPage() {
   const router = useRouter();
   const { user, nickname, profileImage, email, countPasses } = useRooms();
@@ -173,10 +172,10 @@ export default function MyPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
+    <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="마이 페이지" />
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <Section title="계정">
             <div className="flex items-center gap-3 py-4">
@@ -208,7 +207,7 @@ export default function MyPage() {
               </span>
               <span className="flex min-w-0 items-center gap-3">
                 <span className="flex items-center gap-1.5">
-                  <span className="max-w-40 text-right text-base font-bold leading-tight text-bold-text dark:text-gold">
+                  <span className="max-w-40 text-right text-base font-bold leading-tight text-bold-text dark:text-white">
                     {activeCountPassName ?? "없음"}
                   </span>
                 </span>
@@ -252,7 +251,7 @@ export default function MyPage() {
           </Section>
 
           <Section title="시스템">
-            <ListRow icon={<CompassIcon className="h-5 w-5" />} label="공지사항" onClick={ComingSoon} />
+            <ListRow icon={<CompassIcon className="h-5 w-5" />} label="공지사항" onClick={() => router.push("/notice")} />
             <ListRow icon={<GearIcon className="h-[18px] w-5" />} label="설정" onClick={() => router.push("/settings")} />
             <ListRow
               icon={<LogoutDoorIcon className="h-5 w-5" />}

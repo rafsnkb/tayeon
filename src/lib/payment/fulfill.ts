@@ -28,7 +28,7 @@ export type FulfillOutcome =
 export async function fulfillPayment(
   paymentId: string,
   expectedUid?: string,
-  via: "complete" | "webhook" = "complete"
+  via: "complete" | "webhook" | "autoPurchase" = "complete"
 ): Promise<FulfillOutcome> {
   const payment = await portone.getPayment({ paymentId }).catch((error) => {
     console.error("[payment] getPayment 실패", paymentId, error);

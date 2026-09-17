@@ -132,6 +132,55 @@ function formatRemaining(ms: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+const READING_LOADING_MESSAGES = [
+  "카드를 섞고 있습니다...",
+  "운명의 흐름을 읽는 중...",
+  "숨겨진 의미를 찾는 중...",
+  "당신을 위한 조언을 준비하고 있습니다...",
+];
+
+function ReadingLoadingMessage() {
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [typedLength, setTypedLength] = useState(0);
+  const [phase, setPhase] = useState<"typing" | "holding" | "fading">("typing");
+  const message = READING_LOADING_MESSAGES[messageIndex];
+
+  useEffect(() => {
+    if (phase === "typing") {
+      if (typedLength < message.length) {
+        const timeout = setTimeout(() => setTypedLength((length) => length + 1), 42);
+        return () => clearTimeout(timeout);
+      }
+      setPhase("holding");
+      return;
+    }
+
+    if (phase === "holding") {
+      const timeout = setTimeout(() => setPhase("fading"), 1000);
+      return () => clearTimeout(timeout);
+    }
+
+    const timeout = setTimeout(() => {
+      setMessageIndex((index) => (index + 1) % READING_LOADING_MESSAGES.length);
+      setTypedLength(0);
+      setPhase("typing");
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [message.length, phase, typedLength]);
+
+  return (
+    <div
+      aria-live="polite"
+      className={`self-start rounded-2xl bg-surface px-4 py-3 text-text transition-opacity duration-1000 ${
+        phase === "fading" ? "opacity-0" : "opacity-100"
+      }`}
+    >
+      {message.slice(0, typedLength)}
+      {phase === "typing" && <span aria-hidden="true" className="ml-0.5 inline-block animate-pulse">|</span>}
+    </div>
+  );
+}
+
 function CardImage({
   card,
   extraRotate = 0,
@@ -423,6 +472,47 @@ function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onG
   );
 }
 
+function PurchaseTicketModal({
+  onClose,
+  onInvite,
+  onPurchase,
+}: {
+  onClose: () => void;
+  onInvite: () => void;
+  onPurchase: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-4" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center gap-3">
+          <div className="w-5" />
+          <p className="flex-1 text-center text-lg font-bold text-bold-text">인연의 끈을 이어갈까요?</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-6 w-6" />
+          </button>
+        </div>
+        <p className="mt-5 text-center text-sm font-semibold leading-5 text-icon-muted">
+          당신의 앞길을 비춰줄 조언을 더 주고싶지만,<br />
+          아쉽게도 가진 이용권을 모두 사용하셨어요.
+        </p>
+        <p className="mt-4 text-center text-sm font-semibold leading-5 text-icon-muted">
+          새로운 나침반이 필요하다면<br />
+          언제든 이용권을 채워주세요.
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button type="button" onClick={onInvite} className="h-12 flex-1 rounded-full bg-cta-fill text-sm font-bold text-cta-text">
+            친구 초대하기
+          </button>
+          <button type="button" onClick={onPurchase} className="h-12 flex-1 rounded-full bg-point text-sm font-bold text-white">
+            이용권 구입하기
+          </button>
+        </div>
+        <p className="mt-5 text-center text-xs font-semibold text-icon-muted">기존 대화는 안전하게 보관됩니다.</p>
+      </div>
+    </div>
+  );
+}
+
 /** 피그마 "Screen / ChatroomNameEdit" — 대화방 이름 변경. 기존엔 브라우저 기본 prompt()를 썼음. */
 function RenameRoomModal({
   initialTitle,
@@ -612,8 +702,8 @@ function ModeSettingsSheet({
                     <span className="block text-lg font-semibold text-bold-text">{INPUT_MODE_SPREAD_LABEL[key]} 스프레드</span>
                     <span className="block text-sm font-semibold text-icon-muted">{SPREAD_DESCRIPTIONS[key]}</span>
                   </span>
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${selected ? "bg-point" : "bg-[#969dad] dark:bg-icon-muted"}`}>
-                    {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${selected ? "bg-point" : "bg-[#868b9a] dark:bg-icon-muted"}`}>
+                    <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-white" : "bg-[#dcdee3] dark:bg-transparent"}`} />
                   </span>
                 </button>
               </div>
@@ -685,12 +775,12 @@ function Switch({
       onClick={onChange}
       disabled={disabled}
       className={`relative h-7 w-[72px] shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-        checked ? "bg-point" : "bg-icon-muted"
+        checked ? "bg-point" : "bg-[#868b9a] dark:bg-icon-muted"
       }`}
     >
       <span
         className={`absolute left-0 top-0.5 h-6 w-6 rounded-full transition-transform ${
-          checked ? "translate-x-[46px] bg-white" : "translate-x-[2px] bg-cta-fill"
+          checked ? "translate-x-[46px] bg-white" : "translate-x-[2px] bg-[#dcdee3] dark:bg-cta-fill"
         }`}
       />
     </button>
@@ -868,6 +958,7 @@ function TarotChat() {
   const [includeZiwei, setIncludeZiwei] = useState(false);
   const [includeCompatibility, setIncludeCompatibility] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [greetingAnimationRoomId, setGreetingAnimationRoomId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [startingPass, setStartingPass] = useState<string | null>(null);
@@ -878,12 +969,14 @@ function TarotChat() {
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
   const [timePassListOpen, setTimePassListOpen] = useState(false);
   const [noTimePassModalOpen, setNoTimePassModalOpen] = useState(false);
+  const [purchaseTicketOpen, setPurchaseTicketOpen] = useState(false);
   const [timePassToUse, setTimePassToUse] = useState<TimePass | null>(null);
   const [renameModalRoomId, setRenameModalRoomId] = useState<string | null>(null);
   const [deleteModalRoomId, setDeleteModalRoomId] = useState<string | null>(null);
   const [roomActionBusy, setRoomActionBusy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
+  const greetedRoomIdsRef = useRef<Set<string>>(new Set());
   // 이 방에서 진행 중인 리딩 요청이 있는지 — 이 인스턴스가 직접 시작했든(loading), 로딩 중
   // 페이지 이동 후 돌아와서 다른(재마운트 전) 인스턴스가 시작한 걸 뒤늦게 알게 됐든
   // (isRoomPending) 상관없이 UI는 동일하게 "응답 대기 중"으로 보여줘야 한다.
@@ -984,11 +1077,23 @@ function TarotChat() {
     (async () => {
       setHistoryLoaded(false);
       const history = await fetchRoomHistory(activeRoomId);
-      if (history) setMessages(history);
+      if (history) {
+        const hasOnlyGreeting = history.length > 0 && history.every((message) => message.role === "assistant" && message.isGreeting);
+        const shouldAnimateGreeting = hasOnlyGreeting && !greetedRoomIdsRef.current.has(activeRoomId);
+        greetedRoomIdsRef.current.add(activeRoomId);
+        setGreetingAnimationRoomId(shouldAnimateGreeting ? activeRoomId : null);
+        setMessages(history);
+      }
       setHistoryLoaded(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeRoomId]);
+
+  useEffect(() => {
+    if (!greetingAnimationRoomId) return;
+    const timeout = setTimeout(() => setGreetingAnimationRoomId(null), 3600);
+    return () => clearTimeout(timeout);
+  }, [greetingAnimationRoomId]);
 
   // 방금 물어본 질문이 이 방에서 서버 응답을 기다리는 중인지는 RoomsContext(레이아웃 레벨,
   // 재마운트에 영향 안 받음)로 추적한다 — 로딩 중에 다른 페이지로 이동했다가 돌아오면 이
@@ -1212,6 +1317,10 @@ function TarotChat() {
   const activeCountPassRemaining = activeCountPass
     ? availableCount(activeCountPass, spread, includeSaju, includeZiwei, includeCompatibility)
     : 0;
+  const hasUsableCountPass = countPasses.some(
+    (pass) => availableCount(pass, "one", false, false) > 0
+  );
+  const noUsableTicket = roomsLoaded && !timePassActive && timePasses.length === 0 && !hasUsableCountPass;
   const inputModeLabel = [
     INPUT_MODE_SPREAD_LABEL[spread],
     includeSaju && "사주",
@@ -1296,6 +1405,19 @@ function TarotChat() {
           onClose={() => setNoTimePassModalOpen(false)}
           onGoCharge={() => {
             setNoTimePassModalOpen(false);
+            router.push("/charge?tab=time");
+          }}
+        />
+      )}
+      {purchaseTicketOpen && (
+        <PurchaseTicketModal
+          onClose={() => setPurchaseTicketOpen(false)}
+          onInvite={() => {
+            setPurchaseTicketOpen(false);
+            router.push("/invite");
+          }}
+          onPurchase={() => {
+            setPurchaseTicketOpen(false);
             router.push("/charge");
           }}
         />
@@ -1318,7 +1440,7 @@ function TarotChat() {
           onClose={() => setDeleteModalRoomId(null)}
         />
       )}
-      <div className="relative flex h-16 shrink-0 items-center border-b border-border bg-topbar">
+      <div className="app-topbar-glass absolute inset-x-0 top-0 z-20 flex h-16 items-center border-b border-border">
         <div className="flex h-full w-full items-center xl:mx-auto xl:max-w-4xl xl:pl-4">
         <button
           type="button"
@@ -1411,29 +1533,25 @@ function TarotChat() {
           상단 페이드(그라데이션 마스크)도 함께 적용. */}
       <div className="relative min-h-0 flex-1">
         {!isBlankRoom && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 mx-auto flex w-full justify-end px-4 pt-2 xl:max-w-4xl">
+          <div className="pointer-events-none absolute inset-x-0 top-16 z-10 mx-auto flex w-full justify-end px-4 pt-2 xl:max-w-4xl">
             <button
               type="button"
               onClick={() => (timePasses.length > 0 ? setTimePassListOpen(true) : setNoTimePassModalOpen(true))}
               aria-label="보유 시간제 이용권"
               className={`pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full ${
                 timePasses.length > 0
-                  ? "bg-point text-white"
-                  : "bg-[#79678f] text-white"
+                  ? "bg-point text-white dark:h-9 dark:w-9 dark:border dark:border-point dark:bg-point-bg dark:text-point"
+                  : "bg-[#79678f] text-white dark:h-9 dark:w-9 dark:border dark:border-icon-muted dark:bg-transparent dark:text-icon-muted"
               }`}
             >
-              <TicketIcon className="h-5 w-6" />
+              <TicketIcon className="h-5 w-6 dark:h-4 dark:w-5" />
             </button>
           </div>
         )}
         <div
           className={`mx-auto flex h-full w-full flex-col gap-3 overflow-y-auto p-4 xl:max-w-4xl ${
-            isBlankRoom ? "pt-3" : "pt-14"
+            isBlankRoom ? "pt-[76px]" : "pt-[120px]"
           }`}
-          style={{
-            WebkitMaskImage: "linear-gradient(to bottom, transparent, black 24px)",
-            maskImage: "linear-gradient(to bottom, transparent, black 24px)",
-          }}
         >
         {!historyLoaded && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
@@ -1453,8 +1571,16 @@ function TarotChat() {
               </div>
             );
           }
+          const greetingIndex = msg.isGreeting
+            ? messages.slice(0, i).filter((message) => message.role === "assistant" && message.isGreeting).length
+            : 0;
+          const animateGreeting = msg.isGreeting && greetingAnimationRoomId === activeRoomId;
           return (
-            <div key={i} className="animate-fade-in flex w-full flex-col items-start">
+            <div
+              key={i}
+              className="animate-fade-in flex w-full flex-col items-start"
+              style={animateGreeting ? { animationDelay: `${greetingIndex}s`, animationFillMode: "backwards" } : undefined}
+            >
               <div className="max-w-[85%] rounded-2xl bg-surface px-4 py-3">
               {msg.cards.some((c) => c.id) && (
                 <div className="mb-2 flex justify-center">
@@ -1545,11 +1671,7 @@ function TarotChat() {
             </div>
           );
         })}
-        {showLoading && (
-          <div className="animate-fade-in self-start rounded-2xl bg-surface px-4 py-3 text-text">
-            카드를 뽑고 해석하는 중...
-          </div>
-        )}
+        {showLoading && <ReadingLoadingMessage />}
         <div ref={messagesEndRef} />
         </div>
       </div>
@@ -1572,6 +1694,12 @@ function TarotChat() {
             ref={questionInputRef}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
+            onFocus={() => {
+              if (noUsableTicket) {
+                questionInputRef.current?.blur();
+                setPurchaseTicketOpen(true);
+              }
+            }}
             placeholder="궁금한 것을 물어보세요"
             className="h-14 min-w-0 flex-1 bg-transparent px-3.5 text-base font-semibold text-bold-text placeholder-placeholder outline-none"
             disabled={showLoading}

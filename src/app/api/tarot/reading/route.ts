@@ -29,6 +29,7 @@ import { calculateSaju, buildSajuPromptBlock, type SajuResult } from "@/lib/saju
 import { calculateZiwei, buildZiweiPromptBlock, type ZiweiResult } from "@/lib/ziwei/calculate";
 import { isValidBirthInfo, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
+import { attemptAutoCountPurchase } from "@/lib/payment/autoCountPurchase";
 import type { DocumentReference } from "firebase-admin/firestore";
 
 // 궁합 옵션이 꺼진 채 상대방 관계를 묻는 질문을 서버가 결정적으로 차단할 때(LLM 호출 없음) 쓰는
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest) {
 
     const balance: number = userData?.coins ?? 0;
     const countPassesSnap = await userRef.collection("countPasses").get();
-    const countPasses = countPassesSnap.docs
+    let countPasses = countPassesSnap.docs
       .sort((a, b) => String(a.data().createdAt).localeCompare(String(b.data().createdAt)));
     const rawTone = userData?.tone;
     const tone = isToneKey(rawTone) ? rawTone : DEFAULT_TONE;
@@ -246,7 +247,7 @@ export async function POST(req: NextRequest) {
       (includeZiwei ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
       (includeCompatibility ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
 
-    const chosenPass = spreadCovered ? null : countPasses.find((doc) =>
+    let chosenPass = spreadCovered ? null : countPasses.find((doc) =>
       availableCount(
         doc.data() as CountPassBalance,
         spread,
@@ -256,11 +257,36 @@ export async function POST(req: NextRequest) {
       ) > 0
     );
 
-    if (!spreadCovered && !chosenPass && balance < legacyCost) {
-      return NextResponse.json(
-        { error: "이용 가능한 횟수가 없어요. 이용권을 구입해주세요." },
-        { status: 402 }
-      );
+    if (!spreadCovered && !chosenPass) {
+      const autoPurchase = await attemptAutoCountPurchase({ uid, userRef });
+      if (autoPurchase.kind === "purchased") {
+        const refreshedPasses = await userRef.collection("countPasses").get();
+        countPasses = refreshedPasses.docs.sort((a, b) =>
+          String(a.data().createdAt).localeCompare(String(b.data().createdAt))
+        );
+        chosenPass = countPasses.find((doc) =>
+          availableCount(
+            doc.data() as CountPassBalance,
+            spread,
+            Boolean(includeSaju),
+            Boolean(includeZiwei),
+            Boolean(includeCompatibility)
+          ) > 0
+        );
+      }
+      // 추천 질문 버튼도 이 API를 거치므로, 여기서 막아야 직접 입력과 동일하게 이용권 소진을
+      // 보장할 수 있다. 예전 코인 잔액이 남아 있어도 신규 리딩에는 우회 사용하지 않는다.
+      if (!chosenPass) {
+        return NextResponse.json(
+          {
+            error:
+              autoPurchase.kind === "failed"
+                ? autoPurchase.message
+                : "이용 가능한 횟수가 없어요. 이용권을 구입해주세요.",
+          },
+          { status: 402 }
+        );
+      }
     }
 
     const drawnCards = drawCards(SPREADS[spread].cardCount, useReversedCards);

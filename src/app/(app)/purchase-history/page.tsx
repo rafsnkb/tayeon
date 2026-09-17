@@ -7,9 +7,9 @@ import SubPageTopBar from "@/components/SubPageTopBar";
  * 연결하면 됨. */
 export default function PurchaseHistoryPage() {
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
+    <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="결제 내역" />
-      <div className="flex flex-1 items-center justify-center p-4">
+      <div className="flex flex-1 items-center justify-center p-4 pt-20">
         <p className="text-center text-sm text-icon-muted">
           아직 결제 내역이 없어요.
           <br />

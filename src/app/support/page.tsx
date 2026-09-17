@@ -1,17 +1,15 @@
-import { SUPPORT_EMAIL } from "@/lib/company";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import SupportCenter from "@/components/SupportCenter";
 
-export default function SupportPage() {
-  return (
-    <main className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-4 text-xl font-bold text-bold-text">고객센터</h1>
-      <p className="text-text">
-        문의사항은 이메일로 접수해주세요.
-      </p>
-      <p className="mt-2">
-        <a href={`mailto:${SUPPORT_EMAIL}`} className="text-point underline">
-          {SUPPORT_EMAIL}
-        </a>
-      </p>
-    </main>
-  );
+function parseFaq(markdown: string) {
+  return [...markdown.matchAll(/Q\.\s*(.+?)\r?\n\r?\nA\.\s*([\s\S]*?)(?=\r?\n\r?\nQ\.|\s*$)/g)].map((match) => ({
+    question: match[1].trim(),
+    answer: match[2].trim(),
+  }));
+}
+
+export default async function SupportPage() {
+  const markdown = await readFile(path.join(process.cwd(), "doc", "FAQ.md"), "utf8");
+  return <SupportCenter faqs={parseFaq(markdown)} />;
 }

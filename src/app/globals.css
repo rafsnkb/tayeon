@@ -89,6 +89,26 @@ body {
   font-weight: 600;
 }
 
+/* 모든 상단바가 테마별 글래스 표면을 공유한다. */
+.app-topbar-glass {
+  isolation: isolate;
+  background: transparent;
+}
+
+.app-topbar-glass::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background-color: rgb(255 255 255 / 80%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+
+.dark .app-topbar-glass::before {
+  background-color: rgb(25 25 29 / 80%);
+}
+
 /*
  * 타이포그래피 스케일 (Pretendard 2종 웨이트만 사용: SemiBold/Bold, 그 외 웨이트는 로드하지 않음)
  * SemiBold(600): 본문/보조 텍스트/카드 제목/탭 라벨/일반 제목 | Bold(700): 큰 타이틀/섹션 헤더/CTA

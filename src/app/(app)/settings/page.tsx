@@ -157,9 +157,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
+    <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="설정" />
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <SectionPanel title="상담 설정">
             <div>
