@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { FREE_SIGNUP_COINS } from "@/lib/tarot/pricing";
 import type { BirthInfo, JasiRule } from "@/lib/tarot/birthInfo";
 
 const JASI_RULES: JasiRule[] = ["midnight", "jasi", "splitJasi"];
@@ -52,15 +51,11 @@ export async function POST(req: NextRequest) {
   }
 
   const userRef = adminDb.collection("users").doc(uid);
-  const existing = await userRef.get();
-  const alreadySignedUp = Boolean(existing.data()?.termsAgreedAt);
-
   await userRef.set(
     {
       nickname: trimmed,
       termsAgreedAt: new Date().toISOString(),
       ...birthInfoUpdate,
-      ...(alreadySignedUp ? {} : { coins: FREE_SIGNUP_COINS }),
     },
     { merge: true }
   );

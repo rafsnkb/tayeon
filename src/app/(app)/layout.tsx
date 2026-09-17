@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
+import { BrandBi } from "@/components/BrandBi";
 import { NewChatIcon, ChevronRightIcon } from "./tarot/icons";
 
 const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
@@ -33,7 +34,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const {
     user,
     profileImage,
-    coins,
+    countPasses,
     activeTimePass,
     timePasses,
     rooms,
@@ -132,9 +133,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
             로고 옆 화살표로 사이드바를 아이콘 전용 레일로 접을 수 있음(hori.chat과 동일 동작) */}
         <div className="shrink-0">
           <div className={`flex h-16 items-center px-4 ${sidebarCollapsed ? "xl:justify-center xl:px-0" : "justify-between"}`}>
-            <span className={`text-2xl font-bold ${sidebarCollapsed ? "xl:hidden" : ""}`}>
-              <span className="text-bold-text">타</span>
-              <span className="text-point">연</span>
+            <span className={sidebarCollapsed ? "xl:hidden" : ""}>
+              <BrandBi />
             </span>
             <button
               type="button"
@@ -149,12 +149,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className={sidebarCollapsed ? "xl:hidden" : ""}>
             <div className="flex items-center justify-between px-4 py-1.5">
-              <span className="text-sm font-semibold text-icon-muted">보유코인</span>
+              <span className="text-sm font-semibold text-icon-muted">횟수제 이용권</span>
               <span className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <img src="/icons/coin.png" alt="" className="h-5 w-5" />
                   <span className="text-lg font-bold text-bold-text dark:text-gold">
-                    {coins !== null ? coins.toLocaleString("ko-KR") : "-"}
+                    {countPasses.length ? `보유 ${countPasses.length}개` : "없음"}
                   </span>
                 </span>
                 <button
@@ -162,7 +161,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   onClick={handleGoCharge}
                   className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
                 >
-                  충전
+                  구입
                 </button>
               </span>
             </div>

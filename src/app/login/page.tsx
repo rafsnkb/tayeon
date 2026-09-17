@@ -1,4 +1,5 @@
 import TestAccountLogin from "./TestAccountLogin";
+import { BrandBi } from "@/components/BrandBi";
 
 // 친구 초대 링크(/login?ref=CODE)로 들어온 경우, OAuth 왕복 동안 유일하게 그대로 되돌아오는
 // state 파라미터에 초대 코드를 실어서 콜백(src/app/api/auth/kakao/callback/route.ts)까지
@@ -27,18 +28,10 @@ export default async function LoginPage({
 }) {
   const { error, ref } = await searchParams;
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-bg p-6">
-      <span className="text-3xl font-bold">
-        <span className="text-bold-text">타</span>
-        <span className="text-point">연</span>
-      </span>
-
-      <div className="flex w-full max-w-sm flex-col gap-5 rounded-[32px] border border-border bg-topbar p-6">
-        <span className="self-center text-2xl font-bold">
-          <span className="text-bold-text">타</span>
-          <span className="text-point">연</span>
-        </span>
-        <p className="text-center text-base font-semibold text-bold-text">
+    <main className="flex min-h-dvh items-center justify-center bg-[#0e0f10] p-6">
+      <div className="flex w-full max-w-sm flex-col gap-5 rounded-[32px] border border-[#e4d8ef] bg-[#fcfbff] p-6 shadow-[0_16px_42px_rgba(0,0,0,0.2)]">
+        <span className="self-center"><BrandBi variant="light" /></span>
+        <p className="text-center text-base font-semibold text-[#74628a]">
           작은 고민도 넘기지 말고
           <br />
           타연에서 타로ㆍ사주ㆍ자미두수로
@@ -48,8 +41,8 @@ export default async function LoginPage({
 
         {error && <p className="text-center text-sm text-urgent">로그인에 실패했어요. 다시 시도해주세요.</p>}
 
-        <p className="rounded-full bg-chip-fill py-2.5 text-center text-sm font-semibold text-white">
-          최초 가입 시 <span className="text-gold">500코인</span> 지급
+        <p className="rounded-2xl bg-[#f5f1fa] px-4 py-2.5 text-center text-sm font-semibold leading-5 text-[#74628a]">
+          최초 가입 시 무료 4회(모든 기능 무제한) 지급
         </p>
 
         <a
@@ -59,7 +52,7 @@ export default async function LoginPage({
           로그인ㆍ회원가입
         </a>
 
-        <p className="text-center text-xs text-icon-muted">
+        <p className="text-center text-xs text-[#74628a]">
           로그인 시{" "}
           <a href="/terms" target="_blank" className="text-point underline">
             이용약관

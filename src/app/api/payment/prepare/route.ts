@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { resolveProduct } from "@/lib/payment/products";
+import { adminDb } from "@/lib/firebase/admin";
 
 // 결제창(PortOne.requestPayment)을 열기 직전에 프론트가 호출하는 엔드포인트.
 //
@@ -20,8 +21,18 @@ export async function POST(req: NextRequest) {
 
   const { productId } = (await req.json()) as { productId?: string };
   const product = resolveProduct(productId);
-  if (!product) {
+  if (!product || product.type === "coin") {
     return NextResponse.json({ error: "존재하지 않는 상품이에요." }, { status: 400 });
+  }
+
+  if (product.type === "countPass") {
+    const passes = await adminDb.collection("users").doc(uid).collection("countPasses").get();
+    if (passes.docs.some((doc) => {
+      const data = doc.data();
+      return data.source === "purchase" && Number(data.remaining) > 0 && new Date(data.expiresAt).getTime() > Date.now();
+    })) {
+      return NextResponse.json({ error: "보유 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
+    }
   }
 
   const paymentId = randomUUID();

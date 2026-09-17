@@ -3,17 +3,16 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useRooms, type TimePass } from "@/lib/tarot/RoomsContext";
-import { TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
+import { useRooms, type CountPass, type TimePass } from "@/lib/tarot/RoomsContext";
+import { COUNT_PACKAGES, availableCount } from "@/lib/tarot/pricing";
+import { TIER_TEXTURE, TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
 import {
   SPREADS,
-  SAJU_ADD_ON_COST,
-  ZIWEI_ADD_ON_COST,
-  COMPATIBILITY_ADD_ON_COST,
   type SpreadKey,
 } from "@/lib/tarot/pricing";
 import { openMenu } from "@/lib/ui/menuBus";
 import ConfirmModal from "@/components/ConfirmModal";
+import { BrandBi } from "@/components/BrandBi";
 import {
   MenuIcon,
   SendIcon,
@@ -30,6 +29,7 @@ import {
   SpreadDualIcon,
   SpreadCelticIcon,
   TicketIcon,
+  InfoCircleIcon,
 } from "./icons";
 
 const DEFAULT_ROOM_TITLE = "새 대화";
@@ -40,6 +40,64 @@ const SPREAD_ICONS: Record<SpreadKey, (props: { className?: string }) => React.J
   dual: SpreadDualIcon,
   celtic: SpreadCelticIcon,
 };
+
+const INPUT_MODE_SPREAD_LABEL: Record<SpreadKey, string> = {
+  one: "원 카드",
+  three: "쓰리 카드",
+  dual: "양자택일",
+  celtic: "켈틱 크로스",
+};
+
+function countPassName(pass: { productId?: string; source?: string }): string {
+  const purchased = COUNT_PACKAGES.find((pkg) => pkg.id === pass.productId);
+  if (purchased) return `${purchased.name} 이용권`;
+  if (pass.source === "signup-free") return "첫 가입 체험 이용권";
+  if (pass.source === "referral-signup") return "친구 초대 이용권";
+  if (pass.source === "bonus-reward") return "보너스 리워드 이용권";
+  if (pass.source === "referral-payout") return "친구 결제 리워드 이용권";
+  if (pass.source === "admin-grant") return "관리자 지급 이용권";
+  return "이용권";
+}
+
+const COUNT_PASS_CARD_TIERS = [
+  { border: "#9de9ed", text: "#9de9ed", tagBg: "rgba(12, 68, 86, 0.86)", bg: TIER_TEXTURE[4] },
+  { border: "#2f8bee", text: "#66b0ff", tagBg: "rgba(15, 52, 98, 0.86)", bg: TIER_TEXTURE[3] },
+  { border: "#2f8bee", text: "#66b0ff", tagBg: "rgba(15, 52, 98, 0.86)", bg: TIER_TEXTURE[3] },
+  { border: "#8335d6", text: "#a04ff8", tagBg: "rgba(56, 24, 82, 0.86)", bg: TIER_TEXTURE[2] },
+  { border: "#8335d6", text: "#a04ff8", tagBg: "rgba(56, 24, 82, 0.86)", bg: TIER_TEXTURE[2] },
+  { border: "#ff007f", text: "#ff007f", tagBg: "rgba(82, 17, 59, 0.86)", bg: TIER_TEXTURE[1] },
+];
+
+function CountPassUsageModal({ pass, onClose }: { pass: CountPass; onClose: () => void }) {
+  const productIndex = COUNT_PACKAGES.findIndex((pkg) => pkg.id === pass.productId);
+  const product = productIndex >= 0 ? COUNT_PACKAGES[productIndex] : null;
+  const tier = COUNT_PASS_CARD_TIERS[productIndex >= 0 ? productIndex : 1];
+  const remainingPercent = Math.max(0, Math.min(100, pass.remaining * 100)).toFixed(2);
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-[32px] border border-border bg-topbar p-4" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="w-5" />
+          <p className="flex-1 text-center text-lg font-bold text-bold-text">이용권 사용량</p>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text"><CloseIcon className="h-5 w-5" /></button>
+        </div>
+        <p className="mb-2 text-center text-sm font-semibold text-icon-muted">현재 이용권</p>
+        <div className="relative h-20 overflow-hidden rounded-[28px] border bg-cover bg-center p-4" style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}>
+          <div className="absolute inset-0 bg-[#19191d]/70" />
+          <div className="relative">
+            <p className="text-xl font-bold text-white">{countPassName(pass)}</p>
+            <span className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-sm font-semibold" style={{ color: tier.text, backgroundColor: tier.tagBg }}>
+              {product?.bonus ?? "무료 이용권"}
+            </span>
+          </div>
+        </div>
+        <p className="mb-2 mt-6 text-center text-sm font-semibold text-icon-muted">남은 사용량</p>
+        <p className="mx-auto w-fit rounded-full bg-chip-fill px-4 py-1 text-xl font-bold text-white">{remainingPercent}%</p>
+      </div>
+    </div>
+  );
+}
 
 type TarotCardInfo = { id: string; nameKo: string; nameEn: string; reversed: boolean };
 
@@ -62,7 +120,7 @@ type ChatMessage =
       timePassApplied?: boolean;
       suggestions?: string[];
       /** 방을 처음 열었을 때 캐릭터가 먼저 건네는 인사말(실제 리딩 아님) — 카드/스프레드 표시,
-       * "코인 차감 안됨" 안내 등 리딩 전용 UI를 이 메시지에는 붙이지 않기 위한 구분용 플래그. */
+       * 이용권 차감 안내 등 리딩 전용 UI를 이 메시지에는 붙이지 않기 위한 구분용 플래그. */
       isGreeting?: boolean;
     }
   | { role: "error"; text: string };
@@ -177,7 +235,7 @@ function WelcomePopup({ onClose }: { onClose: () => void }) {
         <ul className="list-disc pl-5 text-sm text-text">
           <li>타연은 오락 목적의 서비스이며, 의학적·법적·재정적 조언을 대체하지 않습니다.</li>
           <li>만 14세 미만은 이용이 제한됩니다.</li>
-          <li>충전한 코인은 사용 후 환불되지 않으며, 유효기간은 무기한입니다.</li>
+          <li>횟수제 이용권은 구입일부터 6개월 동안 사용할 수 있어요.</li>
           <li>
             자세한 내용은{" "}
             <a href="/terms" target="_blank" className="text-point underline">
@@ -207,10 +265,6 @@ const SPREAD_DESCRIPTIONS: Record<SpreadKey, string> = {
   dual: "어느 한쪽을 선택해야 할 때 추천",
   celtic: "세부적인 심층 분석에 추천",
 };
-
-function CoinIcon({ className = "h-5 w-5" }: { className?: string }) {
-  return <img src="/icons/coin.png" alt="" className={className} />;
-}
 
 function TimePassCard({ pass, actionLabel, onAction, busy }: {
   pass: TimePass;
@@ -428,10 +482,14 @@ function RenameRoomModal({
 /** 피그마 "Screen / SpreadSelect"의 List_Spread — 스프레드 4종을 설명+가격과 함께 고르는 바텀시트 */
 function SpreadSelectSheet({
   spread,
+  remainingBySpread,
+  timePassActive,
   onSelect,
   onClose,
 }: {
   spread: SpreadKey;
+  remainingBySpread: Record<SpreadKey, number>;
+  timePassActive: boolean;
   onSelect: (key: SpreadKey) => void;
   onClose: () => void;
 }) {
@@ -483,17 +541,126 @@ function SpreadSelectSheet({
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-0.5">
-                    <span className="text-xs font-semibold text-icon-muted">질문 1회</span>
-                    <span className="flex items-center gap-1">
-                      <CoinIcon className="h-5 w-5" />
-                      <span className="text-base font-semibold text-gold">{SPREADS[key].cost}</span>
-                    </span>
+                    <span className="text-xs font-semibold text-icon-muted">남은 횟수</span>
+                    <span className="text-base font-semibold text-gold">{timePassActive ? "무제한" : `${remainingBySpread[key]}회`}</span>
                   </span>
                 </button>
               </div>
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ModeSettingsSheet({
+  spread,
+  includeSaju,
+  includeZiwei,
+  includeCompatibility,
+  hasBirthInfo,
+  myTimeUnknown,
+  hasPartner,
+  onSelectSpread,
+  onToggleSaju,
+  onToggleZiwei,
+  onToggleCompatibility,
+  onClose,
+}: {
+  spread: SpreadKey;
+  includeSaju: boolean;
+  includeZiwei: boolean;
+  includeCompatibility: boolean;
+  hasBirthInfo: boolean;
+  myTimeUnknown: boolean;
+  hasPartner: boolean;
+  onSelectSpread: (spread: SpreadKey) => void;
+  onToggleSaju: () => void;
+  onToggleZiwei: () => void;
+  onToggleCompatibility: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="max-h-full w-full overflow-y-auto rounded-t-[28px] border border-border bg-topbar p-4 xl:mx-auto xl:max-w-4xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center gap-3 p-1">
+          <div className="w-5" />
+          <div className="flex-1 text-center">
+            <p className="text-lg font-bold text-bold-text">스프레드 선택</p>
+            <p className="text-sm font-semibold text-icon-muted">원하는 스프레드를 선택할 수 있어요</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="rounded-2xl bg-[#f7f4fb] dark:bg-chip-fill">
+          {(Object.keys(SPREADS) as SpreadKey[]).map((key, index) => {
+            const Icon = SPREAD_ICONS[key];
+            const selected = key === spread;
+            return (
+              <div key={key}>
+                {index > 0 && <div className="mx-2 h-px bg-border" />}
+                <button type="button" onClick={() => onSelectSpread(key)} className="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-lg font-semibold text-bold-text">{INPUT_MODE_SPREAD_LABEL[key]} 스프레드</span>
+                    <span className="block text-sm font-semibold text-icon-muted">{SPREAD_DESCRIPTIONS[key]}</span>
+                  </span>
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${selected ? "bg-point" : "bg-[#969dad] dark:bg-icon-muted"}`}>
+                    {selected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                  </span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        <section className="mt-4">
+          <p className="text-center text-lg font-bold text-bold-text">사주ㆍ자미두수 해석 추가</p>
+          <p className="text-center text-sm font-semibold text-icon-muted">타로에 사주ㆍ자미두수 정보를 추가해서 심층 분석</p>
+          <p className="text-center text-sm font-semibold text-urgent [word-break:keep-all]">사주를 추가하려면 생년월일 정보가, 자미두수를 추가하려면 태어난 시간 정보가 필요합니다</p>
+          <div className="mt-2 rounded-2xl bg-[#f7f4fb] dark:bg-chip-fill">
+            <div className="flex items-center gap-3 px-4 py-2">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text"><SajuIcon className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold text-bold-text">사주 해석 추가</span>
+                <span className="block text-sm font-semibold text-icon-muted">타로+사주 조합으로 심층 분석</span>
+              </span>
+              <Switch checked={includeSaju} onChange={onToggleSaju} disabled={!hasBirthInfo} />
+            </div>
+            <div className="mx-2 h-px bg-border" />
+            <div className="flex items-center gap-3 px-4 py-2">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text"><ZiweiIcon className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold text-bold-text">자미두수 해석 추가</span>
+                <span className="block text-sm font-semibold text-icon-muted">타로+자미두수 조합으로 심층 분석</span>
+              </span>
+              <Switch checked={includeZiwei} onChange={onToggleZiwei} disabled={!hasBirthInfo || myTimeUnknown} />
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-3">
+          <p className="text-center text-lg font-bold text-bold-text">궁합 해석 추가</p>
+          <p className="text-center text-sm font-semibold text-icon-muted">사주ㆍ자미두수 정보를 기반으로 궁합까지 타로 리딩</p>
+          <p className="text-center text-sm font-semibold text-urgent [word-break:keep-all]">궁합 해석을 추가하려면 상대방 프로필 정보가 필요합니다.</p>
+          <div className="mt-2 rounded-2xl bg-[#f7f4fb] dark:bg-chip-fill">
+            <div className="flex items-center gap-3 px-4 py-2">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text"><CompatibilityIcon className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-semibold text-bold-text">궁합 해석 추가</span>
+                <span className="block text-sm font-semibold text-icon-muted">상대방과의 궁합을 더 자세하게 분석</span>
+              </span>
+              <Switch checked={includeCompatibility} onChange={onToggleCompatibility} disabled={!hasBirthInfo || !hasPartner} />
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -523,7 +690,7 @@ function Switch({
     >
       <span
         className={`absolute left-0 top-0.5 h-6 w-6 rounded-full transition-transform ${
-          checked ? "translate-x-11 bg-white" : "translate-x-1 bg-cta-fill"
+          checked ? "translate-x-[46px] bg-white" : "translate-x-[2px] bg-cta-fill"
         }`}
       />
     </button>
@@ -568,37 +735,36 @@ function SajuZiweiSheet({
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl bg-border/40 p-2">
-          <div className="flex items-center gap-3 rounded-lg p-1">
+        <div className="flex flex-col rounded-2xl bg-border/40">
+          <div className="flex items-center gap-3 rounded-lg px-4 py-2">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
               <SajuIcon className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1">
                 <span className="text-base font-semibold text-bold-text">사주 해석 추가</span>
-                <CoinIcon className="h-4 w-4" />
-                <span className="text-sm font-semibold text-gold">{SAJU_ADD_ON_COST}</span>
+                <span className="text-xs font-semibold text-gold">85%</span>
               </span>
               <span className="block text-sm font-semibold text-icon-muted">타로+사주 조합으로 심층 분석</span>
             </span>
             <Switch checked={includeSaju} onChange={onToggleSaju} />
           </div>
-          <div className="h-px bg-border" />
-          <div className="flex items-center gap-3 rounded-lg p-1">
+          <div className="mx-2 h-px bg-border" />
+          <div className="flex items-center gap-3 rounded-lg px-4 py-2">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
               <ZiweiIcon className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1">
                 <span className="text-base font-semibold text-bold-text">자미두수 해석 추가</span>
-                <CoinIcon className="h-4 w-4" />
-                <span className="text-sm font-semibold text-gold">{ZIWEI_ADD_ON_COST}</span>
+                <span className="text-xs font-semibold text-gold">75%</span>
               </span>
               <span className="block text-sm font-semibold text-icon-muted">타로+자미두수 조합으로 심층 분석</span>
             </span>
             <Switch checked={includeZiwei} onChange={onToggleZiwei} disabled={ziweiDisabled} />
           </div>
         </div>
+        <p className="mt-2 text-center text-xs text-icon-muted">사주와 자미두수를 모두 켜면 기본 횟수의 50%가 적용돼요.</p>
       </div>
     </div>
   );
@@ -636,16 +802,15 @@ function CompatibilitySheet({
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl bg-border/40 p-2">
-          <div className="flex items-center gap-3 rounded-lg p-1">
+        <div className="flex flex-col rounded-2xl bg-border/40">
+          <div className="flex items-center gap-3 rounded-lg px-4 py-2">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
               <CompatibilityIcon className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1">
                 <span className="text-base font-semibold text-bold-text">궁합 해석 추가</span>
-                <CoinIcon className="h-4 w-4" />
-                <span className="text-sm font-semibold text-gold">{COMPATIBILITY_ADD_ON_COST}</span>
+                <span className="text-xs font-semibold text-gold">이용권 포함</span>
               </span>
               <span className="block text-sm font-semibold text-icon-muted">상대방과의 궁합을 더 자세하게 분석</span>
             </span>
@@ -670,8 +835,10 @@ function TarotChat() {
   const searchParams = useSearchParams();
   const {
     user,
-    coins,
     setCoins,
+    countPasses,
+    setCountPasses,
+    refreshMe,
     rooms,
     activeRoomId,
     selectRoom,
@@ -695,6 +862,8 @@ function TarotChat() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "1");
   const [spread, setSpread] = useState<SpreadKey>("one");
+  const [modeSettingsOpen, setModeSettingsOpen] = useState(false);
+  const [countPassUsageOpen, setCountPassUsageOpen] = useState(false);
   const [includeSaju, setIncludeSaju] = useState(false);
   const [includeZiwei, setIncludeZiwei] = useState(false);
   const [includeCompatibility, setIncludeCompatibility] = useState(false);
@@ -731,6 +900,19 @@ function TarotChat() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTimePass]);
+
+  // 생년월일이 없으면 사주·자미두수·궁합 모두 사용할 수 없고, 태어난 시간이 없으면
+  // 자미두수만 사용할 수 없다. 프로필 정보가 바뀐 뒤 남아 있던 선택값도 함께 정리한다.
+  useEffect(() => {
+    if (!hasBirthInfo) {
+      setIncludeSaju(false);
+      setIncludeZiwei(false);
+      setIncludeCompatibility(false);
+      return;
+    }
+    if (myTimeUnknown) setIncludeZiwei(false);
+    if (!hasPartner) setIncludeCompatibility(false);
+  }, [hasBirthInfo, myTimeUnknown, hasPartner]);
 
   // 방 목록은 RoomsContext(레이아웃 레벨)가 불러온다 — 여기서는 URL의 ?room= 파라미터가
   // 가리키는 방으로 맞춰준다(없으면 컨텍스트가 이미 골라둔 기본값을 그대로 씀).
@@ -905,6 +1087,13 @@ function TarotChat() {
       ]);
       return;
     }
+    if ((includeSaju || includeZiwei || includeCompatibility) && !hasBirthInfo) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "error", text: "사주, 자미두수 또는 궁합을 보려면 내 정보에서 생년월일시를 먼저 입력해주세요." },
+      ]);
+      return;
+    }
     if (includeZiwei && includeCompatibility && partnerTimeUnknown) {
       setMessages((prev) => [
         ...prev,
@@ -950,6 +1139,7 @@ function TarotChat() {
       }
 
       setCoins(data.remainingCoins);
+      if (data.countPassApplied) await refreshMe();
       if (data.roomTitle) setRoomTitleLocal(activeRoomId, data.roomTitle);
       setMessages((prev) => [
         ...prev,
@@ -991,6 +1181,7 @@ function TarotChat() {
           if (meRes?.ok) {
             const meData = await meRes.json();
             setCoins(meData.coins);
+            setCountPasses(meData.countPasses ?? []);
           }
         }
       } else {
@@ -1009,12 +1200,24 @@ function TarotChat() {
     activeTimePass && new Date(activeTimePass.expiresAt).getTime() > now
   );
   const spreadCoveredDisplay = timePassActive;
-  const optionsCoveredDisplay = timePassActive && Boolean(activeTimePass?.includesOptions);
-  const displayedCost =
-    (spreadCoveredDisplay ? 0 : SPREADS[spread].cost) +
-    (includeSaju ? (optionsCoveredDisplay ? 0 : SAJU_ADD_ON_COST) : 0) +
-    (includeZiwei ? (optionsCoveredDisplay ? 0 : ZIWEI_ADD_ON_COST) : 0) +
-    (includeCompatibility ? (optionsCoveredDisplay ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
+  const remainingBySpread = Object.fromEntries(
+    (Object.keys(SPREADS) as SpreadKey[]).map((key) => [
+      key,
+      countPasses.reduce((sum, pass) => sum + availableCount(pass, key, includeSaju, includeZiwei, includeCompatibility), 0),
+    ])
+  ) as Record<SpreadKey, number>;
+  const activeCountPass = [...countPasses]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .find((pass) => availableCount(pass, spread, includeSaju, includeZiwei, includeCompatibility) > 0);
+  const activeCountPassRemaining = activeCountPass
+    ? availableCount(activeCountPass, spread, includeSaju, includeZiwei, includeCompatibility)
+    : 0;
+  const inputModeLabel = [
+    INPUT_MODE_SPREAD_LABEL[spread],
+    includeSaju && "사주",
+    includeZiwei && "자미두수",
+    includeCompatibility && "궁합",
+  ].filter(Boolean).join(" + ") + " 모드";
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
   const isBlankRoom = (activeRoom?.title ?? DEFAULT_ROOM_TITLE) === DEFAULT_ROOM_TITLE && messages.length === 0;
@@ -1022,9 +1225,30 @@ function TarotChat() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-bg">
       {showWelcome && <WelcomePopup onClose={() => setShowWelcome(false)} />}
+      {countPassUsageOpen && activeCountPass && (
+        <CountPassUsageModal pass={activeCountPass} onClose={() => setCountPassUsageOpen(false)} />
+      )}
+      {modeSettingsOpen && (
+        <ModeSettingsSheet
+          spread={spread}
+          includeSaju={includeSaju}
+          includeZiwei={includeZiwei}
+          includeCompatibility={includeCompatibility}
+          hasBirthInfo={hasBirthInfo}
+          myTimeUnknown={myTimeUnknown}
+          hasPartner={hasPartner}
+          onSelectSpread={setSpread}
+          onToggleSaju={() => setIncludeSaju((value) => !value)}
+          onToggleZiwei={() => setIncludeZiwei((value) => !value)}
+          onToggleCompatibility={() => setIncludeCompatibility((value) => !value)}
+          onClose={() => setModeSettingsOpen(false)}
+        />
+      )}
       {spreadSheetOpen && (
         <SpreadSelectSheet
           spread={spread}
+          remainingBySpread={remainingBySpread}
+          timePassActive={timePassActive}
           onSelect={setSpread}
           onClose={() => setSpreadSheetOpen(false)}
         />
@@ -1111,10 +1335,9 @@ function TarotChat() {
           <button
             type="button"
             onClick={openMenu}
-            className="flex flex-1 items-center justify-center gap-3 text-xl font-bold"
+            className="flex flex-1 items-center justify-center"
           >
-            <span className="text-bold-text">타</span>
-            <span className="-ml-2 text-point">연</span>
+            <BrandBi className="h-6 w-12" />
           </button>
         ) : (
           <>
@@ -1193,13 +1416,13 @@ function TarotChat() {
               type="button"
               onClick={() => (timePasses.length > 0 ? setTimePassListOpen(true) : setNoTimePassModalOpen(true))}
               aria-label="보유 시간제 이용권"
-              className={`pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border ${
+              className={`pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full ${
                 timePasses.length > 0
-                  ? "border-point bg-point-bg text-point"
-                  : "border-icon-muted text-icon-muted"
+                  ? "bg-point text-white"
+                  : "bg-[#79678f] text-white"
               }`}
             >
-              <TicketIcon className="h-4 w-5" />
+              <TicketIcon className="h-5 w-6" />
             </button>
           </div>
         )}
@@ -1274,7 +1497,7 @@ function TarotChat() {
               </div>
               {!msg.isGreeting && !msg.charged && !msg.guidanceOnly && (
                 <div className="mt-1 w-full text-xs">
-                  <p className="px-1 text-text">해당 답변은 코인 차감이 되지 않습니다.</p>
+                  <p className="px-1 text-text">해당 답변은 이용권 횟수가 차감되지 않습니다.</p>
                   {msg.flaggedForAbuse && (
                     <p className="mt-1 text-center text-urgent">
                       타로와 무관하거나 시스템의 기능을 악용하려는 질문을 반복적으로 계속할 경우,
@@ -1286,10 +1509,10 @@ function TarotChat() {
               {msg.charged && (msg.sajuFree || msg.ziweiFree) && (
                 <p className="mt-1 w-full px-1 text-xs text-text">
                   {msg.sajuFree && msg.ziweiFree
-                    ? "이번 답변에는 사주·자미두수 해석이 포함되지 않아 해당 코인은 차감되지 않았어요."
+                    ? "이번 답변에는 사주·자미두수 해석이 포함되지 않아 타로 기준으로만 이용권이 차감됐어요."
                     : msg.sajuFree
-                      ? "이번 답변에는 사주 해석이 포함되지 않아 해당 코인은 차감되지 않았어요."
-                      : "이번 답변에는 자미두수 해석이 포함되지 않아 해당 코인은 차감되지 않았어요."}
+                      ? "이번 답변에는 사주 해석이 포함되지 않아 타로 기준으로만 이용권이 차감됐어요."
+                      : "이번 답변에는 자미두수 해석이 포함되지 않아 타로 기준으로만 이용권이 차감됐어요."}
                 </p>
               )}
               {msg.charged && msg.timePassApplied && (
@@ -1343,79 +1566,37 @@ function TarotChat() {
 
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col gap-1 rounded-[28px] border border-border bg-surface px-4 py-3"
+          className="flex flex-col gap-2 rounded-[40px] border border-border bg-surface px-[12px] pt-3 pb-[12px]"
         >
           <input
             ref={questionInputRef}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="궁금한 것을 물어보세요"
-            className="min-w-0 flex-1 bg-transparent text-base font-semibold text-bold-text placeholder-placeholder outline-none"
+            className="h-14 min-w-0 flex-1 bg-transparent px-3.5 text-base font-semibold text-bold-text placeholder-placeholder outline-none"
             disabled={showLoading}
           />
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setSpreadSheetOpen(true)}
-              className="flex h-10 shrink-0 items-center rounded-full bg-chip-fill px-5 text-sm font-semibold text-white"
+              onClick={() => setModeSettingsOpen(true)}
+              className="flex h-12 min-w-0 shrink items-center overflow-hidden rounded-full bg-chip-fill px-7 text-base font-semibold whitespace-nowrap text-white"
             >
-              {SPREADS[spread].label}
+              <span className="truncate">{inputModeLabel}</span>
             </button>
-            {hasBirthInfo && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSajuZiweiSheetOpen(true)}
-                  aria-pressed={includeSaju}
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                    includeSaju
-                      ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
-                      : "bg-chip-fill text-white"
-                  }`}
-                >
-                  <SajuIcon className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSajuZiweiSheetOpen(true)}
-                  aria-pressed={includeZiwei}
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                    includeZiwei
-                      ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
-                      : "bg-chip-fill text-white"
-                  }`}
-                >
-                  <ZiweiIcon className="h-5 w-5" />
-                </button>
-              </>
-            )}
-            {hasPartner && (
-              <button
-                type="button"
-                onClick={() => setCompatibilitySheetOpen(true)}
-                aria-pressed={includeCompatibility}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                  includeCompatibility
-                    ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
-                    : "bg-chip-fill text-white"
-                }`}
-              >
-                <CompatibilityIcon className="h-5 w-5" />
-              </button>
-            )}
-            <span className="flex-1" />
+            <span className="min-w-0 flex-1" />
             <button
               type="submit"
               disabled={showLoading}
               aria-label="질문하기"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text disabled:opacity-50"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text disabled:opacity-50"
             >
               <SendIcon className="h-5 w-5" />
             </button>
           </div>
         </form>
 
-        <div className="flex flex-wrap items-center justify-between gap-1 pt-1.5 px-1 text-xs">
+        <div className="flex flex-col items-start gap-1 px-1 pt-1.5 text-xs">
           <div className="flex flex-col gap-0.5">
             {!hasBirthInfo && (
               <p className="text-placeholder">
@@ -1434,11 +1615,18 @@ function TarotChat() {
               </p>
             )}
           </div>
-          <span className="whitespace-nowrap text-icon-muted">
-            보유 {coins !== null ? coins.toLocaleString("ko-KR") : "-"}코인 · 총{" "}
-            {displayedCost.toLocaleString("ko-KR")}코인
-            {spreadCoveredDisplay && <span className="text-point"> (이용권 적용)</span>}
-          </span>
+          {activeCountPass ? (
+            <button type="button" onClick={() => setCountPassUsageOpen(true)} className="flex items-center gap-1 whitespace-nowrap text-icon-muted">
+              <InfoCircleIcon className="h-4 w-4" />
+              <span>{countPassName(activeCountPass)} / 남은 횟수: {activeCountPassRemaining}회</span>
+            </button>
+          ) : (
+            <span className="whitespace-nowrap text-icon-muted">
+            {spreadCoveredDisplay && activeTimePass
+              ? `${activeTimePass.minutes}분 무제한 이용권 사용 중`
+              : "보유 이용권 없음"}
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -38,12 +38,27 @@ export async function GET(req: NextRequest) {
     includesOptions: doc.data().includesOptions,
   }));
 
+  const countPassesSnap = await userRef.collection("countPasses").get();
+  const countPasses = countPassesSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as {
+      id: string;
+      remaining: number;
+      expiresAt?: string | null;
+      basis: number;
+      productId?: string;
+      source?: string;
+      createdAt: string;
+      allowances: Record<string, number>;
+    }))
+    .filter((pass) => Number(pass.remaining) > 0 && (!pass.expiresAt || new Date(pass.expiresAt).getTime() > Date.now()));
+
   return NextResponse.json({
     nickname: data?.nickname ?? null,
     profileImage: data?.profileImage ?? null,
     email: data?.email ?? null,
     termsAgreedAt: data?.termsAgreedAt ?? null,
     coins: data?.coins ?? 0,
+    countPasses,
     tone: data?.tone ?? DEFAULT_TONE,
     useReversedCards: data?.useReversedCards ?? true,
     birthInfo: data?.birthInfo ?? null,

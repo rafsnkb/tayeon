@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { findUidByReferralCode, grantSignupReferralReward } from "@/lib/referral/code";
+import { findUidByReferralCode, grantSignupFreePass, grantSignupReferralReward } from "@/lib/referral/code";
 
 const KAKAO_REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!;
 const KAKAO_REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!;
@@ -87,7 +87,11 @@ export async function GET(req: NextRequest) {
     { merge: true }
   );
 
-  // 친구 초대(리퍼럴) 가입 보상 — 신규 유저 본인이 아니라 링크를 공유한 추천인에게 지급된다.
+  if (isNewUser) {
+    await grantSignupFreePass(uid);
+  }
+
+  // 친구 초대(리퍼럴) 가입 보상은 최초 가입 체험권과 별도로 추천인과 친구 모두에게 지급된다.
   if (referredBy) {
     await grantSignupReferralReward(referredBy, uid).catch((err) => {
       console.error("[referral] 가입 보상 지급 실패", { referredBy, uid, err });

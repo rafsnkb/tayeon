@@ -5,8 +5,8 @@ import SubPageTopBar from "@/components/SubPageTopBar";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import {
   REFERRAL_MONTHLY_COMMISSION_RATE,
-  REFERRAL_SIGNUP_REWARD_CAP,
-  REFERRAL_SIGNUP_REWARD_COINS,
+  REFERRAL_SIGNUP_FRIEND_CAP,
+  REFERRAL_SIGNUP_FREE_PASSES,
 } from "@/lib/tarot/pricing";
 
 /** 피그마 "Screen / FriendInvite" — asset/Screen/friendInvite.png. 카카오톡 친구 목록/메시지
@@ -15,7 +15,7 @@ import {
 export default function InvitePage() {
   const { user } = useRooms();
   const [code, setCode] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState<number>(REFERRAL_SIGNUP_REWARD_CAP);
+  const [invitedFriends, setInvitedFriends] = useState(0);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function InvitePage() {
       if (!res.ok) return;
       const data = await res.json();
       setCode(data.code);
-      setRemaining(data.remaining);
+      setInvitedFriends(data.invitedFriends);
     })();
   }, [user]);
 
@@ -43,18 +43,15 @@ export default function InvitePage() {
       <SubPageTopBar title="친구 초대" />
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 rounded-[32px] border border-border bg-topbar p-6">
-          <div className="flex flex-col items-center gap-1 text-center text-sm font-semibold text-icon-muted">
-            <p>
-              내 초대 링크로 친구가 타연에 가입할 때마다
-              <br />
-              {REFERRAL_SIGNUP_REWARD_COINS}코인을 드려요
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+          <section className="rounded-[32px] border border-border bg-topbar p-6 text-center">
+            <h2 className="text-xl font-bold text-bold-text">친구 초대 리워드 - {REFERRAL_SIGNUP_FREE_PASSES}회</h2>
+            <p className="mt-3 text-sm font-semibold text-icon-muted">
+              친구를 초대하면 {REFERRAL_SIGNUP_FREE_PASSES}회 무료 이용권을 드려요!<br />
+              나와 친구 모두 받을 수 있어요!
             </p>
-            <p className="text-point">(최대 {REFERRAL_SIGNUP_REWARD_CAP}코인 획득 가능)</p>
-          </div>
-
-          <p className="text-center text-base font-bold text-bold-text">남은 획득 가능 코인: {remaining}코인</p>
-
+            <p className="mt-1 text-sm font-semibold text-point">(최대 {REFERRAL_SIGNUP_FRIEND_CAP}명)</p>
+            <p className="mt-4 text-base font-bold text-bold-text">내 링크로 가입한 친구: {invitedFriends}/{REFERRAL_SIGNUP_FRIEND_CAP}명</p>
           <button
             type="button"
             onClick={handleCopy}
@@ -63,25 +60,20 @@ export default function InvitePage() {
           >
             {copied ? "복사되었어요!" : "초대 링크 복사"}
           </button>
-
-          <div className="flex flex-col items-center gap-4 border-t border-border pt-6 text-center">
-            <p className="text-sm font-semibold text-icon-muted">
-              내 초대 링크로 타연에 가입한 친구가
-              <br />
-              타연에서 결제를 할 때마다,
-              <br />
-              결제 비용의 {REFERRAL_MONTHLY_COMMISSION_RATE * 100}%에 해당하는 코인(VAT 제외)이
-              <br />
-              나에게 매월 n일에 보너스 리워드로 지급됩니다.
+          </section>
+          <section className="rounded-[32px] border border-border bg-topbar p-6 text-center">
+            <h2 className="text-xl font-bold text-bold-text">친구 결제 리워드 - 무제한</h2>
+            <p className="mt-3 text-sm font-semibold text-bold-text">친구 결제 금액의 {REFERRAL_MONTHLY_COMMISSION_RATE * 100}%를 보너스로!</p>
+            <p className="mt-6 text-sm font-semibold text-bold-text">
+              내 초대로 가입한 친구가 결제하면,<br />
+              결제 비용의 {REFERRAL_MONTHLY_COMMISSION_RATE * 100}%를 이용권으로 환산해<br />
+              매월 5일에 보내드려요.
             </p>
-            <p className="text-xs font-semibold text-icon-muted/70">
-              예) 내 초대 링크로 타연에 가입한 친구들의
-              <br />
-              이번달 결제 비용이 총합 10만원이라면,
-              <br />
-              다음달 n일에 나에게 5,000코인 지급
+            <p className="mt-5 text-xs font-semibold text-icon-muted">
+              (예: 친구들의 이번 달 총 결제액이 10만 원이면<br />
+              다음 달 5일에 원카드 기준 25회 이용권 지급)
             </p>
-          </div>
+          </section>
         </div>
       </div>
     </div>

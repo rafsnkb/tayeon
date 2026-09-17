@@ -99,10 +99,11 @@ export default function AdminHome() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
-  const [grantAmount, setGrantAmount] = useState<Record<string, string>>({});
-  const [grantReason, setGrantReason] = useState<Record<string, string>>({});
-  const [grantBusy, setGrantBusy] = useState<string | null>(null);
-  const [grantMessage, setGrantMessage] = useState<Record<string, string>>({});
+  const [countPassCount, setCountPassCount] = useState<Record<string, string>>({});
+  const [countPassScope, setCountPassScope] = useState<Record<string, "tarot-only" | "all-features">>({});
+  const [countPassReason, setCountPassReason] = useState<Record<string, string>>({});
+  const [countPassBusy, setCountPassBusy] = useState<string | null>(null);
+  const [countPassMessage, setCountPassMessage] = useState<Record<string, string>>({});
 
   const [suspendReason, setSuspendReason] = useState<Record<string, string>>({});
   const [suspendBusy, setSuspendBusy] = useState<string | null>(null);
@@ -184,36 +185,42 @@ export default function AdminHome() {
     }
   }
 
-  async function handleGrant(uid: string) {
+  async function handleGrantCountPass(uid: string) {
     if (!user) return;
-    const amount = Number(grantAmount[uid]);
-    if (!Number.isInteger(amount) || amount === 0) {
-      setGrantMessage((m) => ({ ...m, [uid]: "0이 아닌 정수를 입력해주세요." }));
+    const count = Number(countPassCount[uid]);
+    const featureScope = countPassScope[uid] ?? "tarot-only";
+    const reason = countPassReason[uid]?.trim() ?? "";
+    if (!Number.isInteger(count) || count < 1 || count > 10_000) {
+      setCountPassMessage((m) => ({ ...m, [uid]: "횟수는 1회 이상 10,000회 이하여야 합니다." }));
       return;
     }
-    setGrantBusy(uid);
-    setGrantMessage((m) => ({ ...m, [uid]: "" }));
+    if (!reason) {
+      setCountPassMessage((m) => ({ ...m, [uid]: "지급 사유를 입력해주세요." }));
+      return;
+    }
+    setCountPassBusy(uid);
+    setCountPassMessage((m) => ({ ...m, [uid]: "" }));
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`/api/admin/users/${uid}/grant-coins`, {
+      const res = await fetch(`/api/admin/users/${uid}/grant-count-pass`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${token}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ amount, reason: grantReason[uid] ?? "" }),
+        body: JSON.stringify({ count, featureScope, reason }),
       });
       const body = await res.json();
       if (!res.ok) {
-        setGrantMessage((m) => ({ ...m, [uid]: body.error ?? "지급에 실패했습니다." }));
+        setCountPassMessage((m) => ({ ...m, [uid]: body.error ?? "지급에 실패했습니다." }));
         return;
       }
-      setResults((rs) => rs.map((r) => (r.uid === uid ? { ...r, coins: body.coins } : r)));
-      setGrantMessage((m) => ({ ...m, [uid]: `완료. 현재 잔액 ${body.coins}코인` }));
-      setGrantAmount((a) => ({ ...a, [uid]: "" }));
-      setGrantReason((r) => ({ ...r, [uid]: "" }));
+      const scopeLabel = featureScope === "all-features" ? "모든 기능" : "타로만";
+      setCountPassMessage((m) => ({ ...m, [uid]: `${scopeLabel} ${count}회 이용권을 지급했습니다.` }));
+      setCountPassCount((values) => ({ ...values, [uid]: "" }));
+      setCountPassReason((values) => ({ ...values, [uid]: "" }));
     } finally {
-      setGrantBusy(null);
+      setCountPassBusy(null);
     }
   }
 
@@ -398,7 +405,10 @@ export default function AdminHome() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">타연 관리자</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <img src="/textures/bi_light.png" alt="타연" className="h-6 w-12 object-contain" />
+          관리자
+        </h1>
         <button
           onClick={() => signOut(auth)}
           className="text-sm text-zinc-500 underline"
@@ -567,32 +577,48 @@ export default function AdminHome() {
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="number"
-                placeholder="지급/차감 코인 (예: 100, -50)"
-                value={grantAmount[r.uid] ?? ""}
+                min="1"
+                max="10000"
+                placeholder="지급 횟수 (예: 10)"
+                value={countPassCount[r.uid] ?? ""}
                 onChange={(e) =>
-                  setGrantAmount((a) => ({ ...a, [r.uid]: e.target.value }))
+                  setCountPassCount((values) => ({ ...values, [r.uid]: e.target.value }))
                 }
-                className="w-48 rounded border border-zinc-300 px-2 py-1.5 text-sm"
+                className="w-40 rounded border border-zinc-300 px-2 py-1.5 text-sm"
               />
+              <select
+                value={countPassScope[r.uid] ?? "tarot-only"}
+                onChange={(e) =>
+                  setCountPassScope((values) => ({
+                    ...values,
+                    [r.uid]: e.target.value as "tarot-only" | "all-features",
+                  }))
+                }
+                className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
+              >
+                <option value="tarot-only">타로만</option>
+                <option value="all-features">모든 기능</option>
+              </select>
               <input
                 type="text"
-                placeholder="사유 (선택)"
-                value={grantReason[r.uid] ?? ""}
+                placeholder="지급 사유"
+                maxLength={200}
+                value={countPassReason[r.uid] ?? ""}
                 onChange={(e) =>
-                  setGrantReason((rs) => ({ ...rs, [r.uid]: e.target.value }))
+                  setCountPassReason((values) => ({ ...values, [r.uid]: e.target.value }))
                 }
-                className="flex-1 min-w-[120px] rounded border border-zinc-300 px-2 py-1.5 text-sm"
+                className="flex-1 min-w-[160px] rounded border border-zinc-300 px-2 py-1.5 text-sm"
               />
               <button
-                onClick={() => handleGrant(r.uid)}
-                disabled={grantBusy === r.uid}
+                onClick={() => handleGrantCountPass(r.uid)}
+                disabled={countPassBusy === r.uid}
                 className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
               >
-                코인 적용
+                횟수제 이용권 지급
               </button>
             </div>
-            {grantMessage[r.uid] && (
-              <p className="text-sm text-zinc-600">{grantMessage[r.uid]}</p>
+            {countPassMessage[r.uid] && (
+              <p className="text-sm text-zinc-600">{countPassMessage[r.uid]}</p>
             )}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">

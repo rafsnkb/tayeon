@@ -26,7 +26,10 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-semibold">타연 관리자 로그인</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold">
+          <img src="/textures/bi_light.png" alt="타연" className="h-6 w-12 object-contain" />
+          관리자 로그인
+        </h1>
         <p className="text-sm text-zinc-500">
           구글 계정으로 로그인 후, 관리자로 등록된 계정만 사용할 수 있습니다.
         </p>

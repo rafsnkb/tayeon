@@ -1,11 +1,18 @@
 // 포트원 결제의 customData에 실어 보낼 "상품 식별자"와, 그 식별자를 pricing.ts의 실제 상품
 // 정의(가격/코인수/분)로 되돌리는 로직. 서버가 결제 금액을 검증할 때 반드시 이 표에 있는
 // 가격과 실제 결제 금액이 일치하는지 대조한다 — 클라이언트가 보낸 금액은 절대 신뢰하지 않는다.
-import { COIN_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
+import { COIN_PACKAGES, COUNT_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
 
-export type ProductType = "coin" | "timePass";
+export type ProductType = "coin" | "countPass" | "timePass";
 
 export type ResolvedProduct =
+  | {
+      type: "countPass";
+      productId: string;
+      priceWon: number;
+      basis: number;
+      orderName: string;
+    }
   | {
       type: "coin";
       productId: string;
@@ -31,6 +38,10 @@ export function listCoinProductIds(): { productId: string; priceWon: number; coi
   }));
 }
 
+export function listCountProductIds(): string[] {
+  return COUNT_PACKAGES.map((pkg) => pkg.id);
+}
+
 export function listTimePassProductIds(): {
   productId: string;
   priceWon: number;
@@ -51,6 +62,14 @@ export function listTimePassProductIds(): {
  */
 export function resolveProduct(productId: unknown): ResolvedProduct | null {
   if (typeof productId !== "string") return null;
+
+  const countPkg = COUNT_PACKAGES.find((pkg) => pkg.id === productId);
+  if (countPkg) {
+    return {
+      type: "countPass", productId, priceWon: countPkg.priceWon, basis: countPkg.basis,
+      orderName: `타연 ${countPkg.name} 횟수제 이용권`,
+    };
+  }
 
   const coinPkg = COIN_PACKAGES.find((pkg) => pkg.id === productId);
   if (coinPkg) {
@@ -76,4 +95,13 @@ export function resolveProduct(productId: unknown): ResolvedProduct | null {
   }
 
   return null;
+}
+
+// 가격 변경 전에 시작된 coin-7 결제는 당시 약속한 코인 수량으로 지급한다.
+export function resolvePaidProduct(productId: unknown, paidWon: number): ResolvedProduct | null {
+  const product = resolveProduct(productId);
+  if (product?.type === "coin" && product.productId === "coin-7" && paidWon === 110000) {
+    return { ...product, priceWon: 110000, coins: 135000 };
+  }
+  return product;
 }

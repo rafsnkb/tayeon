@@ -10,10 +10,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { portone } from "@/lib/payment/portone";
-import { resolveProduct } from "@/lib/payment/products";
+import { resolvePaidProduct } from "@/lib/payment/products";
+import { COUNT_PASS_VALIDITY_MONTHS, countAllowances } from "@/lib/tarot/pricing";
 
 export type FulfillOutcome =
-  | { kind: "fulfilled"; alreadyFulfilled: boolean; uid: string; productType: "coin" | "timePass" }
+  | { kind: "fulfilled"; alreadyFulfilled: boolean; uid: string; productType: "coin" | "countPass" | "timePass" }
   | { kind: "not_paid"; status: string }
   | { kind: "rejected"; reason: string };
 
@@ -73,10 +74,18 @@ export async function fulfillPayment(
     return { kind: "rejected", reason: "본인의 결제 건이 아니에요." };
   }
 
-  const product = resolveProduct(customData.productId);
+  const product = resolvePaidProduct(customData.productId, payment.amount.total);
   if (!product) {
     console.error("[payment] 알 수 없는 productId", paymentId, customData.productId);
     return { kind: "rejected", reason: "알 수 없는 상품이에요." };
+  }
+
+  if (product.type === "coin") {
+    const cutoff = Date.parse(process.env.LEGACY_COIN_PAID_BEFORE ?? "");
+    const paidAt = Date.parse(payment.paidAt ?? "");
+    if (!Number.isFinite(cutoff) || !Number.isFinite(paidAt) || paidAt >= cutoff) {
+      return { kind: "rejected", reason: "코인 상품은 판매가 종료됐어요. 결제 내역을 고객센터로 문의해주세요." };
+    }
   }
 
   if (payment.amount.total !== product.priceWon || payment.currency !== "KRW") {
@@ -101,6 +110,14 @@ export async function fulfillPayment(
     }
 
     const timePassRef = product.type === "timePass" ? userRef.collection("timePasses").doc() : null;
+    const countPassRef = product.type === "countPass" ? userRef.collection("countPasses").doc() : null;
+    const issuedAt = payment.paidAt ? new Date(payment.paidAt) : new Date();
+    const expiresAt = new Date(issuedAt);
+    const purchasedDay = expiresAt.getUTCDate();
+    expiresAt.setUTCDate(1);
+    expiresAt.setUTCMonth(expiresAt.getUTCMonth() + COUNT_PASS_VALIDITY_MONTHS);
+    const lastDay = new Date(Date.UTC(expiresAt.getUTCFullYear(), expiresAt.getUTCMonth() + 1, 0)).getUTCDate();
+    expiresAt.setUTCDate(Math.min(purchasedDay, lastDay));
 
     tx.set(paymentRef, {
       status: "fulfilled",
@@ -109,6 +126,8 @@ export async function fulfillPayment(
       priceWon: product.priceWon,
       orderName: payment.orderName,
       coins: product.type === "coin" ? product.coins : null,
+      countPassId: countPassRef?.id ?? null,
+      countBasis: product.type === "countPass" ? product.basis : null,
       timePassId: timePassRef?.id ?? null,
       channelType: payment.channel?.type ?? null,
       isTest: payment.channel?.type === "TEST",
@@ -119,7 +138,20 @@ export async function fulfillPayment(
 
     if (product.type === "coin") {
       tx.set(userRef, { coins: FieldValue.increment(product.coins) }, { merge: true });
-    } else if (timePassRef) {
+    } else if (product.type === "countPass" && countPassRef) {
+      tx.set(countPassRef, {
+        productId: product.productId,
+        source: "purchase",
+        basis: product.basis,
+        remaining: 1,
+        usedCount: 0,
+        allowances: countAllowances(product.basis),
+        priceWon: product.priceWon,
+        paymentId,
+        createdAt: issuedAt.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      });
+    } else if (product.type === "timePass" && timePassRef) {
       tx.set(timePassRef, {
         minutes: product.minutes,
         includesOptions: product.includesOptions,

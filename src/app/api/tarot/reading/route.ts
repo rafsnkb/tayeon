@@ -20,6 +20,9 @@ import {
   SAJU_ADD_ON_COST,
   ZIWEI_ADD_ON_COST,
   COMPATIBILITY_ADD_ON_COST,
+  availableCount,
+  remainingAfterUse,
+  type CountPassBalance,
 } from "@/lib/tarot/pricing";
 import { DEFAULT_TONE, isToneKey, type ToneKey } from "@/lib/tarot/tone";
 import { calculateSaju, buildSajuPromptBlock, type SajuResult } from "@/lib/saju/calculate";
@@ -131,6 +134,9 @@ export async function POST(req: NextRequest) {
     }
 
     const balance: number = userData?.coins ?? 0;
+    const countPassesSnap = await userRef.collection("countPasses").get();
+    const countPasses = countPassesSnap.docs
+      .sort((a, b) => String(a.data().createdAt).localeCompare(String(b.data().createdAt)));
     const rawTone = userData?.tone;
     const tone = isToneKey(rawTone) ? rawTone : DEFAULT_TONE;
     const useReversedCards: boolean = userData?.useReversedCards ?? true;
@@ -150,12 +156,12 @@ export async function POST(req: NextRequest) {
     const spreadCovered = timePassActive;
     const optionsCovered = timePassActive && Boolean(activeTimePass?.includesOptions);
 
-    if ((includeSaju || includeZiwei) && !birthInfo) {
+    if ((includeSaju || includeZiwei || includeCompatibility) && !birthInfo) {
       return NextResponse.json(
         {
           error: rawBirthInfo
             ? "생년월일시 정보 형식이 오래됐어요. 내 정보에서 다시 저장해주세요."
-            : "사주/자미두수를 보려면 내 정보에서 생년월일시를 먼저 입력해주세요.",
+            : "사주, 자미두수 또는 궁합을 보려면 내 정보에서 생년월일시를 먼저 입력해주세요.",
         },
         { status: 400 }
       );
@@ -234,15 +240,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const cost =
-      (spreadCovered ? 0 : SPREADS[spread].cost) +
+    const legacyCost =
+      (spreadCovered ? 0 : { one: 200, three: 250, dual: 300, celtic: 400 }[spread]) +
       (includeSaju ? (optionsCovered ? 0 : SAJU_ADD_ON_COST) : 0) +
       (includeZiwei ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
       (includeCompatibility ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
 
-    if (balance < cost) {
+    const chosenPass = spreadCovered ? null : countPasses.find((doc) =>
+      availableCount(
+        doc.data() as CountPassBalance,
+        spread,
+        Boolean(includeSaju),
+        Boolean(includeZiwei),
+        Boolean(includeCompatibility)
+      ) > 0
+    );
+
+    if (!spreadCovered && !chosenPass && balance < legacyCost) {
       return NextResponse.json(
-        { error: "코인이 부족해요. 충전 후 다시 시도해주세요." },
+        { error: "이용 가능한 횟수가 없어요. 이용권을 구입해주세요." },
         { status: 402 }
       );
     }
@@ -528,8 +544,8 @@ export async function POST(req: NextRequest) {
       const sajuFree = Boolean(cardsOk && includeSaju && !attempt.sajuOk);
       const ziweiFree = Boolean(cardsOk && includeZiwei && !attempt.ziweiOk);
 
-      const chargedCost = cardsOk
-        ? (spreadCovered ? 0 : SPREADS[spread].cost) +
+      const chargedCost = cardsOk && !chosenPass
+        ? (spreadCovered ? 0 : { one: 200, three: 250, dual: 300, celtic: 400 }[spread]) +
           (sajuCharged ? (optionsCovered ? 0 : SAJU_ADD_ON_COST) : 0) +
           (ziweiCharged ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
           (compatibilityCharged ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0)
@@ -546,7 +562,21 @@ export async function POST(req: NextRequest) {
 
       const now = new Date().toISOString();
 
-      if (cardsOk) {
+      let chargedPassId: string | null = null;
+      if (cardsOk && chosenPass) {
+        await adminDb.runTransaction(async (tx) => {
+          const snap = await tx.get(chosenPass.ref);
+          const pass = snap.data() as CountPassBalance | undefined;
+          if (!pass || availableCount(pass, spread, sajuCharged, ziweiCharged, Boolean(includeCompatibility)) < 1) {
+            throw new Error("COUNT_PASS_UNAVAILABLE");
+          }
+          tx.update(chosenPass.ref, {
+            remaining: remainingAfterUse(pass, spread, sajuCharged, ziweiCharged),
+            usedCount: FieldValue.increment(1),
+          });
+        });
+        chargedPassId = chosenPass.id;
+      } else if (chargedCost > 0) {
         await userRef.update({ coins: FieldValue.increment(-chargedCost) });
       }
 
@@ -554,6 +584,7 @@ export async function POST(req: NextRequest) {
         question,
         spread,
         cost: chargedCost,
+        countPassId: chargedPassId,
         cards,
         includeSaju: sajuCharged,
         includeZiwei: ziweiCharged,
@@ -587,6 +618,7 @@ export async function POST(req: NextRequest) {
         partnerNickname: compatibilityCharged && partner ? partner.nickname : null,
         interpretation,
         remainingCoins: cardsOk ? balance - chargedCost : balance,
+        countPassApplied: Boolean(chargedPassId),
         charged: cardsOk,
         guidanceOnly,
         flaggedForAbuse,

@@ -13,7 +13,7 @@ export default function PurchaseHistoryPage() {
         <p className="text-center text-sm text-icon-muted">
           아직 결제 내역이 없어요.
           <br />
-          코인ㆍ이용권을 구입하면 여기에 표시돼요.
+          이용권을 구입하면 여기에 표시돼요.
         </p>
       </div>
     </div>

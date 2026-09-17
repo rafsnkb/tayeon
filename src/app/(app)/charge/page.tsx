@@ -3,20 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import PortOne, { PaymentPayMethod } from "@portone/browser-sdk/v2";
-import { COIN_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
-import { listCoinProductIds, listTimePassProductIds } from "@/lib/payment/products";
+import { COUNT_PACKAGES, TIME_PASS_PACKAGES, countAllowance, availableCount, type SpreadKey } from "@/lib/tarot/pricing";
+import { listTimePassProductIds } from "@/lib/payment/products";
 import { TIER_TEXTURE, TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { CompanyFooter } from "@/components/CompanyFooter";
 import { buildPortoneCustomer } from "@/lib/payment/customer";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 
-// pricing.ts 배열과 같은 순서로 productId를 매핑한다(둘 다 COIN_PACKAGES/TIME_PASS_PACKAGES를
-// 그대로 순회해서 만들어지므로 인덱스가 항상 일치한다 — src/lib/payment/products.ts 참고).
-const COIN_PRODUCT_IDS = listCoinProductIds().map((p) => p.productId);
 const TIME_PASS_PRODUCT_IDS = listTimePassProductIds().map((p) => p.productId);
 
-type Tab = "coin" | "time";
+type Tab = "count" | "time";
 
 function formatWon(won: number) {
   return `₩${won.toLocaleString("ko-KR")}`;
@@ -25,47 +22,30 @@ function formatWon(won: number) {
 // 피그마 카드 테두리가 가격대별로 2개씩 짝지어 청록→파랑→보라→핑크로 올라간다
 // (asset/Screen/Buy - Coin.png 픽셀 샘플링으로 확인, 2026-09-14) — 텍스처 등급 짝(COIN_TEXTURE)과
 // 정확히 같은 경계라, 시간제 이용권 티어 색(TIME_PASS_TIER)을 그대로 재사용하고 청록만 추가한다.
-const COIN_TEAL = "#2fe0c8";
-const COIN_BORDER = [
-  COIN_TEAL,
-  COIN_TEAL,
-  TIME_PASS_TIER[15].border,
-  TIME_PASS_TIER[15].border,
-  TIME_PASS_TIER[30].border,
-  TIME_PASS_TIER[30].border,
-  TIME_PASS_TIER[60].border,
+const COUNT_TIERS = [
+  { border: "#9de9ed", text: "#9de9ed", tagBg: "rgba(12, 68, 86, 0.86)", bg: TIER_TEXTURE[4] },
+  { border: "#2f8bee", text: "#66b0ff", tagBg: "rgba(15, 52, 98, 0.86)", bg: TIER_TEXTURE[3] },
+  { border: "#2f8bee", text: "#66b0ff", tagBg: "rgba(15, 52, 98, 0.86)", bg: TIER_TEXTURE[3] },
+  { border: "#8335d6", text: "#a04ff8", tagBg: "rgba(56, 24, 82, 0.86)", bg: TIER_TEXTURE[2] },
+  { border: "#8335d6", text: "#a04ff8", tagBg: "rgba(56, 24, 82, 0.86)", bg: TIER_TEXTURE[2] },
+  { border: "#ff007f", text: "#ff007f", tagBg: "rgba(82, 17, 59, 0.86)", bg: TIER_TEXTURE[1] },
 ];
-// "N+보너스 M" 알약 배경 — 전부 같은 검정이 아니라 카드 테두리 색조를 따라 은은하게 짙어짐
-// (asset/Screen/Buy - Coin.png 6곳 픽셀 샘플링으로 확인, 2026-09-15: 청록 rgb(35,54,78)/
-// 파랑 rgb(25,50,73)/보라 rgb(41,36,67)/핑크 rgb(57,32,57) — 티어별 tagBg와 계열이 같아 재사용).
-const COIN_TEAL_BONUS_BG = "#23364e";
-const COIN_BONUS_BG = [
-  COIN_TEAL_BONUS_BG,
-  COIN_TEAL_BONUS_BG,
-  TIME_PASS_TIER[15].tagBg,
-  TIME_PASS_TIER[15].tagBg,
-  TIME_PASS_TIER[30].tagBg,
-  TIME_PASS_TIER[30].tagBg,
-  TIME_PASS_TIER[60].tagBg,
-];
-// 코인 상품 7종이 성운 텍스처 4장을 가격대별로 나눠 쓴다(1,100/3,500→tier4, 6,000/14,000→tier3,
-// 40,000/65,000→tier2, 135,000→tier1 — 사용자가 직접 지정한 매핑, 2026-09-14).
-const COIN_TEXTURE = [
-  TIER_TEXTURE[4],
-  TIER_TEXTURE[4],
-  TIER_TEXTURE[3],
-  TIER_TEXTURE[3],
-  TIER_TEXTURE[2],
-  TIER_TEXTURE[2],
-  TIER_TEXTURE[1],
-];
+
+const SPREAD_KEYS: SpreadKey[] = ["one", "three", "dual", "celtic"];
+const SPREAD_SHORT: Record<SpreadKey, string> = {
+  one: "원 카드", three: "쓰리 카드", dual: "양자택일", celtic: "켈틱 크로스",
+};
 
 /** 피그마 "Screen / Buy - Coin". 포트원 V2 결제창을 직접 호출해 코인/시간제 이용권을 구매한다. */
 export default function ChargePage() {
-  const [tab, setTab] = useState<Tab>("coin");
+  const [tab, setTab] = useState<Tab>("count");
+  const [selected, setSelected] = useState<(typeof COUNT_PACKAGES)[number] | null>(null);
   const [notice, setNotice] = useState<{ type: "info" | "error"; message: string } | null>(null);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
-  const { user, email, nickname, refreshMe } = useRooms();
+  const { user, email, nickname, refreshMe, countPasses } = useRooms();
+  const hasCountPass = countPasses.some(
+    (pass) => pass.source === "purchase" && availableCount(pass, "one", false, false) > 0
+  );
 
   async function handlePurchase(productId: string) {
     if (!user || purchasingId) return;
@@ -81,7 +61,8 @@ export default function ChargePage() {
         body: JSON.stringify({ productId }),
       });
       if (!prepareRes.ok) {
-        setNotice({ type: "error", message: "결제 준비에 실패했어요. 잠시 후 다시 시도해주세요." });
+        const failed = await prepareRes.json().catch(() => ({}));
+        setNotice({ type: "error", message: failed.error ?? "결제 준비에 실패했어요. 잠시 후 다시 시도해주세요." });
         return;
       }
       const prepared = await prepareRes.json();
@@ -136,8 +117,8 @@ export default function ChargePage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-bg">
-      <SubPageTopBar title="코인ㆍ이용권 구입" />
+    <div className="flex h-full flex-col overflow-hidden bg-[#f8f5fc]">
+      <SubPageTopBar title={selected ? "구입하기" : "횟수ㆍ시간제 이용권 구입"} onBack={selected ? () => setSelected(null) : undefined} />
       <div className="flex-1 overflow-y-auto p-4">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           {notice && (
@@ -152,36 +133,80 @@ export default function ChargePage() {
             </div>
           )}
 
-          {tab === "coin" && (
+          {selected && (
+            <>
+              <div
+                className="relative flex h-20 items-center overflow-hidden rounded-[28px] border bg-cover bg-center p-4"
+                style={{ borderColor: COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].border, backgroundImage: `url(${COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].bg})` }}
+              >
+                <div className="absolute inset-0 bg-[#19191d]/70" />
+                <div className="relative">
+                  <p className="text-xl font-bold text-white">{selected.name} 이용권</p>
+                  <span
+                    className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-sm font-semibold"
+                    style={{
+                      color: COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].text,
+                      backgroundColor: COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].tagBg,
+                    }}
+                  >
+                    {selected.bonus}
+                  </span>
+                </div>
+              </div>
+              <div className="px-4 text-sm font-semibold text-[#3d2c58]">
+                <p>결제금액</p>
+                <div className="mt-2 flex justify-between text-[#75628b]"><span>상품금액 (VAT 포함)</span><span>{selected.priceWon.toLocaleString("ko-KR")}원</span></div>
+                <div className="mt-2 flex justify-between border-t border-[#e2d8ef] pt-2"><span>총 결제금액</span><span>{selected.priceWon.toLocaleString("ko-KR")}원</span></div>
+              </div>
+              <p className="mt-2 text-center text-sm font-semibold text-[#75628b]">이용권 상세정보</p>
+              <div className="rounded-[28px] border border-[#dfd2ee] bg-[#fdfcff] p-4">
+                {[
+                  { title: "타로만 사용 시", saju: false, ziwei: false },
+                  { title: "타로+사주 사용 시", saju: true, ziwei: false },
+                  { title: "타로+자미두수 사용 시", saju: false, ziwei: true },
+                  { title: "타로+사주+자미두수 사용 시", saju: true, ziwei: true },
+                ].map((group, index) => (
+                  <div key={group.title} className={index ? "mt-3 border-t border-[#ded0ed] pt-3" : ""}>
+                    <p className="mb-2 text-center text-sm font-semibold text-[#75628b]">{group.title}</p>
+                    <div className="rounded-2xl bg-[#f6f1fb] p-3 text-xs">
+                      <div className="flex justify-between rounded bg-[#79678f] px-2 py-1 font-semibold text-white"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+                      {SPREAD_KEYS.map((spread) => (
+                        <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-[#75628b]">
+                          <span>{SPREAD_SHORT[spread]}{group.saju ? "+사주" : ""}{group.ziwei ? "+자미두수" : ""}</span>
+                          <strong className="shrink-0 text-[#75628b]">{countAllowance(selected.basis, spread, group.saju, group.ziwei)}회</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {hasCountPass && <p className="text-center text-sm text-urgent">보유 이용권을 소진한 후 새 이용권을 구매할 수 있어요.</p>}
+            </>
+          )}
+          {!selected && tab === "count" && (
             <div className="flex flex-col gap-3">
-              {COIN_PACKAGES.map((pkg, i) => {
-                const bonus = pkg.coins - pkg.priceWon;
-                const color = COIN_BORDER[i % COIN_BORDER.length];
-                const bonusBg = COIN_BONUS_BG[i % COIN_BONUS_BG.length];
-                const bg = COIN_TEXTURE[i % COIN_TEXTURE.length];
-                const productId = COIN_PRODUCT_IDS[i];
+              {COUNT_PACKAGES.map((pkg, i) => {
+                const tier = COUNT_TIERS[i];
                 return (
                   <button
-                    key={pkg.priceWon}
+                    key={pkg.id}
                     type="button"
-                    onClick={() => handlePurchase(productId)}
+                    onClick={() => setSelected(pkg)}
                     disabled={purchasingId !== null}
                     className="relative flex h-20 items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left disabled:opacity-60"
-                    style={{ borderColor: color, backgroundImage: `url(${bg})` }}
+                    style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}
                   >
                     <div className="absolute inset-0 bg-[#19191d]/70" />
                     <div className="relative">
                       <p className="text-xl font-bold text-white">
-                        {pkg.coins.toLocaleString("ko-KR")} 코인
+                        {pkg.name} 이용권
                       </p>
-                      {bonus > 0 && (
-                        <p
-                          className="mt-1 inline-block rounded-full px-3 py-1 text-sm font-semibold"
-                          style={{ color, backgroundColor: bonusBg }}
-                        >
-                          {pkg.priceWon.toLocaleString("ko-KR")}+보너스 {bonus.toLocaleString("ko-KR")}
-                        </p>
-                      )}
+                      <span
+                        className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-sm font-semibold"
+                        style={{ color: tier.text, backgroundColor: tier.tagBg }}
+                      >
+                        {pkg.bonus}
+                      </span>
                     </div>
                     <span className="relative shrink-0 rounded-full bg-point px-4 py-2 text-sm font-semibold text-white">
                       {formatWon(pkg.priceWon)}
@@ -192,7 +217,7 @@ export default function ChargePage() {
             </div>
           )}
 
-          {tab === "time" && (
+          {!selected && tab === "time" && (
             <div className="flex flex-col gap-3">
               {TIME_PASS_PACKAGES.map((pkg, i) => {
                 const tier = TIME_PASS_TIER[pkg.minutes] ?? TIME_PASS_TIER[15];
@@ -225,12 +250,15 @@ export default function ChargePage() {
             </div>
           )}
 
-          <ul className="list-disc space-y-1 rounded-[28px] border border-border bg-topbar p-4 pl-8 text-xs text-icon-muted">
-            {tab === "coin" ? (
+          {!selected && <ul className="list-disc space-y-1 rounded-[28px] border border-border bg-topbar p-4 pl-8 text-xs text-icon-muted">
+            {tab === "count" ? (
               <>
-                <li>구입한 코인의 유효기간은 무기한이며, 사용한 코인은 환불되지 않습니다.</li>
-                <li>미사용 코인은 결제일로부터 7일 이내 전액 환불 가능합니다.</li>
-                <li>구입한 코인은 오래된 코인부터 소진됩니다.</li>
+                <li>본 이용권은 &lsquo;횟수 차감형&rsquo; 이용권이며, 1회 결제 상품입니다.</li>
+                <li>&ldquo;1회&rdquo;는, 사용자의 질문 1번과 AI의 답변 1번이 한 횟수로 차감되는 구조입니다.</li>
+                <li>이용권은 1개만 보유 가능합니다. 추가 구매를 원하시면 현재 보유 이용권을 소진하셔야 합니다.</li>
+                <li>친구 초대로 인해 받은 이용권이 있을 경우, 해당 이용권이 먼저 사용됩니다.</li>
+                <li>구매 후 7일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
+                <li>유효기간은 구입일로부터 6개월입니다.</li>
               </>
             ) : (
               <>
@@ -245,23 +273,28 @@ export default function ChargePage() {
               </Link>
               을 확인해주세요.
             </li>
-          </ul>
+          </ul>}
           {/* PG(KG이니시스) 입점심사 요건: 사업자정보가 메인 화면뿐 아니라 결제 페이지에도
               상시 노출돼야 함(help.portone.io/content/requirements) — 기존엔 /me에만 있었음. */}
           <CompanyFooter />
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
-        <div className="mx-auto flex w-full max-w-2xl overflow-hidden rounded-full bg-chip-fill">
+        {selected ? (
+          <button type="button" onClick={() => handlePurchase(selected.id)} disabled={purchasingId !== null || hasCountPass} className="mx-auto block h-12 w-full max-w-2xl rounded-2xl bg-point text-base font-bold text-white disabled:opacity-60">
+            {formatWon(selected.priceWon)} 결제하기
+          </button>
+        ) : <div className="mx-auto flex w-full max-w-2xl overflow-hidden rounded-full bg-chip-fill">
           <button
             type="button"
-            onClick={() => setTab("coin")}
+            onClick={() => setTab("count")}
             className={`h-14 flex-1 text-base font-semibold ${
-              tab === "coin" ? "bg-point text-white" : "text-white"
+              tab === "count" ? "bg-point text-white" : "text-white"
             }`}
           >
-            코인
+            횟수제
           </button>
+          <button type="button" disabled title="준비 중" className="h-14 flex-1 text-base font-semibold text-icon-muted">자동충전</button>
           <button
             type="button"
             onClick={() => setTab("time")}
@@ -271,7 +304,7 @@ export default function ChargePage() {
           >
             이용권
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FREE_SIGNUP_COINS } from "@/lib/tarot/pricing";
 
 // KG이니시스 전자계약 사전점검의 "비회원 구매 가능 여부"(회원가입 필수 → 테스트 ID/PW 요구)
 // 항목 대응. 타연은 카카오 로그인만 있어서 심사자가 쓸 수 있는 ID/PW 로그인이 없었음 — 새
@@ -28,7 +27,7 @@ export async function POST(req: NextRequest) {
       nickname: "심사용계정",
       provider: "pg-review",
       termsAgreedAt: new Date().toISOString(),
-      coins: FREE_SIGNUP_COINS,
+      coins: 0,
       createdAt: new Date().toISOString(),
     });
   }

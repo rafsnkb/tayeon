@@ -1,8 +1,8 @@
 export const SPREADS = {
   one: { label: "원카드", cardCount: 1, cost: 200 },
-  three: { label: "쓰리카드", cardCount: 3, cost: 250 },
-  dual: { label: "양자택일", cardCount: 5, cost: 300 },
-  celtic: { label: "켈틱크로스", cardCount: 10, cost: 400 },
+  three: { label: "쓰리카드", cardCount: 3, cost: 300 },
+  dual: { label: "양자택일", cardCount: 5, cost: 400 },
+  celtic: { label: "켈틱크로스", cardCount: 10, cost: 500 },
 } as const;
 
 export type SpreadKey = keyof typeof SPREADS;
@@ -11,17 +11,29 @@ export function isSpreadKey(value: unknown): value is SpreadKey {
   return typeof value === "string" && value in SPREADS;
 }
 
-export const FREE_SIGNUP_COINS = 500;
-
-// 친구 초대(리퍼럴) 보상 — asset/Screen/friendInvite.png 기획대로: 초대 링크로 가입할 때마다
-// 100코인, 1인당 누적 최대 500코인(가입 보상 한정, 아래 월간 정산 보너스는 별도 한도 없음).
-export const REFERRAL_SIGNUP_REWARD_COINS = 100;
-export const REFERRAL_SIGNUP_REWARD_CAP = 500;
-// 내가 초대한 친구가 결제할 때마다, 결제 비용(VAT 제외)의 5%를 매월 코인으로 정산 지급.
+// 친구 초대는 가입한 친구와 추천인 모두에게 원카드 기준 무료 이용권 5회를 준다.
+// 추천 가능한 친구 수는 5명이며, 월간 결제 리워드에는 횟수 제한이 없다.
+export const REFERRAL_SIGNUP_FREE_PASSES = 5;
+export const REFERRAL_SIGNUP_FRIEND_CAP = 5;
 export const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
 
+// 첫 카카오 가입 보상은 스프레드/옵션 조합과 무관하게 정확히 4회를 쓸 수 있는 체험 이용권이다.
+// 남은 권리를 옵션 변경에 따라 환산하는 유료 이용권과 달리, 모든 조합을 같은 4회로 고정한다.
+export const SIGNUP_FREE_PASSES = 4;
+export const SIGNUP_FREE_PASS_BASIS = SIGNUP_FREE_PASSES * SPREADS.one.cost;
+
+export function signupFreePassAllowances(): Record<string, number> {
+  return Object.fromEntries(
+    (Object.keys(SPREADS) as SpreadKey[]).flatMap((spread) =>
+      [false, true].flatMap((saju) =>
+        [false, true].map((ziwei) => [countKey(spread, saju, ziwei), SIGNUP_FREE_PASSES])
+      )
+    )
+  );
+}
+
 // 보너스 리워드 — "내가" 이번 달에 결제한 코인ㆍ이용권 금액(VAT 제외)에 따라 다음달 5일에
-// 코인으로 페이백해주는 자체 캐시백(친구 결제 리워드와는 별개). asset/Screen/RewardInfoModal.png
+// 원카드 기준 무료 이용권으로 페이백해주는 자체 캐시백(친구 결제 리워드와는 별개). asset/Screen/RewardInfoModal.png
 // 기획표 그대로: 결제금액이 해당 구간(minWon) 이상이면 전체 금액에 그 구간 요율을 적용한다
 // (누진세처럼 구간별로 쪼개 계산하지 않는 단일 구간 조회 — 내림차순으로 첫 매치).
 export const PAYMENT_BONUS_REWARD_TIERS = [
@@ -40,10 +52,9 @@ export function bonusRewardRateForWon(totalWon: number): number {
   return tier?.rate ?? 0;
 }
 
-// 리워드로 지급되는 코인은 항상 10의 배수여야 자연스럽다(타연엔 1자리 단위로 소모되는 컨텐츠가
-// 없음) — 유저에게 지급되는 금액이니 반올림 대신 항상 올림으로 처리해서 애매하게 깎이지 않게 한다.
-export function ceilToTens(n: number): number {
-  return Math.ceil(n / 10) * 10;
+export function rewardPassesForWon(totalWon: number, rate: number): number {
+  // 원카드 200원 상당을 1회로 환산하며, 표에 표시되는 횟수처럼 반올림으로 지급한다.
+  return Math.round((totalWon * rate) / SPREADS.one.cost);
 }
 
 // 원카드(200) 기준 타로/타로+사주/타로+사주+자미두수 = 200/250/400 이었던
@@ -51,11 +62,8 @@ export function ceilToTens(n: number): number {
 export const SAJU_ADD_ON_COST = 50;
 export const ZIWEI_ADD_ON_COST = 150;
 
-// 궁합(상대 정보 반영) 추가금. 자미두수처럼 사주와 무관하게 독립적으로 선택 가능.
-// 기존 기획 문서 가격표(타로+사주+궁합=300)에서 유도한 사주 addon(50)과 동일선상에 있었으나,
-// 상대 1인분 데이터까지 추가로 고려하는 부담을 감안해 자미두수(150)보다는 낮고 사주(50)보다는
-// 높은 값으로 잡음 — 확정된 가격표는 아니므로 필요 시 조정할 것.
-export const COMPATIBILITY_ADD_ON_COST = 100;
+// 궁합은 횟수제 상품에 기본 포함. 기존 코인으로 이용하는 경우도 추가 차감하지 않는다.
+export const COMPATIBILITY_ADD_ON_COST = 0;
 
 // 코인 충전 상품. 1코인=1원 기준 + 대량 구매일수록 커지는 보너스 코인(사용자가 직접 확정).
 // id는 결제 productId(src/lib/payment/products.ts)의 기반이 되는 고정 식별자 — 나중에 가격을
@@ -68,8 +76,77 @@ export const COIN_PACKAGES = [
   { id: "coin-4", priceWon: 12500, coins: 14000 },
   { id: "coin-5", priceWon: 35000, coins: 40000 },
   { id: "coin-6", priceWon: 55000, coins: 65000 },
-  { id: "coin-7", priceWon: 110000, coins: 135000 },
+  { id: "coin-7", priceWon: 99000, coins: 120000 },
 ] as const;
+
+export const COUNT_PACKAGES = [
+  { id: "count-starter", name: "스타터", priceWon: 3000, basis: 3000, bonus: "타연 체험에 추천" },
+  { id: "count-basic", name: "베이직", priceWon: 5900, basis: 6200, bonus: "추가 횟수 +5% 포함" },
+  { id: "count-standard", name: "스탠다드", priceWon: 12900, basis: 14000, bonus: "추가 횟수 +8.5% 포함" },
+  { id: "count-plus", name: "플러스", priceWon: 35000, basis: 40000, bonus: "추가 횟수 +11% 포함" },
+  { id: "count-premium", name: "프리미엄", priceWon: 55000, basis: 65000, bonus: "추가 횟수 +18% 포함" },
+  { id: "count-ultimate", name: "얼티밋", priceWon: 110000, basis: 135000, bonus: "추가 횟수 +23% 포함" },
+] as const;
+
+export const COUNT_PASS_VALIDITY_MONTHS = 6;
+
+export function countAllowance(
+  basis: number,
+  spread: SpreadKey,
+  saju: boolean,
+  ziwei: boolean,
+  usePublishedException = true
+): number {
+  // 목업 표는 스타터 켈틱크로스+자미두수를 4회로 명시한다(일반 반올림은 5회).
+  if (usePublishedException && basis === 3000 && spread === "celtic" && !saju && ziwei) return 4;
+  const base = Math.round(basis / SPREADS[spread].cost);
+  return Math.round(base * (saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1));
+}
+
+export function countKey(spread: SpreadKey, saju: boolean, ziwei: boolean): string {
+  return `${spread}-${Number(saju)}-${Number(ziwei)}`;
+}
+
+export function countAllowances(basis: number, usePublishedException = true): Record<string, number> {
+  return Object.fromEntries(
+    (Object.keys(SPREADS) as SpreadKey[]).flatMap((spread) =>
+      [false, true].flatMap((saju) =>
+        [false, true].map((ziwei) => [
+          countKey(spread, saju, ziwei),
+          countAllowance(basis, spread, saju, ziwei, usePublishedException),
+        ])
+      )
+    )
+  );
+}
+
+export type CountPassBalance = {
+  basis: number;
+  remaining: number;
+  expiresAt?: string | null;
+  allowances?: Record<string, number>;
+  featureScope?: "tarot-only" | "all-features";
+};
+
+export function availableCount(
+  pass: CountPassBalance,
+  spread: SpreadKey,
+  saju: boolean,
+  ziwei: boolean,
+  compatibility = false
+): number {
+  if (pass.remaining <= 0 || (pass.expiresAt && new Date(pass.expiresAt).getTime() <= Date.now())) return 0;
+  if (pass.featureScope === "tarot-only" && (saju || ziwei || compatibility)) return 0;
+  const allowance = pass.allowances?.[countKey(spread, saju, ziwei)] ?? countAllowance(pass.basis, spread, saju, ziwei);
+  return Math.round(pass.remaining * allowance);
+}
+
+export function remainingAfterUse(pass: CountPassBalance, spread: SpreadKey, saju: boolean, ziwei: boolean): number {
+  const allowance = pass.allowances?.[countKey(spread, saju, ziwei)] ?? countAllowance(pass.basis, spread, saju, ziwei);
+  const next = Math.max(0, pass.remaining - 1 / allowance);
+  const largestAllowance = Math.max(...Object.values(pass.allowances ?? countAllowances(pass.basis)));
+  return Math.round(next * largestAllowance) > 0 ? next : 0;
+}
 
 // 시간제 무제한 상품(구매 시간 내 이용 무제한). 15분 티어는 타로만, 30/60분 티어는
 // 사주/자미두수/궁합 옵션까지 전부 포함 — 사용자가 직접 확정한 가격/범위.

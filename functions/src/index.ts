@@ -1,7 +1,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 
 initializeApp();
 
@@ -9,16 +9,39 @@ export const ping = onRequest((req, res) => {
   res.json({ ok: true });
 });
 
-// 친구 초대(리퍼럴) 월간 5% 정산 — asset/Screen/friendInvite.png 기획, src/lib/tarot/pricing.ts의
-// REFERRAL_MONTHLY_COMMISSION_RATE와 동일한 값을 쓴다(패키지가 분리돼 있어 상수를 공유 import할
-// 수 없으므로 값만 그대로 복사, 바꾸려면 두 군데 다 고칠 것).
+// 친구 초대(리퍼럴) 월간 5% 정산. Functions 패키지는 앱 코드와 분리되어 있어 아래 가격 규칙을
+// 같은 값으로 유지한다.
 const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
+const ONE_CARD_BASIS = 200;
+const SPREAD_COSTS = { one: 200, three: 300, dual: 400, celtic: 500 } as const;
 
-// 타연엔 1자리 단위(1~9코인)로 소모되는 컨텐츠가 없어서, 리워드로 지급되는 코인도 항상 10의
-// 배수여야 자연스럽다(예: 8,900원 결제의 5%는 445원 — 10의 배수가 아님). 유저에게 지급되는
-// 금액이니 반올림 대신 항상 올림으로 처리해서 애매하게 깎이는 일이 없게 한다.
-function ceilToTens(n: number): number {
-  return Math.ceil(n / 10) * 10;
+function rewardPassesForWon(totalWon: number, rate: number): number {
+  return Math.round((totalWon * rate) / ONE_CARD_BASIS);
+}
+
+function countAllowances(basis: number): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [spread, cost] of Object.entries(SPREAD_COSTS)) {
+    const base = Math.round(basis / cost);
+    result[`${spread}-0-0`] = base;
+    result[`${spread}-1-0`] = Math.round(base * 0.85);
+    result[`${spread}-0-1`] = Math.round(base * 0.75);
+    result[`${spread}-1-1`] = Math.round(base * 0.5);
+  }
+  return result;
+}
+
+function rewardPassData(source: "bonus-reward" | "referral-payout", freePasses: number, createdAt: string) {
+  const basis = freePasses * ONE_CARD_BASIS;
+  return {
+    source,
+    basis,
+    remaining: 1,
+    allowances: countAllowances(basis),
+    freePasses,
+    createdAt,
+    expiresAt: null,
+  };
 }
 
 // 매월 5일 03:00(KST)에 "지난달" 결제 건을 정산한다 — 월초 며칠의 여유는 말일 늦은 밤 결제까지
@@ -74,34 +97,36 @@ export const monthlyReferralPayout = onSchedule(
       totalWonByReferrerUid.set(referredBy, (totalWonByReferrerUid.get(referredBy) ?? 0) + totalWon);
     }
 
-    const commissionByReferrerUid = new Map<string, number>();
+    const passesByReferrerUid = new Map<string, number>();
     for (const [referrerUid, totalWon] of totalWonByReferrerUid) {
-      const commission = ceilToTens(totalWon * REFERRAL_MONTHLY_COMMISSION_RATE);
-      if (commission > 0) commissionByReferrerUid.set(referrerUid, commission);
+      const freePasses = rewardPassesForWon(totalWon, REFERRAL_MONTHLY_COMMISSION_RATE);
+      if (freePasses > 0) passesByReferrerUid.set(referrerUid, freePasses);
     }
 
     // 3. 추천인별로 이번 정산 주기 1회만 지급(referralPayouts/{yyyy-mm} 문서를 멱등성 키로 사용 —
     // 함수가 재시도/중복 실행되더라도 같은 달에 두 번 지급되지 않는다).
-    for (const [referrerUid, commission] of commissionByReferrerUid) {
+    for (const [referrerUid, freePasses] of passesByReferrerUid) {
       const referrerRef = db.collection("users").doc(referrerUid);
       const payoutRef = referrerRef.collection("referralPayouts").doc(payoutKey);
+      const passRef = referrerRef.collection("countPasses").doc();
 
       await db.runTransaction(async (tx) => {
         const [referrerSnap, payoutSnap] = await Promise.all([tx.get(referrerRef), tx.get(payoutRef)]);
         if (payoutSnap.exists || !referrerSnap.exists) return;
 
+        const createdAt = new Date().toISOString();
         tx.set(payoutRef, {
-          coins: commission,
+          freePasses,
           rate: REFERRAL_MONTHLY_COMMISSION_RATE,
           periodStart: startIso,
           periodEnd: endIso,
-          createdAt: new Date().toISOString(),
+          createdAt,
         });
-        tx.set(referrerRef, { coins: FieldValue.increment(commission) }, { merge: true });
+        tx.set(passRef, rewardPassData("referral-payout", freePasses, createdAt));
       });
     }
 
-    console.log(`[referral-payout] ${payoutKey} 정산 완료 — 추천인 ${commissionByReferrerUid.size}명`);
+    console.log(`[referral-payout] ${payoutKey} 정산 완료 — 추천인 ${passesByReferrerUid.size}명`);
   }
 );
 
@@ -164,25 +189,27 @@ export const monthlyBonusRewardPayout = onSchedule(
     // 함수가 재시도/중복 실행되더라도 같은 달에 두 번 지급되지 않는다).
     for (const [uid, totalWon] of totalByUid) {
       const rate = bonusRewardRateForWon(totalWon);
-      const coins = ceilToTens(totalWon * rate);
-      if (coins <= 0) continue;
+      const freePasses = rewardPassesForWon(totalWon, rate);
+      if (freePasses <= 0) continue;
 
       const userRef = db.collection("users").doc(uid);
       const payoutRef = userRef.collection("bonusRewardPayouts").doc(payoutKey);
+      const passRef = userRef.collection("countPasses").doc();
 
       await db.runTransaction(async (tx) => {
         const [userSnap, payoutSnap] = await Promise.all([tx.get(userRef), tx.get(payoutRef)]);
         if (payoutSnap.exists || !userSnap.exists) return;
 
+        const createdAt = new Date().toISOString();
         tx.set(payoutRef, {
-          coins,
+          freePasses,
           rate,
           totalWon,
           periodStart: startIso,
           periodEnd: endIso,
-          createdAt: new Date().toISOString(),
+          createdAt,
         });
-        tx.set(userRef, { coins: FieldValue.increment(coins) }, { merge: true });
+        tx.set(passRef, rewardPassData("bonus-reward", freePasses, createdAt));
       });
     }
 

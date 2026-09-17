@@ -17,13 +17,15 @@ type UsageEntry = {
   includeCompatibility: boolean;
   cost: number;
   timePassApplied: boolean;
+  countPassApplied: boolean;
   createdAt: string;
 };
 
 type RewardEntry = {
   kind: "reward";
   label: string;
-  coins: number;
+  freePasses: number | null;
+  coins: number | null;
   createdAt: string;
 };
 
@@ -33,7 +35,7 @@ function monthLabelFromPayoutKey(payoutKey: string): string {
   return Number.isFinite(month) ? String(month) : "?";
 }
 
-/** 피그마 "Screen / UsingHistory"("코인 내역") — 코인이 나간 사용 내역(리딩 기록)과 들어온 리워드
+/** 피그마 "Screen / UsingHistory"("이용 내역") — 이용권 사용 내역과 들어온 리워드
  * 지급 내역(보너스 리워드/친구 결제 리워드)을 합쳐 시간순으로 보여준다. 유저→방→리딩 순회는
  * admin의 scanReadings와 같은 이유로(커스텀 인덱스 없음) collectionGroup+where 대신 이 방식을 씀. */
 export async function GET(req: NextRequest) {
@@ -44,10 +46,11 @@ export async function GET(req: NextRequest) {
 
   const userRef = adminDb.collection("users").doc(uid);
 
-  const [roomsSnap, bonusPayoutsSnap, referralPayoutsSnap] = await Promise.all([
+  const [roomsSnap, bonusPayoutsSnap, referralPayoutsSnap, countPassesSnap] = await Promise.all([
     userRef.collection("rooms").orderBy("updatedAt", "desc").limit(ROOM_LIMIT).get(),
     userRef.collection("bonusRewardPayouts").get(),
     userRef.collection("referralPayouts").get(),
+    userRef.collection("countPasses").get(),
   ]);
 
   const usageEntries: UsageEntry[] = [];
@@ -70,24 +73,49 @@ export async function GET(req: NextRequest) {
         includeCompatibility: Boolean(data.includeCompatibility),
         cost: data.cost ?? 0,
         timePassApplied: Boolean(data.timePassApplied),
+        countPassApplied: Boolean(data.countPassId),
         createdAt: data.createdAt,
       });
     }
   }
 
   const rewardEntries: RewardEntry[] = [
-    ...bonusPayoutsSnap.docs.map((doc) => ({
+    // 전환 전 코인 정산 이력은 그대로 남긴다. 전환 후 정산은 아래 countPasses에서 표시한다.
+    ...bonusPayoutsSnap.docs.filter((doc) => typeof doc.data().freePasses !== "number").map((doc) => ({
       kind: "reward" as const,
       label: `${monthLabelFromPayoutKey(doc.id)}월 결제 리워드`,
-      coins: Number(doc.data().coins ?? 0),
+      freePasses: typeof doc.data().freePasses === "number" ? doc.data().freePasses : null,
+      coins: typeof doc.data().coins === "number" ? doc.data().coins : null,
       createdAt: doc.data().createdAt,
     })),
-    ...referralPayoutsSnap.docs.map((doc) => ({
+    ...referralPayoutsSnap.docs.filter((doc) => typeof doc.data().freePasses !== "number").map((doc) => ({
       kind: "reward" as const,
       label: "친구 결제 리워드",
-      coins: Number(doc.data().coins ?? 0),
+      freePasses: typeof doc.data().freePasses === "number" ? doc.data().freePasses : null,
+      coins: typeof doc.data().coins === "number" ? doc.data().coins : null,
       createdAt: doc.data().createdAt,
     })),
+    ...countPassesSnap.docs
+      .filter((doc) => ["admin-grant", "signup-free", "referral-signup", "bonus-reward", "referral-payout"].includes(doc.data().source))
+      .map((doc) => {
+        const data = doc.data();
+        const label = data.source === "admin-grant"
+          ? `관리자 이용권 지급${data.reason ? ` · ${data.reason}` : ""}`
+          : data.source === "signup-free"
+          ? "첫 가입 체험 이용권"
+          : data.source === "referral-signup"
+          ? "친구 초대 리워드"
+          : data.source === "referral-payout"
+            ? "친구 결제 리워드"
+            : "결제 리워드";
+        return {
+          kind: "reward" as const,
+          label,
+          freePasses: Number(data.freePasses ?? Math.round(Number(data.basis ?? 0) / 200)),
+          coins: null,
+          createdAt: data.createdAt,
+        };
+      }),
   ];
 
   const entries: (UsageEntry | RewardEntry)[] = [...usageEntries, ...rewardEntries];

@@ -14,13 +14,15 @@ type UsageEntry = {
   includeCompatibility: boolean;
   cost: number;
   timePassApplied: boolean;
+  countPassApplied: boolean;
   createdAt: string;
 };
 
 type RewardEntry = {
   kind: "reward";
   label: string;
-  coins: number;
+  freePasses: number | null;
+  coins: number | null;
   createdAt: string;
 };
 
@@ -59,12 +61,12 @@ export default function UsageHistoryPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-bg">
-      <SubPageTopBar title="코인 내역" />
+      <SubPageTopBar title="이용 내역" />
       <div className="flex-1 overflow-y-auto p-4">
         {entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (
-          <p className="pt-8 text-center text-sm text-icon-muted">아직 코인 내역이 없어요.</p>
+          <p className="pt-8 text-center text-sm text-icon-muted">아직 이용 내역이 없어요.</p>
         ) : (
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
             {entries.map((e, i) => (
@@ -74,7 +76,9 @@ export default function UsageHistoryPage() {
                   <div className="flex items-center justify-between rounded-[28px] border border-border bg-topbar p-4">
                     <p className="truncate text-base font-semibold text-bold-text">[{e.label}]</p>
                     <span className="shrink-0 text-base font-bold text-point">
-                      +{e.coins.toLocaleString("ko-KR")} 코인
+                      {e.freePasses !== null
+                        ? `+원카드 기준 ${e.freePasses.toLocaleString("ko-KR")}회`
+                        : `+${(e.coins ?? 0).toLocaleString("ko-KR")} 코인`}
                     </span>
                   </div>
                 ) : (
@@ -88,7 +92,7 @@ export default function UsageHistoryPage() {
                       </p>
                     </div>
                     <span className="shrink-0 text-base font-bold text-bold-text">
-                      {e.timePassApplied ? "이용권 사용" : `-${e.cost.toLocaleString("ko-KR")} 코인`}
+                      {e.timePassApplied ? "시간제 이용권 사용" : e.countPassApplied ? "횟수제 이용권 1회" : `-${e.cost.toLocaleString("ko-KR")} 코인`}
                     </span>
                   </div>
                 )}

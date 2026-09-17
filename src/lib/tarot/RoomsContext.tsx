@@ -15,6 +15,7 @@ import {
 } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import type { CountPassBalance } from "@/lib/tarot/pricing";
 
 export type Room = { id: string; title: string; updatedAt: string };
 export type ActiveTimePass = {
@@ -25,6 +26,15 @@ export type ActiveTimePass = {
   expiresAt: string;
 };
 export type TimePass = { id: string; minutes: number; includesOptions: boolean };
+export type CountPass = CountPassBalance & {
+  id: string;
+  productId?: string;
+  source?: "purchase" | "admin-grant" | "signup-free" | "referral-signup" | "bonus-reward" | "referral-payout";
+  featureScope?: "tarot-only" | "all-features";
+  reason?: string | null;
+  freePasses?: number;
+  createdAt: string;
+};
 
 type RoomsContextValue = {
   user: User | null;
@@ -32,6 +42,8 @@ type RoomsContextValue = {
   profileImage: string | null;
   email: string | null;
   coins: number | null;
+  countPasses: CountPass[];
+  setCountPasses: Dispatch<SetStateAction<CountPass[]>>;
   setCoins: Dispatch<SetStateAction<number | null>>;
   hasBirthInfo: boolean;
   myTimeUnknown: boolean;
@@ -64,6 +76,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [coins, setCoins] = useState<number | null>(null);
+  const [countPasses, setCountPasses] = useState<CountPass[]>([]);
   const [hasBirthInfo, setHasBirthInfo] = useState(false);
   const [myTimeUnknown, setMyTimeUnknown] = useState(false);
   const [hasPartner, setHasPartner] = useState(false);
@@ -107,6 +120,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setProfileImage(data.profileImage ?? null);
     setEmail(data.email ?? null);
     setCoins(data.coins);
+    setCountPasses(data.countPasses ?? []);
     setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
     setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
     setHasPartner(Boolean(data.partner?.nickname));
@@ -137,6 +151,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setProfileImage(data.profileImage ?? null);
         setEmail(data.email ?? null);
         setCoins(data.coins);
+        setCountPasses(data.countPasses ?? []);
         setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
         setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
         setHasPartner(Boolean(data.partner?.nickname));
@@ -164,6 +179,27 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       setLoaded(true);
     });
   }, []);
+
+  // 관리자 지급처럼 다른 화면에서 바뀌는 이용권은 로그인 시 한 번만 읽으면 열린 채팅 화면에
+  // 반영되지 않는다. Firestore 클라이언트 읽기 권한은 열지 않은 상태라, 기존의 인증된 BFF
+  // 경로를 화면 재진입 및 짧은 주기로 다시 조회한다.
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshMe();
+    };
+
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    const interval = window.setInterval(refreshWhenVisible, 10_000);
+
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.clearInterval(interval);
+    };
+  }, [user, refreshMe]);
 
   const createRoom = useCallback(async (): Promise<Room | null> => {
     if (!user) return null;
@@ -226,6 +262,8 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         profileImage,
         email,
         coins,
+        countPasses,
+        setCountPasses,
         setCoins,
         hasBirthInfo,
         myTimeUnknown,

@@ -6,6 +6,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import type { BirthInfo } from "@/lib/tarot/birthInfo";
 import { PRIVACY_POLICY_SECTIONS, TERMS_SECTIONS } from "@/lib/legal/content";
+import { BrandBi } from "@/components/BrandBi";
 
 const POLICY_SECTIONS: Record<"terms" | "privacy", { title: string; sections: typeof TERMS_SECTIONS }> = {
   terms: { title: "이용약관", sections: TERMS_SECTIONS },
@@ -198,10 +199,7 @@ export default function SignupPage() {
       {openPolicy && <PolicyModal policy={openPolicy} onClose={() => setOpenPolicy(null)} />}
 
       <div className="flex h-16 shrink-0 items-center justify-center">
-        <span className="text-2xl font-bold">
-          <span className="text-bold-text">타</span>
-          <span className="text-point">연</span>
-        </span>
+        <BrandBi />
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 overflow-y-auto">
