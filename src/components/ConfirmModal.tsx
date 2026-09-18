@@ -18,7 +18,7 @@ export default function ConfirmModal({
   busy?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
         onClick={(e) => e.stopPropagation()}

@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import ModalViewportChrome from "@/components/ModalViewportChrome";
 
 const pretendard = localFont({
   src: [
@@ -46,6 +47,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#f7f4fb",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -59,6 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
+        <ModalViewportChrome />
         {children}
       </body>
     </html>

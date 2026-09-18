@@ -76,7 +76,7 @@ function CountPassUsageModal({ pass, onClose }: { pass: CountPass; onClose: () =
   const remainingPercent = Math.max(0, Math.min(100, pass.remaining * 100)).toFixed(2);
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-[32px] border border-border bg-topbar p-4" onClick={(event) => event.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <div className="w-5" />
@@ -279,7 +279,7 @@ function DualPathLayout({ cards }: { cards: TarotCardInfo[] }) {
 
 function WelcomePopup({ onClose }: { onClose: () => void }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-w-sm flex-col gap-3 rounded-2xl bg-surface p-6">
         <h2 className="text-lg font-bold text-bold-text">타연에 오신 걸 환영해요</h2>
         <ul className="list-disc pl-5 text-sm text-text">
@@ -364,7 +364,7 @@ function HeldTimepassListModal({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
         className="flex max-h-[70vh] w-full xl:mx-auto xl:max-w-4xl flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
@@ -408,7 +408,7 @@ function HeldTimepassUseModal({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
         className="flex w-full xl:mx-auto xl:max-w-4xl flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
@@ -445,7 +445,7 @@ function HeldTimepassUseModal({
  * 없을 때(HeldTimepassListModal 대신) 뜨는, 화면 중앙에 뜨는 안내 모달. */
 function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onGoCharge: () => void }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
@@ -483,7 +483,7 @@ function PurchaseTicketModal({
   onPurchase: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-4" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-3">
           <div className="w-5" />
@@ -528,7 +528,7 @@ function RenameRoomModal({
 }) {
   const [title, setTitle] = useState(initialTitle);
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
         onClick={(e) => e.stopPropagation()}
@@ -585,7 +585,7 @@ function SpreadSelectSheet({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
         className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
@@ -673,7 +673,7 @@ function ModeSettingsSheet({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
         className="max-h-full w-full overflow-y-auto rounded-t-[28px] border border-border bg-topbar p-4 xl:mx-auto xl:max-w-4xl"
         onClick={(e) => e.stopPropagation()}
@@ -806,7 +806,7 @@ function SajuZiweiSheet({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
         className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
@@ -873,7 +873,7 @@ function CompatibilitySheet({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
         className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}

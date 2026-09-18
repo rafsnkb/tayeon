@@ -267,6 +267,7 @@ export default function MyPage() {
 
       {accountInfoOpen && (
         <div
+          data-modal-overlay="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setAccountInfoOpen(false)}
         >
@@ -318,6 +319,7 @@ export default function MyPage() {
 
       {rewardInfoOpen && (
         <div
+          data-modal-overlay="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setRewardInfoOpen(false)}
         >

@@ -22,7 +22,7 @@ function PolicyModal({
 }) {
   const { title, sections } = POLICY_SECTIONS[policy];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 rounded-[28px] border border-border bg-topbar p-6">
         <h2 className="text-lg font-bold text-bold-text">{title}</h2>
         <div className="flex-1 overflow-y-auto">
