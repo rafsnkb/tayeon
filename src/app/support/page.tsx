@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { Suspense } from "react";
 import SupportCenter from "@/components/SupportCenter";
 
 function parseFaq(markdown: string) {
@@ -11,5 +12,9 @@ function parseFaq(markdown: string) {
 
 export default async function SupportPage() {
   const markdown = await readFile(path.join(process.cwd(), "doc", "FAQ.md"), "utf8");
-  return <SupportCenter faqs={parseFaq(markdown)} />;
+  return (
+    <Suspense fallback={<div className="min-h-dvh bg-bg" />}>
+      <SupportCenter faqs={parseFaq(markdown)} />
+    </Suspense>
+  );
 }
