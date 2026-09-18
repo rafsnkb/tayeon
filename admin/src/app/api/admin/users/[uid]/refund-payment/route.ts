@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
 import { portone } from "@/lib/payment/portone";
 
-// 결제 취소(환불) — 관리자 전용으로 만든 이유:
-// 타연의 환불 정책(src/lib/legal/content.ts 제9조)은 "환불 요청은 admin@rafraum.com으로 접수"
-// 라고 명시돼 있어, 애초에 셀프서비스 환불이 아니라 관리자가 문의를 받아 처리하는 흐름이다.
-// 게다가 코인은 FIFO 차감 원장이 없는 단일 숫자 필드라(pricing.ts 주석 참고) "이 결제로 받은
-// 코인이 아직 안 쓰였는지"를 완벽히 추적할 수 없다 — 아래 unusedHeuristic은 최선의 근사치일 뿐,
-// 최종 판단은 사람이 하는 게 안전하다.
+const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+// 환불 정책은 UI 조건이 아니라 서버에서 강제한다.
+// 결제 후 7일 이내 + 횟수제 미사용 또는 시간제 미활성화인 구매 건만 취소할 수 있다.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ uid: string }> }
@@ -33,10 +30,9 @@ export async function POST(
   }
   const payment = paymentSnap.data() as {
     status: string;
-    productType: "coin" | "timePass";
-    coins: number | null;
+    productType: "countPass" | "timePass" | "coin";
+    countPassId: string | null;
     timePassId: string | null;
-    priceWon: number;
     paidAt: string;
   };
 
@@ -47,33 +43,20 @@ export async function POST(
     );
   }
 
-  // 참고용 경고 — 하드 블록은 아니다. 관리자가 이메일로 접수한 사안을 검토한 뒤 진행하는
-  // 흐름이므로, 정책 위반 여부를 최종 판단하는 건 관리자다. 응답의 warnings로 눈에 띄게 알려준다.
-  const warnings: string[] = [];
-  const daysSincePaid = (Date.now() - new Date(payment.paidAt).getTime()) / 86_400_000;
-  if (daysSincePaid > 7) {
-    warnings.push(`결제일로부터 ${Math.floor(daysSincePaid)}일 지났어요(정책상 7일 이내 전액 환불).`);
+  const paidAt = Date.parse(payment.paidAt);
+  if (!Number.isFinite(paidAt) || Date.now() - paidAt > REFUND_WINDOW_MS || paidAt > Date.now()) {
+    return NextResponse.json({ error: "결제 후 7일 이내의 이용권만 환불할 수 있어요." }, { status: 409 });
   }
 
-  if (payment.productType === "coin" && payment.coins) {
-    const userSnap = await userRef.get();
-    const currentCoins = (userSnap.data()?.coins as number | undefined) ?? 0;
-    // FIFO 원장이 없어 정확한 "이 결제로 받은 코인" 잔여량은 알 수 없다 — 최소한 이 결제로 받은
-    // 코인 수만큼 잔액이 남아있는지만 근사적으로 확인한다.
-    if (currentCoins < payment.coins) {
-      warnings.push(
-        `현재 코인 잔액(${currentCoins.toLocaleString("ko-KR")})이 이 결제로 지급된 코인(${payment.coins.toLocaleString(
-          "ko-KR"
-        )})보다 적어요 — 이미 일부 사용됐을 수 있어요.`
-      );
-    }
+  const passCollection = payment.productType === "countPass" ? "countPasses" : payment.productType === "timePass" ? "timePasses" : null;
+  const passId = payment.productType === "countPass" ? payment.countPassId : payment.timePassId;
+  if (!passCollection || !passId) {
+    return NextResponse.json({ error: "현재 판매하지 않는 상품이거나 이용권 정보를 찾을 수 없어요." }, { status: 409 });
   }
-
-  if (payment.productType === "timePass" && payment.timePassId) {
-    const passSnap = await userRef.collection("timePasses").doc(payment.timePassId).get();
-    if (passSnap.data()?.status !== "unused") {
-      warnings.push(`이용권이 이미 "${passSnap.data()?.status}" 상태예요 — 미사용이 아닐 수 있어요.`);
-    }
+  const passRef = userRef.collection(passCollection).doc(passId);
+  const passSnap = await passRef.get();
+  if (!passSnap.exists || passSnap.data()?.status !== "unused") {
+    return NextResponse.json({ error: "한 번도 사용하거나 활성화하지 않은 이용권만 환불할 수 있어요." }, { status: 409 });
   }
 
   let cancellation;
@@ -88,8 +71,10 @@ export async function POST(
 
   const adminUser = await adminAuth.getUser(adminUid);
   const now = new Date().toISOString();
+  const refundRequestRef = adminDb.collection("refundRequests").doc(paymentId);
 
   await adminDb.runTransaction(async (tx) => {
+    const refundRequestSnap = await tx.get(refundRequestRef);
     tx.update(paymentRef, {
       status: "refunded",
       refundedAt: now,
@@ -98,14 +83,13 @@ export async function POST(
       refundedByEmail: adminUser.email ?? null,
     });
 
-    if (payment.productType === "coin" && payment.coins) {
-      tx.set(userRef, { coins: FieldValue.increment(-payment.coins) }, { merge: true });
-    } else if (payment.productType === "timePass" && payment.timePassId) {
-      tx.update(userRef.collection("timePasses").doc(payment.timePassId), {
-        status: "refunded",
-      });
+    tx.update(passRef, { status: "refunded" });
+    // 사용자 요청에서 시작한 건은 PG 취소와 동일한 트랜잭션에서 완료 처리한다. 취소는 됐는데
+    // 요청만 대기 상태로 남는 운영상 혼선을 방지한다.
+    if (refundRequestSnap.exists && refundRequestSnap.data()?.status === "pending") {
+      tx.update(refundRequestRef, { status: "approved", approvedAt: now, approvedByUid: adminUid });
     }
   });
 
-  return NextResponse.json({ cancellation, warnings });
+  return NextResponse.json({ cancellation });
 }

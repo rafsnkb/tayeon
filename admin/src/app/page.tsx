@@ -43,7 +43,15 @@ const GENDER_LABEL: Record<string, string> = { male: "남성", female: "여성",
 type Status = "loading" | "unauthenticated" | "forbidden" | "ok";
 
 // admin/은 타연 본체와 완전히 분리된 별도 앱이라 src/lib/tarot/pricing.ts를 import하지 않음 —
-// 본체의 TIME_PASS_PACKAGES와 값이 바뀌면 이 목록도 같이 수동으로 맞춰줄 것.
+// 본체의 TIME_PASS_PACKAGES/COMBOS와 값이 바뀌면 이 목록들도 같이 수동으로 맞춰줄 것.
+type ComboKey = "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei";
+const COMBO_OPTIONS: { value: ComboKey; label: string }[] = [
+  { value: "tarot", label: "타로 전용" },
+  { value: "tarot-saju", label: "타로+사주" },
+  { value: "tarot-ziwei", label: "타로+자미두수" },
+  { value: "tarot-saju-ziwei", label: "타로+사주+자미두수" },
+];
+
 const TIME_PASS_TIERS = [
   { label: "15분권 (타로만)", minutes: 15, includesOptions: false, priceWon: 8900 },
   { label: "30분권 (전부 포함)", minutes: 30, includesOptions: true, priceWon: 19900 },
@@ -100,7 +108,7 @@ export default function AdminHome() {
   const [statsError, setStatsError] = useState<string | null>(null);
 
   const [countPassCount, setCountPassCount] = useState<Record<string, string>>({});
-  const [countPassScope, setCountPassScope] = useState<Record<string, "tarot-only" | "all-features">>({});
+  const [countPassCombo, setCountPassCombo] = useState<Record<string, ComboKey>>({});
   const [countPassReason, setCountPassReason] = useState<Record<string, string>>({});
   const [countPassBusy, setCountPassBusy] = useState<string | null>(null);
   const [countPassMessage, setCountPassMessage] = useState<Record<string, string>>({});
@@ -188,7 +196,7 @@ export default function AdminHome() {
   async function handleGrantCountPass(uid: string) {
     if (!user) return;
     const count = Number(countPassCount[uid]);
-    const featureScope = countPassScope[uid] ?? "tarot-only";
+    const combo = countPassCombo[uid] ?? "tarot";
     const reason = countPassReason[uid]?.trim() ?? "";
     if (!Number.isInteger(count) || count < 1 || count > 10_000) {
       setCountPassMessage((m) => ({ ...m, [uid]: "횟수는 1회 이상 10,000회 이하여야 합니다." }));
@@ -208,15 +216,15 @@ export default function AdminHome() {
           authorization: `Bearer ${token}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ count, featureScope, reason }),
+        body: JSON.stringify({ count, combo, reason }),
       });
       const body = await res.json();
       if (!res.ok) {
         setCountPassMessage((m) => ({ ...m, [uid]: body.error ?? "지급에 실패했습니다." }));
         return;
       }
-      const scopeLabel = featureScope === "all-features" ? "모든 기능" : "타로만";
-      setCountPassMessage((m) => ({ ...m, [uid]: `${scopeLabel} ${count}회 이용권을 지급했습니다.` }));
+      const comboLabel = COMBO_OPTIONS.find((o) => o.value === combo)?.label ?? combo;
+      setCountPassMessage((m) => ({ ...m, [uid]: `${comboLabel} ${count}회 이용권을 지급했습니다.` }));
       setCountPassCount((values) => ({ ...values, [uid]: "" }));
       setCountPassReason((values) => ({ ...values, [uid]: "" }));
     } finally {
@@ -417,6 +425,14 @@ export default function AdminHome() {
         </button>
       </header>
 
+      <nav className="flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-white p-3 text-sm">
+        <a href="/users" className="rounded bg-zinc-900 px-3 py-1.5 font-medium text-white">사용자 관리</a>
+        <a href="/moderation" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">모더레이션</a>
+        <a href="/refund-requests" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">환불 요청</a>
+        <a href="/analytics" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">API 분석</a>
+        <a href="/notices" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">공지사항</a>
+      </nav>
+
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-zinc-700">
@@ -587,17 +603,20 @@ export default function AdminHome() {
                 className="w-40 rounded border border-zinc-300 px-2 py-1.5 text-sm"
               />
               <select
-                value={countPassScope[r.uid] ?? "tarot-only"}
+                value={countPassCombo[r.uid] ?? "tarot"}
                 onChange={(e) =>
-                  setCountPassScope((values) => ({
+                  setCountPassCombo((values) => ({
                     ...values,
-                    [r.uid]: e.target.value as "tarot-only" | "all-features",
+                    [r.uid]: e.target.value as ComboKey,
                   }))
                 }
                 className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
               >
-                <option value="tarot-only">타로만</option>
-                <option value="all-features">모든 기능</option>
+                {COMBO_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
               <input
                 type="text"
