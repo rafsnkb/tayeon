@@ -52,6 +52,7 @@
   --icon-muted: #868b9a;
   --placeholder: #585858;
   --gold: #f9de92;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -109,18 +110,16 @@ body {
   background-color: rgb(25 25 29 / 80%);
 }
 
-/* Chrome/Safari 자동완성의 밝은 배경이 다크 테마 입력칸을 덮어쓰지 않게 한다. */
+/* Chrome/Safari 자동완성의 밝은 배경이 다크 테마 입력칸을 덮어쓰지 않게 한다.
+   Chrome은 자동완성 배경에 UA !important를 사용하므로 box-shadow로 덮지 않는다.
+   배경을 글자 영역으로만 clip하면 기존 입력칸 배경/테두리가 그대로 보인다. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  /* Chrome의 autofill UA 규칙은 강제 우선순위로 적용되므로 여기에서도 명시적으로 이긴다. */
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
   -webkit-text-fill-color: var(--bold-text) !important;
   caret-color: var(--bold-text) !important;
-  /* 안쪽은 다크 배경으로 덮고, 바깥 1px 그림자로 라운드 테두리를 다시 그린다.
-     브라우저 자동완성의 기본 테두리와 섞여 끊겨 보이는 현상을 막는다. */
-  border-color: transparent !important;
-  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset, 0 0 0 1px var(--border) !important;
-  box-shadow: 0 0 0 1000px var(--bg) inset, 0 0 0 1px var(--border) !important;
 }
 
 /* 분홍색 버튼은 단색 면을 유지하고, 시선 유도는 버튼 바깥의 은은한 글로우로만 처리한다. */
