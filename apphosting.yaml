@@ -72,6 +72,6 @@ env:
     availability:
       - RUNTIME
   - variable: RESEND_ADMIN_EMAIL
-    value: "admin@rafraum.com"
+    value: "tayeon@rafraum.com"
     availability:
       - RUNTIME
