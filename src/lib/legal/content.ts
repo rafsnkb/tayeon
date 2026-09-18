@@ -8,6 +8,8 @@
 
 import {
   COMPANY_NAME_KO,
+  CIVIL_COMPLAINT_OFFICER_NAME,
+  CIVIL_COMPLAINT_PHONE,
   PRIVACY_OFFICER_NAME,
   SUPPORT_EMAIL,
 } from "@/lib/company";
@@ -140,7 +142,7 @@ Anthropic은 API를 통해 전송된 데이터를 기본적으로 자사 모델 
   },
 ];
 
-export const TERMS_EFFECTIVE_DATE = "2026-09-13";
+export const TERMS_EFFECTIVE_DATE = "2026-09-18";
 
 export const TERMS_SECTIONS: LegalSection[] = [
   {
@@ -219,7 +221,13 @@ export const TERMS_SECTIONS: LegalSection[] = [
 3. 기존 코인의 청약 철회 및 환불은 구매 당시 고지된 조건에 따릅니다. 무상 지급된 혜택은 유상 구매 상품의 환불과 구분하여 처리합니다.
 4. 회사의 귀책사유로 정상적으로 서비스를 이용하지 못한 경우에는 관계 법령에 따라 환불 또는 동일한 상품으로 보상합니다.
 5. 환불 요청은 ${SUPPORT_EMAIL}으로 접수하며, 「전자상거래 등에서의 소비자보호에 관한 법률」 제18조제2항에 따라 청약 철회를 받은 날로부터 3영업일 이내에 환급합니다. 다만 결제대행사의 정책에 따라 실제 환급까지 추가 시일이 소요될 수 있습니다.
-6. 시간제 이용권의 환불 조건은 관계 법령과 상품별 고지 내용에 따릅니다.`,
+6. 시간제 이용권의 환불 조건은 관계 법령과 상품별 고지 내용에 따릅니다.
+7. 환불은 결제에 사용한 동일한 결제수단으로만 가능합니다.`,
+  },
+  {
+    title: "제9조의2 (판매 상품의 책임 및 민원 처리)",
+    body: `1. ${COMPANY_NAME_KO}이 운영하는 타연 사이트에서 판매되는 모든 이용권 및 유료 서비스는 ${COMPANY_NAME_KO}이 책임지고 제공합니다.
+2. 판매 상품 및 서비스에 관한 민원 담당자는 ${CIVIL_COMPLAINT_OFFICER_NAME}이며, 연락처는 ${CIVIL_COMPLAINT_PHONE}입니다.`,
   },
   {
     title: "제10조 (미성년자 결제)",

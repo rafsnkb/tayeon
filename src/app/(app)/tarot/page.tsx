@@ -13,6 +13,7 @@ import {
 import { openMenu } from "@/lib/ui/menuBus";
 import ConfirmModal from "@/components/ConfirmModal";
 import { BrandBi } from "@/components/BrandBi";
+import { CompanyInfoBar } from "@/components/CompanyInfoBar";
 import {
   MenuIcon,
   SendIcon,
@@ -1757,6 +1758,7 @@ function TarotChat() {
           )}
         </div>
       </div>
+      <CompanyInfoBar />
     </div>
   );
 }
