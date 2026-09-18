@@ -115,8 +115,11 @@ input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--bold-text);
   caret-color: var(--bold-text);
-  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset;
-  box-shadow: 0 0 0 1000px var(--bg) inset;
+  /* 안쪽은 다크 배경으로 덮고, 바깥 1px 그림자로 라운드 테두리를 다시 그린다.
+     브라우저 자동완성의 기본 테두리와 섞여 끊겨 보이는 현상을 막는다. */
+  border-color: transparent;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset, 0 0 0 1px var(--border);
+  box-shadow: 0 0 0 1000px var(--bg) inset, 0 0 0 1px var(--border);
 }
 
 /* 분홍색 버튼은 단색 면을 유지하고, 시선 유도는 버튼 바깥의 은은한 글로우로만 처리한다. */
