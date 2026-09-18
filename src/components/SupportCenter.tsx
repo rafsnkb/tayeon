@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { BackIcon, CheckIcon, CloseIcon } from "@/app/(app)/tarot/icons";
-import { SUPPORT_EMAIL } from "@/lib/company";
+import { auth } from "@/lib/firebase/client";
 
 type Faq = { question: string; answer: string };
 type Tab = "faq" | "inquiry";
-type Attachment = { name: string; url: string };
+type Attachment = { file: File; url: string };
 
 export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
   const [tab, setTab] = useState<Tab>("faq");
@@ -15,6 +15,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsRef = useRef<Attachment[]>([]);
 
@@ -26,7 +27,11 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
 
   function addAttachments(files: FileList | null) {
     if (!files) return;
-    const images = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, Math.max(0, 3 - attachments.length)).map((file) => ({ name: file.name, url: URL.createObjectURL(file) }));
+    const images = Array.from(files)
+      .filter((file) => file.type.startsWith("image/") && file.size <= 2 * 1024 * 1024)
+      .slice(0, Math.max(0, 3 - attachments.length))
+      .map((file) => ({ file, url: URL.createObjectURL(file) }));
+    if (images.length < Array.from(files).length) setMessage("이미지 파일만 첨부할 수 있으며, 파일당 최대 크기는 2MB예요.");
     setAttachments((current) => [...current, ...images]);
   }
 
@@ -37,21 +42,38 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
     });
   }
 
-  function submitInquiry(event: FormEvent<HTMLFormElement>) {
+  async function submitInquiry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     if (!agreed) {
       setMessage("개인정보 수집 및 이용에 동의해주세요.");
       return;
     }
-    const name = String(form.get("name") ?? "").trim();
-    const nickname = String(form.get("nickname") ?? "").trim();
-    const email = String(form.get("email") ?? "").trim();
-    const content = String(form.get("content") ?? "").trim();
-    const subject = `[타연 고객센터] ${nickname}님의 문의`;
-    const body = `이름: ${name}\n닉네임: ${nickname}\n이메일: ${email}\n\n문의 내용\n${content}${attachments.length ? `\n\n첨부 파일: ${attachments.map((attachment) => attachment.name).join(", ")}` : ""}`;
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    setMessage(attachments.length ? "메일 앱이 열렸어요. 첨부 이미지는 메일에 추가해 주세요." : "메일 앱이 열렸어요.");
+    const requestData = new FormData();
+    for (const [key, value] of form.entries()) requestData.append(key, value);
+    attachments.forEach(({ file }) => requestData.append("attachments", file));
+
+    setIsSubmitting(true);
+    setMessage(null);
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch("/api/support/inquiries", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: requestData,
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "문의 접수 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.");
+      event.currentTarget.reset();
+      attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
+      setAttachments([]);
+      setAgreed(false);
+      setMessage("문의가 접수되었어요. 입력하신 이메일로 답변드릴게요.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "문의 접수 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -81,10 +103,10 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>사용중인 닉네임<span className="text-urgent">*</span></span><input required name="nickname" placeholder="타연에서 사용중인 닉네임을 입력해주세요" className="h-12 rounded-2xl border border-border bg-bg px-3 text-base text-bold-text outline-none placeholder-placeholder" /></label>
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>이메일<span className="text-urgent">*</span></span><input required type="email" name="email" placeholder="이메일을 입력해주세요" className="h-12 rounded-2xl border border-border bg-bg px-3 text-base text-bold-text outline-none placeholder-placeholder" /><span className="text-xs text-urgent">입력하신 메일로 답변해드립니다.</span></label>
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>문의 내용<span className="text-urgent">*</span></span><textarea required name="content" rows={5} placeholder="문의 내용을 상세하게 입력해주시면 빠른 처리가 가능합니다" className="resize-none rounded-2xl border border-border bg-bg p-3 text-base text-bold-text outline-none placeholder-placeholder" /></label>
-              <div className="mb-4"><p className="mb-2 text-sm text-icon-muted">스크린샷 첨부</p><input ref={fileInputRef} onChange={(event) => addAttachments(event.target.files)} accept="image/*" multiple type="file" className="sr-only" /><div className="flex min-h-20 flex-wrap items-center gap-2 rounded-2xl bg-bg p-3">{attachments.map((attachment, index) => <div key={attachment.url} className="relative h-14 w-14"><div className="h-full w-full overflow-hidden rounded-lg border border-border"><img src={attachment.url} alt={attachment.name} className="h-full w-full object-cover" /></div><button type="button" onClick={() => removeAttachment(index)} aria-label={`${attachment.name} 삭제`} className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-urgent text-urgent-text"><CloseIcon className="h-2 w-2" /></button></div>)}{attachments.length < 3 && <button type="button" onClick={() => fileInputRef.current?.click()} className="ml-auto rounded-full bg-cta-fill px-6 py-2.5 text-sm font-semibold text-cta-text">파일 첨부하기</button>}</div></div>
+              <div className="mb-4"><p className="mb-2 text-sm text-icon-muted">스크린샷 첨부 <span className="text-xs">(이미지 3장, 장당 2MB 이하)</span></p><input ref={fileInputRef} onChange={(event) => { addAttachments(event.target.files); event.currentTarget.value = ""; }} accept="image/*" multiple type="file" className="sr-only" /><div className="flex min-h-20 flex-wrap items-center gap-2 rounded-2xl bg-bg p-3">{attachments.map((attachment, index) => <div key={attachment.url} className="relative h-14 w-14"><div className="h-full w-full overflow-hidden rounded-lg border border-border"><img src={attachment.url} alt={attachment.file.name} className="h-full w-full object-cover" /></div><button type="button" onClick={() => removeAttachment(index)} aria-label={`${attachment.file.name} 삭제`} className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-urgent text-urgent-text"><CloseIcon className="h-2 w-2" /></button></div>)}{attachments.length < 3 && <button type="button" onClick={() => fileInputRef.current?.click()} className="ml-auto rounded-full bg-cta-fill px-6 py-2.5 text-sm font-semibold text-cta-text">파일 첨부하기</button>}</div></div>
               <label className="flex cursor-pointer items-center gap-2 border-t border-border pt-4 text-sm text-bold-text"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="sr-only" /><span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${agreed ? "bg-point text-white" : "border border-border"}`}><CheckIcon className={`h-3 w-3 ${agreed ? "" : "opacity-50"}`} /></span>[필수] 타연의 <Link href="/privacy" className="text-point underline" onClick={(event) => event.stopPropagation()}>개인정보 수집 및 이용</Link>에 동의합니다.</label>
-              {message && <p role="status" className="mt-3 text-sm text-urgent">{message}</p>}
-              <button type="submit" className="mt-4 h-12 w-full rounded-full bg-point text-base font-semibold text-white">문의 접수하기</button>
+              {message && <p role="status" className={`mt-3 text-sm ${message.startsWith("문의가 접수") ? "text-point" : "text-urgent"}`}>{message}</p>}
+              <button disabled={isSubmitting} type="submit" className="mt-4 h-12 w-full rounded-full bg-point text-base font-semibold text-white disabled:cursor-wait disabled:opacity-60">{isSubmitting ? "접수 중..." : "문의 접수하기"}</button>
             </form>
           </section>
         )}

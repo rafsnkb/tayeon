@@ -62,3 +62,16 @@ env:
     secret: PG_REVIEW_TEST_ID
   - variable: PG_REVIEW_TEST_PASSWORD
     secret: PG_REVIEW_TEST_PASSWORD
+  # 고객센터 문의 전달용. `firebase apphosting:secrets:set RESEND_API_KEY`로 먼저 등록한다.
+  - variable: RESEND_API_KEY
+    secret: RESEND_API_KEY
+    availability:
+      - RUNTIME
+  - variable: RESEND_FROM_EMAIL
+    value: "Tayeon Support <support@tayeon.kr>"
+    availability:
+      - RUNTIME
+  - variable: RESEND_ADMIN_EMAIL
+    value: "admin@rafraum.com"
+    availability:
+      - RUNTIME
