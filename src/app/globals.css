@@ -111,13 +111,14 @@ body {
 }
 
 /* Chrome/Safari 자동완성의 밝은 배경이 다크 테마 입력칸을 덮어쓰지 않게 한다.
-   Chrome은 자동완성 배경에 UA !important를 사용하므로 box-shadow로 덮지 않는다.
-   배경을 글자 영역으로만 clip하면 기존 입력칸 배경/테두리가 그대로 보인다. */
+   자동완성 배경을 투명하게 만들면 카드 표면색이 비쳐 입력칸이 흐려 보이므로,
+   일반 입력칸과 같은 --bg 색을 inset shadow로 명시한다. */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
+  border-color: var(--border) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--bg) inset !important;
   -webkit-text-fill-color: var(--bold-text) !important;
   caret-color: var(--bold-text) !important;
 }
