@@ -1,13 +1,14 @@
 import { randomBytes } from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
+import { addMonthsClamped } from "@/lib/util/dateMath";
 import {
   REFERRAL_SIGNUP_FRIEND_CAP,
   REFERRAL_SIGNUP_FREE_PASSES,
   SIGNUP_FREE_PASS_BASIS,
   SIGNUP_FREE_PASSES,
   SPREADS,
-  countAllowances,
+  PENDING_REWARD_CLAIM_WINDOW_MONTHS,
   signupFreePassAllowances,
 } from "@/lib/tarot/pricing";
 
@@ -66,6 +67,8 @@ export async function grantSignupFreePass(uid: string): Promise<void> {
       freePasses: SIGNUP_FREE_PASSES,
       basis: SIGNUP_FREE_PASS_BASIS,
       remaining: 1,
+      combo: "any",
+      status: "unused",
       allowances: signupFreePassAllowances(),
       createdAt: new Date().toISOString(),
       expiresAt: null,
@@ -73,7 +76,10 @@ export async function grantSignupFreePass(uid: string): Promise<void> {
   });
 }
 
-/** 신규 가입 리워드. 추천인과 친구 모두에게 원카드 기준 무료 이용권 5회를 멱등 발급한다. */
+/** 신규 가입 리워드. 추천인과 친구 모두에게 원카드 기준 무료 이용권 5회 상당을 멱등 지급한다.
+ * 2026-09-18부터 즉시 지급이 아니라 "받은 이용권 내역"에서 조합을 골라 수령하는 대기(pending)
+ * 레코드로 바뀌었다(지급일로부터 1개월 내 미수령 시 소멸) — 월간 결제 리워드(functions/src/index.ts의
+ * monthlyReferralPayout)와 동일한 pendingRewards 스키마를 공유한다. */
 export async function grantSignupReferralReward(referrerUid: string, newUid: string): Promise<void> {
   if (referrerUid === newUid) return;
   const referrerRef = adminDb.collection("users").doc(referrerUid);
@@ -87,23 +93,25 @@ export async function grantSignupReferralReward(referrerUid: string, newUid: str
     if (invitedFriends >= REFERRAL_SIGNUP_FRIEND_CAP) return;
 
     const now = new Date().toISOString();
+    const claimWindowExpiresAt = addMonthsClamped(now, PENDING_REWARD_CLAIM_WINDOW_MONTHS);
     const basis = REFERRAL_SIGNUP_FREE_PASSES * SPREADS.one.cost;
-    const referrerPassRef = referrerRef.collection("countPasses").doc();
+    const referrerRewardRef = referrerRef.collection("pendingRewards").doc();
     const friendRef = adminDb.collection("users").doc(newUid);
-    const friendPassRef = friendRef.collection("countPasses").doc();
-    const pass = (recipient: "referrer" | "friend") => ({
-      source: "referral-signup",
+    const friendRewardRef = friendRef.collection("pendingRewards").doc();
+    const pendingReward = (recipient: "referrer" | "friend") => ({
+      source: "referral-signup" as const,
       recipient,
+      freePasses: REFERRAL_SIGNUP_FREE_PASSES,
       basis,
-      remaining: 1,
-      allowances: countAllowances(basis),
+      status: "pending" as const,
       createdAt: now,
-      expiresAt: null,
+      claimWindowExpiresAt,
+      claimedAt: null,
     });
 
     tx.set(grantRef, { freePasses: REFERRAL_SIGNUP_FREE_PASSES, createdAt: now });
-    tx.set(referrerPassRef, pass("referrer"));
-    tx.set(friendPassRef, pass("friend"));
+    tx.set(referrerRewardRef, pendingReward("referrer"));
+    tx.set(friendRewardRef, pendingReward("friend"));
     tx.set(referrerRef, { referralSignupFriends: FieldValue.increment(1) }, { merge: true });
   });
 }

@@ -2,7 +2,7 @@
 // 필수로 요구한다(2026-09-15, 실제 테스트+공식 문서로 확인 — opi/ko/integration/pg/v2/
 // inicis-v2.md). 타연은 카카오 로그인에 전화번호 동의항목이 없고 이메일도 동의 안 한 계정이면
 // 비어있을 수 있어서, 없는 값은 형식만 유효한 자리표시 값으로 대체한다 — 이니시스는 형식만
-// 검증하고 실제로 메일/문자를 보내지 않는다. /charge, /billing 양쪽에서 공유해서 쓴다.
+// 검증하고 실제로 메일/문자를 보내지 않는다.
 export function buildPortoneCustomer(params: {
   uid: string;
   email: string | null;

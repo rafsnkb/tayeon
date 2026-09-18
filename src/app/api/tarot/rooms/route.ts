@@ -24,18 +24,34 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ rooms });
 }
 
+const ROOM_LIMIT = 100;
+
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
   if (!uid) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const { confirmDeleteOldest } = (await req.json().catch(() => ({}))) as { confirmDeleteOldest?: boolean };
+
+  const roomsRef = adminDb.collection("users").doc(uid).collection("rooms");
+  const countSnap = await roomsRef.count().get();
+  if (countSnap.data().count >= ROOM_LIMIT) {
+    if (!confirmDeleteOldest) {
+      return NextResponse.json(
+        { error: "대화방 갯수가 한도에 도달했습니다.", code: "ROOM_LIMIT" },
+        { status: 409 }
+      );
+    }
+    const oldestSnap = await roomsRef.orderBy("createdAt", "asc").limit(1).get();
+    const oldest = oldestSnap.docs[0];
+    if (oldest) {
+      await adminDb.recursiveDelete(oldest.ref);
+    }
+  }
+
   const now = new Date().toISOString();
-  const roomRef = await adminDb
-    .collection("users")
-    .doc(uid)
-    .collection("rooms")
-    .add({ title: "새 대화", createdAt: now, updatedAt: now });
+  const roomRef = await roomsRef.add({ title: "새 대화", createdAt: now, updatedAt: now });
 
   return NextResponse.json({ id: roomRef.id, title: "새 대화", updatedAt: now });
 }

@@ -15,25 +15,33 @@ import {
 } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
-import type { CountPassBalance } from "@/lib/tarot/pricing";
+import type { ComboKey, CountPassBalance } from "@/lib/tarot/pricing";
 
 export type Room = { id: string; title: string; updatedAt: string };
 export type ActiveTimePass = {
   passId: string;
   minutes: number;
-  includesOptions: boolean;
+  combo: ComboKey;
   startedAt: string;
   expiresAt: string;
 };
-export type TimePass = { id: string; minutes: number; includesOptions: boolean };
+export type TimePass = { id: string; minutes: number; combo: ComboKey };
 export type CountPass = CountPassBalance & {
   id: string;
   productId?: string;
   source?: "purchase" | "admin-grant" | "signup-free" | "referral-signup" | "bonus-reward" | "referral-payout";
-  featureScope?: "tarot-only" | "all-features";
   reason?: string | null;
   freePasses?: number;
   createdAt: string;
+};
+export type ActiveCountPass = {
+  passId: string;
+  combo: ComboKey | "any";
+  basis: number;
+  remaining: number;
+  expiresAt: string | null;
+  source?: string;
+  productId?: string;
 };
 
 type RoomsContextValue = {
@@ -44,6 +52,7 @@ type RoomsContextValue = {
   coins: number | null;
   countPasses: CountPass[];
   setCountPasses: Dispatch<SetStateAction<CountPass[]>>;
+  activeCountPass: ActiveCountPass | null;
   setCoins: Dispatch<SetStateAction<number | null>>;
   hasBirthInfo: boolean;
   myTimeUnknown: boolean;
@@ -58,7 +67,7 @@ type RoomsContextValue = {
   selectRoom: (roomId: string) => void;
   loaded: boolean;
   authChecked: boolean;
-  createRoom: () => Promise<Room | null>;
+  createRoom: (force?: boolean) => Promise<Room | null>;
   deleteRoom: (roomId: string) => Promise<void>;
   renameRoom: (roomId: string, title: string) => Promise<void>;
   setRoomTitleLocal: (roomId: string, title: string) => void;
@@ -77,6 +86,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
   const [coins, setCoins] = useState<number | null>(null);
   const [countPasses, setCountPasses] = useState<CountPass[]>([]);
+  const [activeCountPass, setActiveCountPass] = useState<ActiveCountPass | null>(null);
   const [hasBirthInfo, setHasBirthInfo] = useState(false);
   const [myTimeUnknown, setMyTimeUnknown] = useState(false);
   const [hasPartner, setHasPartner] = useState(false);
@@ -121,6 +131,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setEmail(data.email ?? null);
     setCoins(data.coins);
     setCountPasses(data.countPasses ?? []);
+    setActiveCountPass(data.activeCountPass ?? null);
     setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
     setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
     setHasPartner(Boolean(data.partner?.nickname));
@@ -152,6 +163,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setEmail(data.email ?? null);
         setCoins(data.coins);
         setCountPasses(data.countPasses ?? []);
+        setActiveCountPass(data.activeCountPass ?? null);
         setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
         setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
         setHasPartner(Boolean(data.partner?.nickname));
@@ -201,13 +213,19 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     };
   }, [user, refreshMe]);
 
-  const createRoom = useCallback(async (): Promise<Room | null> => {
+  const createRoom = useCallback(async (force = false): Promise<Room | null> => {
     if (!user) return null;
     const idToken = await user.getIdToken();
     const res = await fetch("/api/tarot/rooms", {
       method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmDeleteOldest: force }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.code === "ROOM_LIMIT") throw new Error("ROOM_LIMIT");
+      throw new Error(data.error ?? "대화방을 만들지 못했어요.");
+    }
     const created: Room = await res.json();
     setRooms((prev) => [created, ...prev]);
     setActiveRoomId(created.id);
@@ -264,6 +282,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         coins,
         countPasses,
         setCountPasses,
+        activeCountPass,
         setCoins,
         hasBirthInfo,
         myTimeUnknown,

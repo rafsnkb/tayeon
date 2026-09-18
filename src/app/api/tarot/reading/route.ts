@@ -20,16 +20,16 @@ import {
   SAJU_ADD_ON_COST,
   ZIWEI_ADD_ON_COST,
   COMPATIBILITY_ADD_ON_COST,
-  availableCount,
-  remainingAfterUse,
+  COMBOS,
   type CountPassBalance,
+  type ComboKey,
 } from "@/lib/tarot/pricing";
+import { pickActiveCountPass, deriveIncludeOptions, chargeActiveCountPass } from "@/lib/tarot/activeCountPass";
 import { DEFAULT_TONE, isToneKey, type ToneKey } from "@/lib/tarot/tone";
 import { calculateSaju, buildSajuPromptBlock, type SajuResult } from "@/lib/saju/calculate";
 import { calculateZiwei, buildZiweiPromptBlock, type ZiweiResult } from "@/lib/ziwei/calculate";
 import { isValidBirthInfo, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
-import { attemptAutoCountPurchase } from "@/lib/payment/autoCountPurchase";
 import type { DocumentReference } from "firebase-admin/firestore";
 
 // 궁합 옵션이 꺼진 채 상대방 관계를 묻는 질문을 서버가 결정적으로 차단할 때(LLM 호출 없음) 쓰는
@@ -86,15 +86,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { question, spread, roomId, includeSaju, includeZiwei, includeCompatibility } =
-    (await req.json()) as {
-      question?: string;
-      spread?: string;
-      roomId?: string;
-      includeSaju?: boolean;
-      includeZiwei?: boolean;
-      includeCompatibility?: boolean;
-    };
+  const { question, spread, roomId, includeCompatibility } = (await req.json()) as {
+    question?: string;
+    spread?: string;
+    roomId?: string;
+    includeCompatibility?: boolean;
+  };
 
   if (!question || !question.trim()) {
     return NextResponse.json({ error: "질문을 입력해주세요." }, { status: 400 });
@@ -128,16 +125,26 @@ export async function POST(req: NextRequest) {
     const userData = userSnap.data();
 
     if (userData?.suspended) {
-      return NextResponse.json(
-        { error: "이용이 제한된 계정이에요. 고객센터로 문의해주세요." },
-        { status: 403 }
-      );
+      const suspendedUntil = Date.parse(userData.suspendedUntil ?? "");
+      if (Number.isFinite(suspendedUntil) && suspendedUntil <= Date.now()) {
+        // 기간 정지는 첫 보호 대상 요청에서 원자적으로 정상 상태로 되돌린다.
+        await userRef.update({ suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
+      } else {
+        return NextResponse.json(
+          {
+            error: "이용이 제한된 계정이에요. 고객센터로 문의해주세요.",
+            code: "SUSPENDED",
+            reason: userData.suspendedReason ?? null,
+            suspendedUntil: userData.suspendedUntil ?? null,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const balance: number = userData?.coins ?? 0;
     const countPassesSnap = await userRef.collection("countPasses").get();
-    let countPasses = countPassesSnap.docs
-      .sort((a, b) => String(a.data().createdAt).localeCompare(String(b.data().createdAt)));
+    const countPasses = countPassesSnap.docs;
     const rawTone = userData?.tone;
     const tone = isToneKey(rawTone) ? rawTone : DEFAULT_TONE;
     const useReversedCards: boolean = userData?.useReversedCards ?? true;
@@ -147,15 +154,35 @@ export async function POST(req: NextRequest) {
     const partner = isValidPartner(rawPartner) ? rawPartner : null;
 
     const activeTimePass = userData?.activeTimePass as
-      | { minutes: number; includesOptions: boolean; expiresAt: string }
+      | { minutes: number; combo?: ComboKey; includesOptions?: boolean; expiresAt: string }
       | null
       | undefined;
     const timePassActive = Boolean(
       activeTimePass && new Date(activeTimePass.expiresAt).getTime() > Date.now()
     );
-    // 15분(타로만) 티어는 스프레드 기본요금만 커버, 30/60분(전부 포함) 티어는 옵션 추가금까지 커버.
+    // 시간제 이용권은 2026-09-19부터 횟수제와 동일하게 조합(combo)으로 고정된다 — 레거시 문서
+    // (개편 이전 구매분)는 combo가 없고 includesOptions만 있어 그 값으로 폴백한다.
+    const timePassCombo: ComboKey | undefined =
+      activeTimePass?.combo ?? (activeTimePass ? (activeTimePass.includesOptions ? "tarot-saju-ziwei" : "tarot") : undefined);
     const spreadCovered = timePassActive;
-    const optionsCovered = timePassActive && Boolean(activeTimePass?.includesOptions);
+
+    // 채팅창에서 사주/자미두수를 더 이상 사용자가 고르지 않는다(2026-09-18) — 시간제 이용권이면
+    // optionsCovered 여부로, 아니면 활성 이용권(우선순위 큐로 고른 후보)의 고정 조합으로 결정한다.
+    // 이용권 자체가 없으면 이후 로직이 의미가 없으므로 여기서 바로 402로 막는다.
+    const activePointerPassId = userData?.activeCountPass?.passId as string | undefined;
+    const chosenPass = spreadCovered ? undefined : pickActiveCountPass(countPasses, activePointerPassId);
+    if (!spreadCovered && !chosenPass) {
+      return NextResponse.json(
+        { error: "이용 가능한 횟수가 없어요. 이용권을 구입해주세요." },
+        { status: 402 }
+      );
+    }
+    const { includeSaju, includeZiwei } = spreadCovered
+      ? {
+          includeSaju: timePassCombo ? COMBOS[timePassCombo].saju : false,
+          includeZiwei: timePassCombo ? COMBOS[timePassCombo].ziwei : false,
+        }
+      : deriveIncludeOptions(chosenPass?.data() as CountPassBalance | undefined, birthInfo);
 
     if ((includeSaju || includeZiwei || includeCompatibility) && !birthInfo) {
       return NextResponse.json(
@@ -239,54 +266,6 @@ export async function POST(req: NextRequest) {
         guidanceOnly: true,
         flaggedForAbuse: false,
       });
-    }
-
-    const legacyCost =
-      (spreadCovered ? 0 : { one: 200, three: 250, dual: 300, celtic: 400 }[spread]) +
-      (includeSaju ? (optionsCovered ? 0 : SAJU_ADD_ON_COST) : 0) +
-      (includeZiwei ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
-      (includeCompatibility ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0);
-
-    let chosenPass = spreadCovered ? null : countPasses.find((doc) =>
-      availableCount(
-        doc.data() as CountPassBalance,
-        spread,
-        Boolean(includeSaju),
-        Boolean(includeZiwei),
-        Boolean(includeCompatibility)
-      ) > 0
-    );
-
-    if (!spreadCovered && !chosenPass) {
-      const autoPurchase = await attemptAutoCountPurchase({ uid, userRef });
-      if (autoPurchase.kind === "purchased") {
-        const refreshedPasses = await userRef.collection("countPasses").get();
-        countPasses = refreshedPasses.docs.sort((a, b) =>
-          String(a.data().createdAt).localeCompare(String(b.data().createdAt))
-        );
-        chosenPass = countPasses.find((doc) =>
-          availableCount(
-            doc.data() as CountPassBalance,
-            spread,
-            Boolean(includeSaju),
-            Boolean(includeZiwei),
-            Boolean(includeCompatibility)
-          ) > 0
-        );
-      }
-      // 추천 질문 버튼도 이 API를 거치므로, 여기서 막아야 직접 입력과 동일하게 이용권 소진을
-      // 보장할 수 있다. 예전 코인 잔액이 남아 있어도 신규 리딩에는 우회 사용하지 않는다.
-      if (!chosenPass) {
-        return NextResponse.json(
-          {
-            error:
-              autoPurchase.kind === "failed"
-                ? autoPurchase.message
-                : "이용 가능한 횟수가 없어요. 이용권을 구입해주세요.",
-          },
-          { status: 402 }
-        );
-      }
     }
 
     const drawnCards = drawCards(SPREADS[spread].cardCount, useReversedCards);
@@ -386,6 +365,7 @@ export async function POST(req: NextRequest) {
         compatibilityBlock,
         recentlyUsedCards,
         today,
+        isFollowUp: history.length > 0,
       });
 
       async function generate() {
@@ -399,6 +379,20 @@ export async function POST(req: NextRequest) {
             { type: "text", text: volatile },
           ],
           messages: [...history, { role: "user", content: safeQuestion }],
+        });
+
+        // 운영 분석 전용 원장: 질문 원문·응답은 저장하지 않고 토큰/모델/익명 속성만 남긴다.
+        const nowForUsage = new Date();
+        const kstParts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", weekday: "short", hour: "2-digit", hourCycle: "h23" }).formatToParts(nowForUsage);
+        const part = (type: string) => kstParts.find((item) => item.type === type)?.value ?? "";
+        const usageEventRef = await adminDb.collection("apiUsageEvents").add({
+          createdAt: nowForUsage.toISOString(), model: READING_MODEL,
+          inputTokens: response.usage.input_tokens ?? 0, outputTokens: response.usage.output_tokens ?? 0,
+          cacheReadInputTokens: response.usage.cache_read_input_tokens ?? 0,
+          cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
+          weekday: part("weekday"), hour: Number(part("hour")),
+          gender: userData?.birthInfo?.gender ?? "unknown",
+          birthYear: typeof userData?.birthInfo?.birthDate === "string" ? Number(userData.birthInfo.birthDate.slice(0, 4)) : null,
         });
 
         const textBlock = response.content.find((block) => block.type === "text");
@@ -516,6 +510,7 @@ export async function POST(req: NextRequest) {
             ? (rawTopic as (typeof TOPIC_CATEGORIES)[number])
             : "기타"
           : null;
+        await usageEventRef.update({ topic });
         const suggestions =
           cardsOk && suggestionsIdx !== -1
             ? afterTopic
@@ -572,9 +567,9 @@ export async function POST(req: NextRequest) {
 
       const chargedCost = cardsOk && !chosenPass
         ? (spreadCovered ? 0 : { one: 200, three: 250, dual: 300, celtic: 400 }[spread]) +
-          (sajuCharged ? (optionsCovered ? 0 : SAJU_ADD_ON_COST) : 0) +
-          (ziweiCharged ? (optionsCovered ? 0 : ZIWEI_ADD_ON_COST) : 0) +
-          (compatibilityCharged ? (optionsCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0)
+          (sajuCharged ? (spreadCovered && timePassCombo && COMBOS[timePassCombo].saju ? 0 : SAJU_ADD_ON_COST) : 0) +
+          (ziweiCharged ? (spreadCovered && timePassCombo && COMBOS[timePassCombo].ziwei ? 0 : ZIWEI_ADD_ON_COST) : 0) +
+          (compatibilityCharged ? (spreadCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0)
         : 0;
 
       const cards = cardsOk
@@ -590,17 +585,9 @@ export async function POST(req: NextRequest) {
 
       let chargedPassId: string | null = null;
       if (cardsOk && chosenPass) {
-        await adminDb.runTransaction(async (tx) => {
-          const snap = await tx.get(chosenPass.ref);
-          const pass = snap.data() as CountPassBalance | undefined;
-          if (!pass || availableCount(pass, spread, sajuCharged, ziweiCharged, Boolean(includeCompatibility)) < 1) {
-            throw new Error("COUNT_PASS_UNAVAILABLE");
-          }
-          tx.update(chosenPass.ref, {
-            remaining: remainingAfterUse(pass, spread, sajuCharged, ziweiCharged),
-            usedCount: FieldValue.increment(1),
-          });
-        });
+        await adminDb.runTransaction((tx) =>
+          chargeActiveCountPass(tx, userRef, chosenPass.ref, spread, sajuCharged, ziweiCharged)
+        );
         chargedPassId = chosenPass.id;
       } else if (chargedCost > 0) {
         await userRef.update({ coins: FieldValue.increment(-chargedCost) });

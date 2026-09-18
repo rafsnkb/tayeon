@@ -4,14 +4,16 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRooms, type CountPass, type TimePass } from "@/lib/tarot/RoomsContext";
-import { COUNT_PACKAGES, availableCount } from "@/lib/tarot/pricing";
-import { TIER_TEXTURE, TIME_PASS_TIER } from "@/lib/tarot/timePassTiers";
+import { COUNT_PACKAGES, availableCount, COMBOS, countPassDisplayName, type ComboKey } from "@/lib/tarot/pricing";
+import { TIER_TEXTURE, TIME_COMBO_TIER } from "@/lib/tarot/timePassTiers";
 import {
   SPREADS,
   type SpreadKey,
 } from "@/lib/tarot/pricing";
 import { openMenu } from "@/lib/ui/menuBus";
 import ConfirmModal from "@/components/ConfirmModal";
+import RoomLimitModal from "@/components/RoomLimitModal";
+import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
 import { BrandBi } from "@/components/BrandBi";
 import { CompanyInfoBar } from "@/components/CompanyInfoBar";
 import {
@@ -19,8 +21,6 @@ import {
   SendIcon,
   RoomInfoIcon,
   NewChatIcon,
-  SajuIcon,
-  ZiweiIcon,
   CompatibilityIcon,
   CloseIcon,
   PencilIcon,
@@ -49,15 +49,11 @@ const INPUT_MODE_SPREAD_LABEL: Record<SpreadKey, string> = {
   celtic: "켈틱 크로스",
 };
 
-function countPassName(pass: { productId?: string; source?: string }): string {
-  const purchased = COUNT_PACKAGES.find((pkg) => pkg.id === pass.productId);
-  if (purchased) return `${purchased.name} 이용권`;
-  if (pass.source === "signup-free") return "첫 가입 체험 이용권";
-  if (pass.source === "referral-signup") return "친구 초대 이용권";
-  if (pass.source === "bonus-reward") return "보너스 리워드 이용권";
-  if (pass.source === "referral-payout") return "친구 결제 리워드 이용권";
-  if (pass.source === "admin-grant") return "관리자 지급 이용권";
-  return "이용권";
+// 활성 이용권 이름 + 조합 표기 — "스탠다드 이용권(타로+사주+자미두수 전용)" 형식(combo:"any"인
+// 가입 무료체험은 특정 조합에 묶이지 않으므로 괄호 생략).
+function countPassFullName(pass: { productId?: string; source?: string; combo: ComboKey | "any" }): string {
+  const base = countPassDisplayName(pass);
+  return pass.combo === "any" ? base : `${base}(${COMBOS[pass.combo].label} 전용)`;
 }
 
 const COUNT_PASS_CARD_TIERS = [
@@ -87,7 +83,7 @@ function CountPassUsageModal({ pass, onClose }: { pass: CountPass; onClose: () =
         <div className="relative h-20 overflow-hidden rounded-[28px] border bg-cover bg-center p-4" style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}>
           <div className="absolute inset-0 bg-[#19191d]/70" />
           <div className="relative">
-            <p className="text-xl font-bold text-white">{countPassName(pass)}</p>
+            <p className="text-xl font-bold text-white">{countPassFullName(pass)}</p>
             <span className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-sm font-semibold" style={{ color: tier.text, backgroundColor: tier.tagBg }}>
               {product?.bonus ?? "무료 이용권"}
             </span>
@@ -285,7 +281,7 @@ function WelcomePopup({ onClose }: { onClose: () => void }) {
         <ul className="list-disc pl-5 text-sm text-text">
           <li>타연은 오락 목적의 서비스이며, 의학적·법적·재정적 조언을 대체하지 않습니다.</li>
           <li>만 14세 미만은 이용이 제한됩니다.</li>
-          <li>횟수제 이용권은 구입일부터 6개월 동안 사용할 수 있어요.</li>
+          <li>횟수제ㆍ시간제 이용권은 구입일부터 1년 동안 사용할 수 있어요.</li>
           <li>
             자세한 내용은{" "}
             <a href="/terms" target="_blank" className="text-point underline">
@@ -300,7 +296,7 @@ function WelcomePopup({ onClose }: { onClose: () => void }) {
         </ul>
         <button
           onClick={onClose}
-          className="mt-2 rounded-full bg-cta-fill px-5 py-2 text-cta-text"
+          className="mt-2 h-12 rounded-full bg-cta-fill px-5 text-base font-semibold text-cta-text"
         >
           확인했어요
         </button>
@@ -322,7 +318,7 @@ function TimePassCard({ pass, actionLabel, onAction, busy }: {
   onAction?: () => void;
   busy?: boolean;
 }) {
-  const tier = TIME_PASS_TIER[pass.minutes] ?? TIME_PASS_TIER[15];
+  const tier = TIME_COMBO_TIER[pass.combo] ?? TIME_COMBO_TIER.tarot;
   return (
     <div
       className="relative flex h-20 items-center gap-2 overflow-hidden rounded-[32px] border bg-cover bg-center px-4"
@@ -330,12 +326,12 @@ function TimePassCard({ pass, actionLabel, onAction, busy }: {
     >
       <div className="absolute inset-0 bg-[#19191d]/70" />
       <div className="relative flex flex-1 flex-col gap-1">
-        <span className="text-2xl font-bold text-white">{pass.minutes}분 무제한</span>
+        <span className="text-2xl font-bold text-white">{pass.minutes}분 {COMBOS[pass.combo].label}</span>
         <span
           className="w-fit rounded-full px-2 py-0.5 text-sm font-semibold"
           style={{ backgroundColor: tier.tagBg, color: tier.tagText }}
         >
-          {pass.includesOptions ? "타로+사주+자미두수+궁합 무제한" : "타로만 무제한"}
+          {COMBOS[pass.combo].label} 무제한
         </span>
       </div>
       {actionLabel && onAction && (
@@ -432,7 +428,7 @@ function HeldTimepassUseModal({
           type="button"
           onClick={onConfirm}
           disabled={busy}
-          className="h-12 w-full rounded-2xl bg-point text-lg font-semibold text-white disabled:opacity-60"
+          className="h-12 w-full rounded-2xl bg-point text-base font-semibold text-white disabled:opacity-60"
         >
           사용하기
         </button>
@@ -464,7 +460,7 @@ function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onG
         <button
           type="button"
           onClick={onGoCharge}
-          className="h-12 w-full rounded-2xl bg-point text-lg font-semibold text-white"
+          className="h-12 w-full rounded-2xl bg-point text-base font-semibold text-white"
         >
           구입하러 가기
         </button>
@@ -501,10 +497,10 @@ function PurchaseTicketModal({
           언제든 이용권을 채워주세요.
         </p>
         <div className="mt-6 flex gap-3">
-          <button type="button" onClick={onInvite} className="h-12 flex-1 rounded-full bg-cta-fill text-sm font-bold text-cta-text">
+          <button type="button" onClick={onInvite} className="h-12 flex-1 rounded-full bg-cta-fill text-base font-bold text-cta-text">
             친구 초대하기
           </button>
-          <button type="button" onClick={onPurchase} className="h-12 flex-1 rounded-full bg-point text-sm font-bold text-white">
+          <button type="button" onClick={onPurchase} className="h-12 flex-1 rounded-full bg-point text-base font-bold text-white">
             이용권 구입하기
           </button>
         </div>
@@ -576,12 +572,18 @@ function SpreadSelectSheet({
   remainingBySpread,
   timePassActive,
   onSelect,
+  includeCompatibility,
+  hasPartner,
+  onToggleCompatibility,
   onClose,
 }: {
   spread: SpreadKey;
   remainingBySpread: Record<SpreadKey, number>;
   timePassActive: boolean;
   onSelect: (key: SpreadKey) => void;
+  includeCompatibility: boolean;
+  hasPartner: boolean;
+  onToggleCompatibility: () => void;
   onClose: () => void;
 }) {
   return (
@@ -640,102 +642,6 @@ function SpreadSelectSheet({
             );
           })}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ModeSettingsSheet({
-  spread,
-  includeSaju,
-  includeZiwei,
-  includeCompatibility,
-  hasBirthInfo,
-  myTimeUnknown,
-  hasPartner,
-  onSelectSpread,
-  onToggleSaju,
-  onToggleZiwei,
-  onToggleCompatibility,
-  onClose,
-}: {
-  spread: SpreadKey;
-  includeSaju: boolean;
-  includeZiwei: boolean;
-  includeCompatibility: boolean;
-  hasBirthInfo: boolean;
-  myTimeUnknown: boolean;
-  hasPartner: boolean;
-  onSelectSpread: (spread: SpreadKey) => void;
-  onToggleSaju: () => void;
-  onToggleZiwei: () => void;
-  onToggleCompatibility: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
-      <div
-        className="max-h-full w-full overflow-y-auto rounded-t-[28px] border border-border bg-topbar p-4 xl:mx-auto xl:max-w-4xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-2 flex items-center gap-3 p-1">
-          <div className="w-5" />
-          <div className="flex-1 text-center">
-            <p className="text-lg font-bold text-bold-text">스프레드 선택</p>
-            <p className="text-sm font-semibold text-icon-muted">원하는 스프레드를 선택할 수 있어요</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="rounded-2xl bg-[#f7f4fb] dark:bg-chip-fill">
-          {(Object.keys(SPREADS) as SpreadKey[]).map((key, index) => {
-            const Icon = SPREAD_ICONS[key];
-            const selected = key === spread;
-            return (
-              <div key={key}>
-                {index > 0 && <div className="mx-2 h-px bg-border" />}
-                <button type="button" onClick={() => onSelectSpread(key)} className="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-lg font-semibold text-bold-text">{INPUT_MODE_SPREAD_LABEL[key]} 스프레드</span>
-                    <span className="block text-sm font-semibold text-icon-muted">{SPREAD_DESCRIPTIONS[key]}</span>
-                  </span>
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${selected ? "bg-point" : "bg-[#868b9a] dark:bg-icon-muted"}`}>
-                    <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-white" : "bg-[#dcdee3] dark:bg-transparent"}`} />
-                  </span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <section className="mt-4">
-          <p className="text-center text-lg font-bold text-bold-text">사주ㆍ자미두수 해석 추가</p>
-          <p className="text-center text-sm font-semibold text-icon-muted">타로에 사주ㆍ자미두수 정보를 추가해서 심층 분석</p>
-          <p className="text-center text-sm font-semibold text-urgent [word-break:keep-all]">사주를 추가하려면 생년월일 정보가, 자미두수를 추가하려면 태어난 시간 정보가 필요합니다</p>
-          <div className="mt-2 rounded-2xl bg-[#f7f4fb] dark:bg-chip-fill">
-            <div className="flex items-center gap-3 px-4 py-2">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text"><SajuIcon className="h-5 w-5" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-semibold text-bold-text">사주 해석 추가</span>
-                <span className="block text-sm font-semibold text-icon-muted">타로+사주 조합으로 심층 분석</span>
-              </span>
-              <Switch checked={includeSaju} onChange={onToggleSaju} disabled={!hasBirthInfo} />
-            </div>
-            <div className="mx-2 h-px bg-border" />
-            <div className="flex items-center gap-3 px-4 py-2">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[#79678f] dark:text-bold-text"><ZiweiIcon className="h-5 w-5" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-lg font-semibold text-bold-text">자미두수 해석 추가</span>
-                <span className="block text-sm font-semibold text-icon-muted">타로+자미두수 조합으로 심층 분석</span>
-              </span>
-              <Switch checked={includeZiwei} onChange={onToggleZiwei} disabled={!hasBirthInfo || myTimeUnknown} />
-            </div>
-          </div>
-        </section>
 
         <section className="mt-3">
           <p className="text-center text-lg font-bold text-bold-text">궁합 해석 추가</p>
@@ -748,7 +654,7 @@ function ModeSettingsSheet({
                 <span className="block text-lg font-semibold text-bold-text">궁합 해석 추가</span>
                 <span className="block text-sm font-semibold text-icon-muted">상대방과의 궁합을 더 자세하게 분석</span>
               </span>
-              <Switch checked={includeCompatibility} onChange={onToggleCompatibility} disabled={!hasBirthInfo || !hasPartner} />
+              <Switch checked={includeCompatibility} onChange={onToggleCompatibility} disabled={!hasPartner} />
             </div>
           </div>
         </section>
@@ -757,8 +663,9 @@ function ModeSettingsSheet({
   );
 }
 
-/** 피그마 "Screen / SpreadSelect"(사주·자미두수 추가 시트, 궁합 추가 시트)가 공용으로 쓰는
- * on/off 스위치 — 기존 코드베이스엔 세그먼트 버튼(ToggleGroup)만 있고 iOS류 스위치가 없어서 신설. */
+/** 피그마 "Screen / SpreadSelect"(궁합 추가 시트)가 쓰던 on/off 스위치 — 기존 코드베이스엔
+ * 세그먼트 버튼(ToggleGroup)만 있고 iOS류 스위치가 없어서 신설. 스프레드 선택 시트 하단의 궁합
+ * 스위치가 그대로 재사용한다(2026-09-18, 사주/자미두수는 이용권 조합 고정으로 별도 시트 제거됨). */
 function Switch({
   checked,
   onChange,
@@ -788,131 +695,6 @@ function Switch({
   );
 }
 
-/** 피그마 "Screen / SpreadSelect"(2번째 프레임) — 사주 아이콘/자미두수 아이콘을 누르면 곧바로
- * 토글되는 대신, 설명+비용+스위치가 있는 바텀시트를 먼저 보여준다. */
-function SajuZiweiSheet({
-  includeSaju,
-  includeZiwei,
-  onToggleSaju,
-  onToggleZiwei,
-  ziweiDisabled,
-  onClose,
-}: {
-  includeSaju: boolean;
-  includeZiwei: boolean;
-  onToggleSaju: () => void;
-  onToggleZiwei: () => void;
-  ziweiDisabled: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
-      <div
-        className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-1 flex items-center gap-3 p-1">
-          <div className="w-5" />
-          <div className="flex-1 text-center">
-            <p className="text-lg font-bold leading-tight text-bold-text">사주ㆍ자미두수 해석 추가</p>
-            <p className="text-sm font-semibold leading-tight text-icon-muted">
-              타로에 사주ㆍ자미두수 정보를 추가해서 심층 분석
-            </p>
-            <p className="text-sm font-semibold leading-tight text-urgent [word-break:keep-all]">
-              사주를 추가하려면 생년월일 정보가, 자미두수를 추가하려면 태어난 시간 정보가 필요합니다
-            </p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex flex-col rounded-2xl bg-border/40">
-          <div className="flex items-center gap-3 rounded-lg px-4 py-2">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
-              <SajuIcon className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1">
-                <span className="text-base font-semibold text-bold-text">사주 해석 추가</span>
-                <span className="text-xs font-semibold text-gold">85%</span>
-              </span>
-              <span className="block text-sm font-semibold text-icon-muted">타로+사주 조합으로 심층 분석</span>
-            </span>
-            <Switch checked={includeSaju} onChange={onToggleSaju} />
-          </div>
-          <div className="mx-2 h-px bg-border" />
-          <div className="flex items-center gap-3 rounded-lg px-4 py-2">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
-              <ZiweiIcon className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1">
-                <span className="text-base font-semibold text-bold-text">자미두수 해석 추가</span>
-                <span className="text-xs font-semibold text-gold">75%</span>
-              </span>
-              <span className="block text-sm font-semibold text-icon-muted">타로+자미두수 조합으로 심층 분석</span>
-            </span>
-            <Switch checked={includeZiwei} onChange={onToggleZiwei} disabled={ziweiDisabled} />
-          </div>
-        </div>
-        <p className="mt-2 text-center text-xs text-icon-muted">사주와 자미두수를 모두 켜면 기본 횟수의 50%가 적용돼요.</p>
-      </div>
-    </div>
-  );
-}
-
-/** 피그마 "Screen / SpreadSelect"(3번째 프레임) — 궁합 아이콘도 위 사주·자미두수 시트와 같은
- * 패턴으로 설명+비용+스위치 바텀시트를 거친다. */
-function CompatibilitySheet({
-  includeCompatibility,
-  onToggle,
-  onClose,
-}: {
-  includeCompatibility: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
-      <div
-        className="w-full xl:mx-auto xl:max-w-4xl rounded-t-[28px] border border-border bg-topbar p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-1 flex items-center gap-3 p-1">
-          <div className="w-5" />
-          <div className="flex-1 text-center">
-            <p className="text-lg font-bold leading-tight text-bold-text">궁합 해석 추가</p>
-            <p className="text-sm font-semibold leading-tight text-icon-muted">
-              타로와 사주ㆍ자미두수 정보를 기반으로 궁합까지
-            </p>
-            <p className="text-xs font-semibold leading-tight text-urgent [word-break:keep-all]">
-              궁합 해석을 추가하려면 상대방 프로필 정보가 필요합니다
-            </p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex flex-col rounded-2xl bg-border/40">
-          <div className="flex items-center gap-3 rounded-lg px-4 py-2">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-bold-text">
-              <CompatibilityIcon className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1">
-                <span className="text-base font-semibold text-bold-text">궁합 해석 추가</span>
-                <span className="text-xs font-semibold text-gold">이용권 포함</span>
-              </span>
-              <span className="block text-sm font-semibold text-icon-muted">상대방과의 궁합을 더 자세하게 분석</span>
-            </span>
-            <Switch checked={includeCompatibility} onChange={onToggle} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function TarotPage() {
   return (
     <Suspense fallback={null}>
@@ -929,6 +711,7 @@ function TarotChat() {
     setCoins,
     countPasses,
     setCountPasses,
+    activeCountPass: activeCountPassInfo,
     refreshMe,
     rooms,
     activeRoomId,
@@ -941,7 +724,6 @@ function TarotChat() {
     hasBirthInfo,
     myTimeUnknown,
     hasPartner,
-    partnerTimeUnknown,
     activeTimePass,
     setActiveTimePass,
     timePasses,
@@ -953,10 +735,7 @@ function TarotChat() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "1");
   const [spread, setSpread] = useState<SpreadKey>("one");
-  const [modeSettingsOpen, setModeSettingsOpen] = useState(false);
   const [countPassUsageOpen, setCountPassUsageOpen] = useState(false);
-  const [includeSaju, setIncludeSaju] = useState(false);
-  const [includeZiwei, setIncludeZiwei] = useState(false);
   const [includeCompatibility, setIncludeCompatibility] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [greetingAnimationRoomId, setGreetingAnimationRoomId] = useState<string | null>(null);
@@ -965,8 +744,6 @@ function TarotChat() {
   const [startingPass, setStartingPass] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [spreadSheetOpen, setSpreadSheetOpen] = useState(false);
-  const [sajuZiweiSheetOpen, setSajuZiweiSheetOpen] = useState(false);
-  const [compatibilitySheetOpen, setCompatibilitySheetOpen] = useState(false);
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
   const [timePassListOpen, setTimePassListOpen] = useState(false);
   const [noTimePassModalOpen, setNoTimePassModalOpen] = useState(false);
@@ -974,6 +751,9 @@ function TarotChat() {
   const [timePassToUse, setTimePassToUse] = useState<TimePass | null>(null);
   const [renameModalRoomId, setRenameModalRoomId] = useState<string | null>(null);
   const [deleteModalRoomId, setDeleteModalRoomId] = useState<string | null>(null);
+  const [roomLimitOpen, setRoomLimitOpen] = useState(false);
+  const [roomLimitBusy, setRoomLimitBusy] = useState(false);
+  const [suspension, setSuspension] = useState<SuspensionInfo | null>(null);
   const [roomActionBusy, setRoomActionBusy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLInputElement>(null);
@@ -995,18 +775,6 @@ function TarotChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTimePass]);
 
-  // 생년월일이 없으면 사주·자미두수·궁합 모두 사용할 수 없고, 태어난 시간이 없으면
-  // 자미두수만 사용할 수 없다. 프로필 정보가 바뀐 뒤 남아 있던 선택값도 함께 정리한다.
-  useEffect(() => {
-    if (!hasBirthInfo) {
-      setIncludeSaju(false);
-      setIncludeZiwei(false);
-      setIncludeCompatibility(false);
-      return;
-    }
-    if (myTimeUnknown) setIncludeZiwei(false);
-    if (!hasPartner) setIncludeCompatibility(false);
-  }, [hasBirthInfo, myTimeUnknown, hasPartner]);
 
   // 방 목록은 RoomsContext(레이아웃 레벨)가 불러온다 — 여기서는 URL의 ?room= 파라미터가
   // 가리키는 방으로 맞춰준다(없으면 컨텍스트가 이미 골라둔 기본값을 그대로 씀).
@@ -1140,6 +908,11 @@ function TarotChat() {
       });
       const data = await res.json();
       if (!res.ok) {
+        const suspensionInfo = parseSuspensionError(data);
+        if (suspensionInfo) {
+          setSuspension(suspensionInfo);
+          return;
+        }
         alert(data.error ?? "이용권을 사용하지 못했어요.");
         return;
       }
@@ -1152,8 +925,23 @@ function TarotChat() {
   }
 
   async function handleNewRoom() {
-    const created = await createRoom();
-    if (created) router.replace(`/tarot?room=${created.id}`);
+    try {
+      const created = await createRoom();
+      if (created) router.replace(`/tarot?room=${created.id}`);
+    } catch (error) {
+      if (error instanceof Error && error.message === "ROOM_LIMIT") setRoomLimitOpen(true);
+    }
+  }
+
+  async function confirmRoomLimit() {
+    setRoomLimitBusy(true);
+    try {
+      const created = await createRoom(true);
+      setRoomLimitOpen(false);
+      if (created) router.replace(`/tarot?room=${created.id}`);
+    } finally {
+      setRoomLimitBusy(false);
+    }
   }
 
   async function confirmDeleteRoom() {
@@ -1183,30 +971,10 @@ function TarotChat() {
     const trimmed = question.trim();
     if (!trimmed || showLoading || !user || !activeRoomId) return;
 
-    if (includeZiwei && myTimeUnknown) {
+    if (includeCompatibility && !hasPartner) {
       setMessages((prev) => [
         ...prev,
-        {
-          role: "error",
-          text: "자미두수를 보려면 태어난 시간이 필요해요. 자미두수는 태어난 시간(시진)에 따라 명궁·신궁의 위치가 달라지기 때문에, 시간 정보 없이는 정확하게 계산할 수 없어요. 내 정보에서 태어난 시간을 입력해주세요.",
-        },
-      ]);
-      return;
-    }
-    if ((includeSaju || includeZiwei || includeCompatibility) && !hasBirthInfo) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "error", text: "사주, 자미두수 또는 궁합을 보려면 내 정보에서 생년월일시를 먼저 입력해주세요." },
-      ]);
-      return;
-    }
-    if (includeZiwei && includeCompatibility && partnerTimeUnknown) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "error",
-          text: "자미두수+궁합을 함께 보려면 상대방의 태어난 시간도 필요해요. 자미두수는 태어난 시간(시진)에 따라 명궁·신궁의 위치가 달라지기 때문에, 시간 정보 없이는 상대방의 자미두수를 정확하게 계산할 수 없어요. 궁합 상대 정보에서 태어난 시간을 입력해주세요.",
-        },
+        { role: "error", text: "궁합을 보려면 메뉴 > 궁합 상대 정보에서 상대방 정보를 먼저 저장해주세요." },
       ]);
       return;
     }
@@ -1229,14 +997,17 @@ function TarotChat() {
           question: trimmed,
           spread,
           roomId: activeRoomId,
-          includeSaju,
-          includeZiwei,
-          includeCompatibility,
+          includeCompatibility: effectiveIncludeCompatibility,
         }),
       });
       const data = await res.json();
 
       if (!res.ok) {
+        const suspensionInfo = parseSuspensionError(data);
+        if (suspensionInfo) {
+          setSuspension(suspensionInfo);
+          return;
+        }
         setMessages((prev) => [
           ...prev,
           { role: "error", text: data.error ?? "오류가 발생했어요." },
@@ -1306,27 +1077,37 @@ function TarotChat() {
     activeTimePass && new Date(activeTimePass.expiresAt).getTime() > now
   );
   const spreadCoveredDisplay = timePassActive;
+  // 활성 이용권(서버가 우선순위 큐로 고른 것)의 고정 조합 — combo:"any"(가입 무료체험)만 예외로
+  // 생년월일시가 입력된 만큼만 자동 포함한다(src/lib/tarot/activeCountPass.ts의 서버 로직과 동일).
+  const activeCountPass = countPasses.find((p) => p.id === activeCountPassInfo?.passId);
+  const activeCombo = activeCountPass
+    ? activeCountPass.combo === "any"
+      ? { saju: hasBirthInfo, ziwei: hasBirthInfo && !myTimeUnknown }
+      : COMBOS[activeCountPass.combo]
+    : { saju: false, ziwei: false };
   const remainingBySpread = Object.fromEntries(
     (Object.keys(SPREADS) as SpreadKey[]).map((key) => [
       key,
-      countPasses.reduce((sum, pass) => sum + availableCount(pass, key, includeSaju, includeZiwei, includeCompatibility), 0),
+      activeCountPass ? availableCount(activeCountPass, key, activeCombo.saju, activeCombo.ziwei) : 0,
     ])
   ) as Record<SpreadKey, number>;
-  const activeCountPass = [...countPasses]
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .find((pass) => availableCount(pass, spread, includeSaju, includeZiwei, includeCompatibility) > 0);
   const activeCountPassRemaining = activeCountPass
-    ? availableCount(activeCountPass, spread, includeSaju, includeZiwei, includeCompatibility)
+    ? availableCount(activeCountPass, spread, activeCombo.saju, activeCombo.ziwei)
     : 0;
   const hasUsableCountPass = countPasses.some(
-    (pass) => availableCount(pass, "one", false, false) > 0
+    (pass) =>
+      pass.remaining > 0 &&
+      pass.status !== "exhausted" &&
+      pass.status !== "expired" &&
+      (!pass.expiresAt || new Date(pass.expiresAt).getTime() > now)
   );
   const noUsableTicket = roomsLoaded && !timePassActive && timePasses.length === 0 && !hasUsableCountPass;
+  // 파트너 정보가 사라진 뒤에도 스위치 상태가 그대로 남아있을 수 있어(effect 대신 파생값으로 처리),
+  // 실제로 반영할 값은 항상 hasPartner와 함께 계산한다.
+  const effectiveIncludeCompatibility = includeCompatibility && hasPartner;
   const inputModeLabel = [
     INPUT_MODE_SPREAD_LABEL[spread],
-    includeSaju && "사주",
-    includeZiwei && "자미두수",
-    includeCompatibility && "궁합",
+    effectiveIncludeCompatibility && "궁합",
   ].filter(Boolean).join(" + ") + " 모드";
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
@@ -1338,46 +1119,16 @@ function TarotChat() {
       {countPassUsageOpen && activeCountPass && (
         <CountPassUsageModal pass={activeCountPass} onClose={() => setCountPassUsageOpen(false)} />
       )}
-      {modeSettingsOpen && (
-        <ModeSettingsSheet
-          spread={spread}
-          includeSaju={includeSaju}
-          includeZiwei={includeZiwei}
-          includeCompatibility={includeCompatibility}
-          hasBirthInfo={hasBirthInfo}
-          myTimeUnknown={myTimeUnknown}
-          hasPartner={hasPartner}
-          onSelectSpread={setSpread}
-          onToggleSaju={() => setIncludeSaju((value) => !value)}
-          onToggleZiwei={() => setIncludeZiwei((value) => !value)}
-          onToggleCompatibility={() => setIncludeCompatibility((value) => !value)}
-          onClose={() => setModeSettingsOpen(false)}
-        />
-      )}
       {spreadSheetOpen && (
         <SpreadSelectSheet
           spread={spread}
           remainingBySpread={remainingBySpread}
           timePassActive={timePassActive}
           onSelect={setSpread}
+          includeCompatibility={effectiveIncludeCompatibility}
+          hasPartner={hasPartner}
+          onToggleCompatibility={() => setIncludeCompatibility((v) => !v)}
           onClose={() => setSpreadSheetOpen(false)}
-        />
-      )}
-      {sajuZiweiSheetOpen && (
-        <SajuZiweiSheet
-          includeSaju={includeSaju}
-          includeZiwei={includeZiwei}
-          onToggleSaju={() => setIncludeSaju((v) => !v)}
-          onToggleZiwei={() => setIncludeZiwei((v) => !v)}
-          ziweiDisabled={myTimeUnknown}
-          onClose={() => setSajuZiweiSheetOpen(false)}
-        />
-      )}
-      {compatibilitySheetOpen && (
-        <CompatibilitySheet
-          includeCompatibility={includeCompatibility}
-          onToggle={() => setIncludeCompatibility((v) => !v)}
-          onClose={() => setCompatibilitySheetOpen(false)}
         />
       )}
       {timePassListOpen && (
@@ -1441,6 +1192,14 @@ function TarotChat() {
           onClose={() => setDeleteModalRoomId(null)}
         />
       )}
+      {roomLimitOpen && (
+        <RoomLimitModal
+          busy={roomLimitBusy}
+          onConfirm={confirmRoomLimit}
+          onClose={() => setRoomLimitOpen(false)}
+        />
+      )}
+      {suspension && <SuspensionModal info={suspension} onClose={() => setSuspension(null)} />}
       <div className="app-topbar-glass absolute inset-x-0 top-0 z-20 flex h-16 items-center border-b border-border">
         <div className="flex h-full w-full items-center xl:mx-auto xl:max-w-4xl xl:pl-4">
         <button
@@ -1708,7 +1467,7 @@ function TarotChat() {
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setModeSettingsOpen(true)}
+              onClick={() => setSpreadSheetOpen(true)}
               className="flex h-12 min-w-0 shrink items-center overflow-hidden rounded-full bg-chip-fill px-7 text-base font-semibold whitespace-nowrap text-white"
             >
               <span className="truncate">{inputModeLabel}</span>
@@ -1747,7 +1506,7 @@ function TarotChat() {
           {activeCountPass ? (
             <button type="button" onClick={() => setCountPassUsageOpen(true)} className="flex items-center gap-1 whitespace-nowrap text-icon-muted">
               <InfoCircleIcon className="h-4 w-4" />
-              <span>{countPassName(activeCountPass)} / 남은 횟수: {activeCountPassRemaining}회</span>
+              <span>{countPassFullName(activeCountPass)} / 남은 횟수: {activeCountPassRemaining}회</span>
             </button>
           ) : (
             <span className="whitespace-nowrap text-icon-muted">

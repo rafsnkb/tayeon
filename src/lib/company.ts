@@ -10,7 +10,7 @@ export const BUSINESS_REGISTRATION_NUMBER = "277-19-02371";
 // 아직 신고 전 — 신고 완료 후 실제 번호로 교체할 것 (doc/작업현황.md 열린 항목 참고)
 export const MAIL_ORDER_BUSINESS_NUMBER = "기입예정";
 export const COMPANY_ADDRESS = "서울특별시 송파구 거마로20길 18, 507호";
-export const SUPPORT_EMAIL = "admin@rafraum.com";
+export const SUPPORT_EMAIL = "tayeon@rafraum.com";
 export const CIVIL_COMPLAINT_OFFICER_NAME = "이성희";
 export const CIVIL_COMPLAINT_PHONE = "010-8609-0037";
 // ⚠️ PG(KG이니시스) 입점심사 요건은 "전화번호(휴대폰 불가)"를 요구하는데(help.portone.io/

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { DEFAULT_TONE } from "@/lib/tarot/tone";
+import { pickActiveCountPass } from "@/lib/tarot/activeCountPass";
+import type { ComboKey, CountPassStatus } from "@/lib/tarot/pricing";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -14,7 +16,7 @@ export async function GET(req: NextRequest) {
   const data = snap.data();
 
   let activeTimePass = data?.activeTimePass as
-    | { passId: string; minutes: number; includesOptions: boolean; startedAt: string; expiresAt: string }
+    | { passId: string; minutes: number; combo?: ComboKey; includesOptions?: boolean; startedAt: string; expiresAt: string }
     | null
     | undefined;
   if (activeTimePass && new Date(activeTimePass.expiresAt).getTime() <= Date.now()) {
@@ -32,13 +34,32 @@ export async function GET(req: NextRequest) {
     .collection("timePasses")
     .where("status", "==", "unused")
     .get();
-  const timePasses = timePassesSnap.docs.map((doc) => ({
-    id: doc.id,
-    minutes: doc.data().minutes,
-    includesOptions: doc.data().includesOptions,
-  }));
+  const timePasses = timePassesSnap.docs
+    .filter((doc) => {
+      const usableUntil = doc.data().usableUntil;
+      return typeof usableUntil !== "string" || new Date(usableUntil).getTime() > Date.now();
+    })
+    .map((doc) => ({
+      id: doc.id,
+      minutes: doc.data().minutes,
+      combo: (doc.data().combo as ComboKey | undefined) ?? (doc.data().includesOptions ? "tarot-saju-ziwei" : "tarot"),
+    }));
 
   const countPassesSnap = await userRef.collection("countPasses").get();
+  const activePointerPassId = data?.activeCountPass?.passId as string | undefined;
+  const activePass = pickActiveCountPass(countPassesSnap.docs, activePointerPassId);
+  const activeCountPass = activePass
+    ? {
+        passId: activePass.id,
+        combo: activePass.data().combo as ComboKey | "any",
+        basis: activePass.data().basis as number,
+        remaining: activePass.data().remaining as number,
+        expiresAt: (activePass.data().expiresAt as string | null | undefined) ?? null,
+        source: activePass.data().source as string | undefined,
+        productId: activePass.data().productId as string | undefined,
+      }
+    : null;
+
   const countPasses = countPassesSnap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as {
       id: string;
@@ -48,9 +69,17 @@ export async function GET(req: NextRequest) {
       productId?: string;
       source?: string;
       createdAt: string;
+      combo: ComboKey | "any";
+      status: CountPassStatus;
       allowances: Record<string, number>;
     }))
-    .filter((pass) => Number(pass.remaining) > 0 && (!pass.expiresAt || new Date(pass.expiresAt).getTime() > Date.now()));
+    .filter(
+      (pass) =>
+        Number(pass.remaining) > 0 &&
+        pass.status !== "exhausted" &&
+        pass.status !== "expired" &&
+        (!pass.expiresAt || new Date(pass.expiresAt).getTime() > Date.now())
+    );
 
   return NextResponse.json({
     nickname: data?.nickname ?? null,
@@ -59,11 +88,14 @@ export async function GET(req: NextRequest) {
     termsAgreedAt: data?.termsAgreedAt ?? null,
     coins: data?.coins ?? 0,
     countPasses,
+    activeCountPass,
     tone: data?.tone ?? DEFAULT_TONE,
     useReversedCards: data?.useReversedCards ?? true,
     birthInfo: data?.birthInfo ?? null,
     partner: data?.partner ?? null,
-    activeTimePass: activeTimePass ?? null,
+    activeTimePass: activeTimePass
+      ? { ...activeTimePass, combo: activeTimePass.combo ?? (activeTimePass.includesOptions ? "tarot-saju-ziwei" : "tarot") }
+      : null,
     timePasses,
   });
 }

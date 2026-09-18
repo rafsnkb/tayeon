@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   const profile = (await profileRes.json()) as {
     id: number;
     properties?: { nickname?: string; profile_image?: string };
-    kakao_account?: { email?: string; is_email_valid?: boolean; is_email_verified?: boolean };
+    kakao_account?: { email?: string; is_email_valid?: boolean; is_email_verified?: boolean; birthday?: string; birthyear?: string; birthday_type?: string; is_leap_month?: boolean };
   };
 
   const uid = `kakao:${profile.id}`;
@@ -62,6 +62,8 @@ export async function GET(req: NextRequest) {
   // 카카오 디벨로퍼스에서 이메일 동의항목을 활성화해야 오고, 동의를 안 했거나 이메일이 없는
   // 카카오 계정이면 이번 로그인 응답에 아예 안 실려온다(2026-09-15) — 그 경우 기존 값 유지.
   const email = profile.kakao_account?.email ?? null;
+  const birthday = profile.kakao_account?.birthday ?? null;
+  const birthyear = profile.kakao_account?.birthyear ?? null;
 
   const userRef = adminDb.collection("users").doc(uid);
   const existing = await userRef.get();
@@ -81,6 +83,7 @@ export async function GET(req: NextRequest) {
       ...(nickname !== null ? { nickname } : {}),
       ...(profileImage !== null ? { profileImage } : {}),
       ...(email !== null ? { email } : {}),
+      ...(birthday !== null ? { kakaoBirthday: birthday, kakaoBirthyear: birthyear, kakaoBirthdayType: profile.kakao_account?.birthday_type ?? null, kakaoIsLeapMonth: profile.kakao_account?.is_leap_month ?? null } : {}),
       ...(referredBy ? { referredBy } : {}),
       updatedAt: new Date().toISOString(),
     },

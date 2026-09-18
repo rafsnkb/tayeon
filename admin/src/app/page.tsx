@@ -411,26 +411,23 @@ export default function AdminHome() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
-      <header className="flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-lg font-semibold">
-          <img src="/textures/bi_light.png" alt="타연" className="h-6 w-12 object-contain" />
-          관리자
-        </h1>
+    <main className="admin-page"><div className="mx-auto max-w-[920px] space-y-7 px-6 pb-12 pt-12">
+      <header className="flex items-end justify-between border-b border-[#D2D2D7] pb-7">
+        <div><p className="mb-2 text-xs font-semibold tracking-wide text-[#86868B]">TAYEON ADMIN</p><h1 className="text-4xl font-semibold tracking-[-.04em] text-[#1D1D1F]">개요</h1><p className="mt-2 text-sm text-[#6E6E73]">오늘 확인할 운영 항목을 빠르게 살펴보세요.</p></div>
         <button
           onClick={() => signOut(auth)}
-          className="text-sm text-zinc-500 underline"
+          className="rounded-full bg-[#E8E8ED] px-3.5 py-2 text-xs font-medium text-[#424245]"
         >
           로그아웃 ({user?.email})
         </button>
       </header>
 
-      <nav className="flex flex-wrap gap-2 rounded-lg border border-zinc-200 bg-white p-3 text-sm">
-        <a href="/users" className="rounded bg-zinc-900 px-3 py-1.5 font-medium text-white">사용자 관리</a>
-        <a href="/moderation" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">모더레이션</a>
-        <a href="/refund-requests" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">환불 요청</a>
-        <a href="/analytics" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">API 분석</a>
-        <a href="/notices" className="rounded border border-zinc-300 px-3 py-1.5 text-zinc-700">공지사항</a>
+      <nav className="grid gap-px overflow-hidden rounded-[24px] bg-[#D2D2D7] text-sm sm:grid-cols-2" aria-label="빠른 작업">
+        <a href="/users" className="bg-white p-5 transition hover:bg-[#F5F5F7]"><b className="block text-[#1D1D1F]">사용자 관리</b><span className="mt-1 block text-xs text-[#6E6E73]">계정, 결제, 이용권</span></a>
+        <a href="/moderation" className="bg-white p-5 transition hover:bg-[#F5F5F7]"><b className="block text-[#1D1D1F]">검토</b><span className="mt-1 block text-xs text-[#6E6E73]">무료 처리와 부정 요청</span></a>
+        <a href="/refund-requests" className="bg-white p-5 transition hover:bg-[#F5F5F7]"><b className="block text-[#1D1D1F]">환불</b><span className="mt-1 block text-xs text-[#6E6E73]">요청 확인 및 승인</span></a>
+        <a href="/analytics" className="bg-white p-5 transition hover:bg-[#F5F5F7]"><b className="block text-[#1D1D1F]">사용량 분석</b><span className="mt-1 block text-xs text-[#6E6E73]">비용과 소비 흐름</span></a>
+        <a href="/notices" className="bg-white p-5 transition hover:bg-[#F5F5F7] sm:col-span-2"><b className="block text-[#1D1D1F]">공지</b><span className="mt-1 block text-xs text-[#6E6E73]">사용자에게 보여 줄 안내 작성</span></a>
       </nav>
 
       <section className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4">
@@ -708,6 +705,6 @@ export default function AdminHome() {
           </div>
         ))}
       </section>
-    </main>
+    </div></main>
   );
 }

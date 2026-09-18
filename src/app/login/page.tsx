@@ -12,6 +12,9 @@ function getKakaoAuthorizeUrl(ref?: string) {
     response_type: "code",
     // 계정정보 모달/마이페이지에 실제 카카오 이메일을 보여주려면 명시적으로 요청해야 함
     // (카카오 디벨로퍼스 콘솔에서 이메일 동의항목이 "선택 동의"면 scope 없인 안 옴, 2026-09-15).
+    // birthday/birthyear는 콘솔(카카오 로그인 > 동의항목)에서 아직 활성화 전이라 요청하면
+    // KOE205(설정 안 된 항목 요청)로 로그인 자체가 막힌다 — 콘솔에서 활성화 완료 후 다시 추가할 것
+    // (2026-09-19, 로컬 재현으로 확인).
     scope: "account_email",
   });
   if (ref) params.set("state", ref);

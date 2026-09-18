@@ -1,7 +1,7 @@
 // 포트원 결제의 customData에 실어 보낼 "상품 식별자"와, 그 식별자를 pricing.ts의 실제 상품
 // 정의(가격/코인수/분)로 되돌리는 로직. 서버가 결제 금액을 검증할 때 반드시 이 표에 있는
 // 가격과 실제 결제 금액이 일치하는지 대조한다 — 클라이언트가 보낸 금액은 절대 신뢰하지 않는다.
-import { COIN_PACKAGES, COUNT_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
+import { COIN_PACKAGES, COUNT_PACKAGES, TIME_PASS_PACKAGES, COMBOS, type ComboKey } from "@/lib/tarot/pricing";
 
 export type ProductType = "coin" | "countPass" | "timePass";
 
@@ -25,7 +25,7 @@ export type ResolvedProduct =
       productId: string;
       priceWon: number;
       minutes: number;
-      includesOptions: boolean;
+      combo: ComboKey;
       orderName: string;
     };
 
@@ -46,13 +46,13 @@ export function listTimePassProductIds(): {
   productId: string;
   priceWon: number;
   minutes: number;
-  includesOptions: boolean;
+  combo: ComboKey;
 }[] {
   return TIME_PASS_PACKAGES.map((pkg) => ({
     productId: pkg.id,
     priceWon: pkg.priceWon,
     minutes: pkg.minutes,
-    includesOptions: pkg.includesOptions,
+    combo: pkg.combo,
   }));
 }
 
@@ -89,8 +89,8 @@ export function resolveProduct(productId: unknown): ResolvedProduct | null {
       productId,
       priceWon: timePassPkg.priceWon,
       minutes: timePassPkg.minutes,
-      includesOptions: timePassPkg.includesOptions,
-      orderName: `타연 시간제 이용권 ${timePassPkg.minutes}분`,
+      combo: timePassPkg.combo,
+      orderName: `타연 시간제 이용권 ${timePassPkg.minutes}분 (${COMBOS[timePassPkg.combo].label})`,
     };
   }
 

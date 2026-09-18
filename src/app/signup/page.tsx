@@ -37,7 +37,7 @@ function PolicyModal({
         </div>
         <button
           onClick={onClose}
-          className="self-end rounded-full bg-point px-5 py-2 text-sm font-semibold text-white"
+          className="h-12 self-end rounded-full bg-point px-5 text-base font-semibold text-white"
         >
           닫기
         </button>
@@ -64,7 +64,7 @@ function ToggleGroup<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
             value === opt.value
-              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+              ? "border border-point-strong bg-point text-white"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -75,8 +75,13 @@ function ToggleGroup<T extends string>({
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <span className="text-sm font-semibold text-icon-muted">
+      {children}
+      {required && <span className="text-urgent">*</span>}
+    </span>
+  );
 }
 
 type CalendarMode = "solar" | "lunar" | "lunarLeap";
@@ -87,8 +92,9 @@ function toCalendarMode(calendarType: BirthInfo["calendarType"], isLeapMonth: bo
 }
 
 /** 피그마 "Screen / Join" — 자시법/진태양시는 화면에 없어서(설정 화면으로 옮겨간 듯) 뺐고, 저장 시엔
- * 기본값(일반/미보정)으로 채워서 보낸다. 생년월일시는 기존처럼 선택 입력 유지(가입 시 건너뛰고
- * 나중에 /me/profile에서 채울 수 있음). */
+ * 기본값(일반/미보정)으로 채워서 보낸다. 생년월일(과 성별)은 2026-09-19부터 닉네임과 동일하게
+ * 필수 — 목업에 생년월일에도 빨간 * 표시가 있어, "나중에 프로필에서 입력" 건너뛰기를 없앴다.
+ * 태어난 시간만 선택 입력으로 유지(자미두수는 태어난 시간이 있어야 가능하므로). */
 export default function SignupPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -135,14 +141,13 @@ export default function SignupPage() {
     });
   }, [router]);
 
-  const birthInfoStarted = Boolean(birthDate.trim() || gender);
-  const birthInfoIncomplete = birthInfoStarted && (!birthDate.trim() || !gender);
+  const birthInfoIncomplete = !birthDate.trim() || !gender;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !nickname.trim() || !agreedTerms || !agreedPrivacy || submitting) return;
     if (birthInfoIncomplete) {
-      setError("생년월일시를 입력하려면 생년월일과 성별을 모두 선택해주세요. 지금 건너뛰려면 둘 다 비워두세요.");
+      setError("생년월일과 성별을 입력해주세요.");
       return;
     }
 
@@ -159,19 +164,17 @@ export default function SignupPage() {
         },
         body: JSON.stringify({
           nickname: nickname.trim(),
-          birthInfo: birthInfoStarted
-            ? {
-                calendarType: calendarMode === "solar" ? "solar" : "lunar",
-                isLeapMonth: calendarMode === "lunarLeap",
-                birthDate,
-                birthTime,
-                timeUnknown,
-                jasiRule: "midnight",
-                useTrueSolarTime: false,
-                gender,
-                birthPlace,
-              }
-            : undefined,
+          birthInfo: {
+            calendarType: calendarMode === "solar" ? "solar" : "lunar",
+            isLeapMonth: calendarMode === "lunarLeap",
+            birthDate,
+            birthTime,
+            timeUnknown,
+            jasiRule: "midnight",
+            useTrueSolarTime: false,
+            gender,
+            birthPlace,
+          },
         }),
       });
 
@@ -205,7 +208,7 @@ export default function SignupPage() {
       <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 overflow-y-auto">
         <div className="flex flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
-            <FieldLabel>닉네임 (변경 가능)</FieldLabel>
+            <FieldLabel required>닉네임 (변경 가능)</FieldLabel>
             <input
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
@@ -215,7 +218,7 @@ export default function SignupPage() {
           </label>
 
           <div className="flex flex-col gap-1">
-            <FieldLabel>생년월일 (선택)</FieldLabel>
+            <FieldLabel required>생년월일</FieldLabel>
             <input
               type="date"
               value={birthDate}
@@ -280,10 +283,6 @@ export default function SignupPage() {
               출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요
             </span>
           </label>
-
-          <p className="text-xs text-icon-muted">
-            생년월일시는 지금 건너뛰고 나중에 내 프로필 관리에서 입력할 수 있어요.
-          </p>
         </div>
 
         <div className="flex flex-col gap-2 px-1">

@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { AdminPageHeader } from "@/components/AdminPageHeader";
 
 type UserItem = {
   uid: string;
@@ -321,25 +322,9 @@ export default function UserDirectoryPage() {
   const suspendedTotal = entries.filter((entry) => entry.status === "suspended").length;
 
   return (
-    <main className="min-h-screen bg-[#F7F5FA] px-4 py-5 text-[#302B38] sm:px-6 lg:px-10 lg:py-8">
+    <main className="admin-page px-4 pb-10 text-[#1D1D1F] sm:px-6 lg:px-10">
       <div className="mx-auto max-w-[1800px] space-y-6">
-        <header className="relative overflow-hidden rounded-[28px] bg-[#30253A] px-6 py-7 text-white shadow-[0_18px_45px_rgb(53_35_67/16%)] sm:px-8">
-          <div className="absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#FF007F]/20 blur-3xl" />
-          <div className="absolute bottom-0 right-28 h-24 w-24 rounded-full border border-white/10" />
-          <div className="relative flex flex-wrap items-start justify-between gap-5">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.18em] text-[#E7C9DD]">TAYEON ADMIN</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">사용자 관리</h1>
-              <p className="mt-2 text-sm text-[#D6CDDB]">사용자 현황과 이용권 상태를 한 곳에서 관리하세요.</p>
-            </div>
-            <button
-              onClick={() => router.push("/")}
-              className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20"
-            >
-              대시보드로 돌아가기
-            </button>
-          </div>
-        </header>
+        <AdminPageHeader title="사용자" description="계정 상태, 결제와 보유 이용권을 한 흐름에서 확인합니다." />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[

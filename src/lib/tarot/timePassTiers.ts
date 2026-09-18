@@ -18,3 +18,16 @@ export const TIME_PASS_TIER: Record<
   30: { bg: TIER_TEXTURE[2], border: "#8335d6", tagBg: "#28173b", tagText: "#a04ff8" },
   60: { bg: TIER_TEXTURE[1], border: "#ff007f", tagBg: "#2c1322", tagText: "#ff007f" },
 };
+
+// 시간제 이용권이 조합(ComboKey) 4종으로 개편되며(2026-09-19) 추가된 조합별 티어 색 — 목업
+// "Buy - Timepass_15.png"를 sharp로 픽셀 샘플링해서 확인(청록/파랑/보라/핑크가 COUNT_TIERS와
+// 정확히 같은 팔레트). /charge 시간제 탭과 /tarot의 보유 이용권 카드가 같이 쓴다.
+export const TIME_COMBO_TIER: Record<
+  "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei",
+  { bg: string; border: string; tagBg: string; tagText: string }
+> = {
+  tarot: { bg: TIER_TEXTURE[4], border: "#9de9ed", tagBg: "rgba(12, 68, 86, 0.86)", tagText: "#9de9ed" },
+  "tarot-saju": { bg: TIER_TEXTURE[3], border: "#2f8bee", tagBg: "rgba(15, 52, 98, 0.86)", tagText: "#66b0ff" },
+  "tarot-ziwei": { bg: TIER_TEXTURE[2], border: "#8335d6", tagBg: "rgba(56, 24, 82, 0.86)", tagText: "#a04ff8" },
+  "tarot-saju-ziwei": { bg: TIER_TEXTURE[1], border: "#ff007f", tagBg: "rgba(82, 17, 59, 0.86)", tagText: "#ff007f" },
+};

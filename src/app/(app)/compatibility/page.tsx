@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
-import ConfirmModal from "@/components/ConfirmModal";
 
 type Partner = {
   nickname: string;
@@ -41,7 +40,7 @@ function ToggleGroup<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
             value === opt.value
-              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+              ? "border border-point-strong bg-point text-white"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -52,14 +51,18 @@ function ToggleGroup<T extends string>({
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <span className="text-sm font-semibold text-icon-muted">
+      {children}
+      {required && <span className="text-urgent">*</span>}
+    </span>
+  );
 }
 
-/** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 전부 선택 입력.
- * 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을 보여주고 기존 값으로
- * 미리 채워두는 방식이라 그에 맞춰 단순화함. 피그마엔 "삭제하기" 버튼도 있었지만 사용자
- * 요청으로 제거함(2026-09-15). */
+/** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 닉네임만 필수, 나머지는
+ * 전부 선택 입력. 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을 보여주고 기존
+ * 값으로 미리 채워두는 방식이라 그에 맞춰 단순화함. "초기화" 버튼은 목업에 없어 제거함(2026-09-19). */
 export default function CompatibilityPage() {
   const [user, setUser] = useState<User | null>(null);
   const [nickname, setNickname] = useState("");
@@ -71,8 +74,6 @@ export default function CompatibilityPage() {
   const [birthPlace, setBirthPlace] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -128,35 +129,13 @@ export default function CompatibilityPage() {
     }
   }
 
-  async function handleReset() {
-    if (!user || resetting) return;
-    setResetting(true);
-    try {
-      const idToken = await user.getIdToken();
-      await fetch("/api/user/partner", {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      setNickname("");
-      setBirthDate("");
-      setBirthTime("");
-      setTimeUnknown(false);
-      setGender("unspecified");
-      setCalendarMode("solar");
-      setBirthPlace("");
-      setResetConfirmOpen(false);
-    } finally {
-      setResetting(false);
-    }
-  }
-
   return (
     <form onSubmit={handleSave} className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="궁합 상대 프로필 관리" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
-            <FieldLabel>궁합 상대 닉네임 (변경 가능)</FieldLabel>
+            <FieldLabel required>궁합 상대 닉네임 (변경 가능)</FieldLabel>
             <input
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
@@ -236,35 +215,16 @@ export default function CompatibilityPage() {
         </div>
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
-        <div className="mx-auto flex w-full max-w-2xl gap-2">
-          <button
-            type="button"
-            onClick={() => setResetConfirmOpen(true)}
-            className="h-12 flex-1 rounded-2xl bg-urgent text-lg font-semibold text-white"
-          >
-            초기화
-          </button>
-          <button
-            type="submit"
-            disabled={!nickname.trim() || submitting}
-            className={`h-12 flex-[2] rounded-2xl text-lg font-semibold ${
-              nickname.trim() ? "bg-point text-white" : "bg-chip-fill text-placeholder"
-            } disabled:opacity-60`}
-          >
-            저장하기
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={!nickname.trim() || submitting}
+          className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
+            nickname.trim() ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+          } disabled:opacity-60`}
+        >
+          저장하기
+        </button>
       </div>
-      {resetConfirmOpen && (
-        <ConfirmModal
-          title="상대 프로필 초기화"
-          description="상대 프로필이 모두 지워집니다."
-          confirmLabel="초기화"
-          busy={resetting}
-          onConfirm={handleReset}
-          onClose={() => setResetConfirmOpen(false)}
-        />
-      )}
     </form>
   );
 }

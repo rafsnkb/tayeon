@@ -11,7 +11,33 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { portone } from "@/lib/payment/portone";
 import { resolvePaidProduct } from "@/lib/payment/products";
-import { COUNT_PASS_VALIDITY_MONTHS, countAllowances } from "@/lib/tarot/pricing";
+import { addMonthsClamped } from "@/lib/util/dateMath";
+import {
+  COUNT_PASS_VALIDITY_MONTHS,
+  TIME_PASS_VALIDITY_MONTHS,
+  COMBOS,
+  countAllowancesForCombo,
+  type ComboKey,
+} from "@/lib/tarot/pricing";
+
+function isComboKey(value: unknown): value is ComboKey {
+  return typeof value === "string" && value in COMBOS;
+}
+
+/** 운영자가 환불을 검토할 때 필요한 결제수단만 보관한다. 카드 전체 번호·계좌번호는 저장하지 않는다. */
+function paymentMethodSummary(method: unknown): { type: string; label: string } | null {
+  if (!method || typeof method !== "object") return null;
+  const value = method as { type?: unknown; provider?: unknown; card?: { name?: unknown; number?: unknown; issuer?: unknown } };
+  const type = typeof value.type === "string" ? value.type : "unknown";
+  if (type === "PaymentMethodCard") {
+    const cardName = typeof value.card?.name === "string" ? value.card.name : typeof value.card?.issuer === "string" ? value.card.issuer : "신용/체크카드";
+    const number = typeof value.card?.number === "string" ? ` ${value.card.number}` : "";
+    return { type, label: `${cardName}${number}` };
+  }
+  if (type === "PaymentMethodEasyPay") return { type, label: typeof value.provider === "string" ? value.provider : "간편결제" };
+  const labels: Record<string, string> = { PaymentMethodTransfer: "계좌이체", PaymentMethodVirtualAccount: "가상계좌", PaymentMethodMobile: "휴대폰 결제", PaymentMethodGiftCertificate: "상품권", PaymentMethodConvenienceStore: "편의점 결제" };
+  return { type, label: labels[type] ?? "기타 결제수단" };
+}
 
 export type FulfillOutcome =
   | { kind: "fulfilled"; alreadyFulfilled: boolean; uid: string; productType: "coin" | "countPass" | "timePass" }
@@ -28,7 +54,7 @@ export type FulfillOutcome =
 export async function fulfillPayment(
   paymentId: string,
   expectedUid?: string,
-  via: "complete" | "webhook" | "autoPurchase" = "complete"
+  via: "complete" | "webhook" = "complete"
 ): Promise<FulfillOutcome> {
   const payment = await portone.getPayment({ paymentId }).catch((error) => {
     console.error("[payment] getPayment 실패", paymentId, error);
@@ -56,7 +82,7 @@ export async function fulfillPayment(
     return { kind: "rejected", reason: "테스트 채널 결제는 프로덕션에서 지급되지 않아요." };
   }
 
-  let customData: { uid?: unknown; productId?: unknown } = {};
+  let customData: { uid?: unknown; productId?: unknown; combo?: unknown } = {};
   try {
     customData = payment.customData ? JSON.parse(payment.customData) : {};
   } catch (error) {
@@ -79,6 +105,15 @@ export async function fulfillPayment(
     console.error("[payment] 알 수 없는 productId", paymentId, customData.productId);
     return { kind: "rejected", reason: "알 수 없는 상품이에요." };
   }
+
+  // 횟수제 이용권은 구매 시점에 고른 조합(타로전용/+사주/+자미두수/+사주자미두수)으로 완전히
+  // 고정된다(2026-09-18) — prepare 단계에서 이미 검증했지만, customData는 결국 클라이언트가
+  // 왕복시키는 값이라 여기서도 다시 검증한다.
+  if (product.type === "countPass" && !isComboKey(customData.combo)) {
+    console.error("[payment] countPass 결제에 유효한 combo가 없음", paymentId, customData.combo);
+    return { kind: "rejected", reason: "이용권 옵션 정보가 없어요." };
+  }
+  const combo = isComboKey(customData.combo) ? customData.combo : null;
 
   if (product.type === "coin") {
     const cutoff = Date.parse(process.env.LEGACY_COIN_PAID_BEFORE ?? "");
@@ -112,12 +147,8 @@ export async function fulfillPayment(
     const timePassRef = product.type === "timePass" ? userRef.collection("timePasses").doc() : null;
     const countPassRef = product.type === "countPass" ? userRef.collection("countPasses").doc() : null;
     const issuedAt = payment.paidAt ? new Date(payment.paidAt) : new Date();
-    const expiresAt = new Date(issuedAt);
-    const purchasedDay = expiresAt.getUTCDate();
-    expiresAt.setUTCDate(1);
-    expiresAt.setUTCMonth(expiresAt.getUTCMonth() + COUNT_PASS_VALIDITY_MONTHS);
-    const lastDay = new Date(Date.UTC(expiresAt.getUTCFullYear(), expiresAt.getUTCMonth() + 1, 0)).getUTCDate();
-    expiresAt.setUTCDate(Math.min(purchasedDay, lastDay));
+    const countPassExpiresAt = addMonthsClamped(issuedAt.toISOString(), COUNT_PASS_VALIDITY_MONTHS);
+    const timePassUsableUntil = addMonthsClamped(issuedAt.toISOString(), TIME_PASS_VALIDITY_MONTHS);
 
     tx.set(paymentRef, {
       status: "fulfilled",
@@ -131,6 +162,7 @@ export async function fulfillPayment(
       timePassId: timePassRef?.id ?? null,
       channelType: payment.channel?.type ?? null,
       isTest: payment.channel?.type === "TEST",
+      paymentMethod: paymentMethodSummary(payment.method),
       paidAt: payment.paidAt,
       fulfilledAt: new Date().toISOString(),
       fulfilledVia: via,
@@ -138,27 +170,31 @@ export async function fulfillPayment(
 
     if (product.type === "coin") {
       tx.set(userRef, { coins: FieldValue.increment(product.coins) }, { merge: true });
-    } else if (product.type === "countPass" && countPassRef) {
+    } else if (product.type === "countPass" && countPassRef && combo) {
       tx.set(countPassRef, {
         productId: product.productId,
         source: "purchase",
         basis: product.basis,
         remaining: 1,
         usedCount: 0,
-        allowances: countAllowances(product.basis),
+        combo,
+        allowances: countAllowancesForCombo(product.basis, combo),
+        status: "unused",
         priceWon: product.priceWon,
         paymentId,
         createdAt: issuedAt.toISOString(),
-        expiresAt: expiresAt.toISOString(),
+        expiresAt: countPassExpiresAt,
       });
     } else if (product.type === "timePass" && timePassRef) {
       tx.set(timePassRef, {
+        productId: product.productId,
         minutes: product.minutes,
-        includesOptions: product.includesOptions,
+        combo: product.combo,
         priceWon: product.priceWon,
         status: "unused",
         startedAt: null,
         expiresAt: null,
+        usableUntil: timePassUsableUntil,
         paymentId,
         createdAt: new Date().toISOString(),
       });

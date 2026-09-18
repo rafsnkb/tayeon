@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
 import { BrandBi } from "@/components/BrandBi";
+import RoomLimitModal from "@/components/RoomLimitModal";
 import { NewChatIcon, ChevronRightIcon } from "./tarot/icons";
 
 const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
@@ -53,11 +54,29 @@ function AppShell({ children }: { children: React.ReactNode }) {
   }, [authChecked, user, router]);
 
   useEffect(() => onOpenMenu(() => setMenuOpen(true)), []);
+  const [roomLimitOpen, setRoomLimitOpen] = useState(false);
+  const [roomLimitBusy, setRoomLimitBusy] = useState(false);
 
   async function handleNewRoom() {
-    const created = await createRoom();
-    setMenuOpen(false);
-    if (created) router.push(`/tarot?room=${created.id}`);
+    try {
+      const created = await createRoom();
+      setMenuOpen(false);
+      if (created) router.push(`/tarot?room=${created.id}`);
+    } catch (error) {
+      if (error instanceof Error && error.message === "ROOM_LIMIT") setRoomLimitOpen(true);
+    }
+  }
+
+  async function confirmRoomLimit() {
+    setRoomLimitBusy(true);
+    try {
+      const created = await createRoom(true);
+      setRoomLimitOpen(false);
+      setMenuOpen(false);
+      if (created) router.push(`/tarot?room=${created.id}`);
+    } finally {
+      setRoomLimitBusy(false);
+    }
   }
 
   function handleSelectRoom(roomId: string) {
@@ -191,6 +210,13 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
         {children}
       </div>
+      {roomLimitOpen && (
+        <RoomLimitModal
+          busy={roomLimitBusy}
+          onConfirm={confirmRoomLimit}
+          onClose={() => setRoomLimitOpen(false)}
+        />
+      )}
     </div>
   );
 }

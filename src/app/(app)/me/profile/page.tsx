@@ -24,7 +24,7 @@ function ToggleGroup<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
             value === opt.value
-              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+              ? "border border-point-strong bg-point text-white"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -35,8 +35,13 @@ function ToggleGroup<T extends string>({
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="text-sm font-semibold text-icon-muted">{children}</span>;
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <span className="text-sm font-semibold text-icon-muted">
+      {children}
+      {required && <span className="text-urgent">*</span>}
+    </span>
+  );
 }
 
 type CalendarMode = "solar" | "lunar" | "lunarLeap";
@@ -127,7 +132,7 @@ export default function MyProfilePage() {
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
-            <FieldLabel>닉네임 (변경 가능)</FieldLabel>
+            <FieldLabel required>닉네임 (변경 가능)</FieldLabel>
             <input
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
@@ -137,7 +142,7 @@ export default function MyProfilePage() {
           </label>
 
           <div className="flex flex-col gap-1">
-            <FieldLabel>생년월일</FieldLabel>
+            <FieldLabel required>생년월일</FieldLabel>
             <input
               type="date"
               value={birthDate}

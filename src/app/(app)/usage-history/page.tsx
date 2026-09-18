@@ -18,16 +18,6 @@ type UsageEntry = {
   createdAt: string;
 };
 
-type RewardEntry = {
-  kind: "reward";
-  label: string;
-  freePasses: number | null;
-  coins: number | null;
-  createdAt: string;
-};
-
-type Entry = UsageEntry | RewardEntry;
-
 function formatDateTime(iso: string) {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -43,7 +33,7 @@ function optionsLabel(e: UsageEntry) {
 }
 
 export default function UsageHistoryPage() {
-  const [entries, setEntries] = useState<Entry[] | null>(null);
+  const [entries, setEntries] = useState<UsageEntry[] | null>(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u: User | null) => {
@@ -72,30 +62,19 @@ export default function UsageHistoryPage() {
             {entries.map((e, i) => (
               <div key={i} className="flex flex-col gap-1.5">
                 <p className="px-1 text-sm text-icon-muted">{formatDateTime(e.createdAt)}</p>
-                {e.kind === "reward" ? (
-                  <div className="flex items-center justify-between rounded-[28px] border border-border bg-topbar p-4">
-                    <p className="truncate text-base font-semibold text-bold-text">[{e.label}]</p>
-                    <span className="shrink-0 text-base font-bold text-point">
-                      {e.freePasses !== null
-                        ? `+원카드 기준 ${e.freePasses.toLocaleString("ko-KR")}회`
-                        : `+${(e.coins ?? 0).toLocaleString("ko-KR")} 코인`}
-                    </span>
+                <div className="flex items-center justify-between rounded-[28px] border border-border bg-topbar p-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-icon-muted">
+                      [채팅] {e.roomTitle}
+                    </p>
+                    <p className="truncate text-base font-semibold text-bold-text">
+                      {optionsLabel(e)}
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between rounded-[28px] border border-border bg-topbar p-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-icon-muted">
-                        [채팅] {e.roomTitle}
-                      </p>
-                      <p className="truncate text-base font-semibold text-bold-text">
-                        {optionsLabel(e)}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-base font-bold text-bold-text">
-                      {e.timePassApplied ? "시간제 이용권 사용" : e.countPassApplied ? "횟수제 이용권 1회" : `-${e.cost.toLocaleString("ko-KR")} 코인`}
-                    </span>
-                  </div>
-                )}
+                  <span className="shrink-0 text-base font-bold text-bold-text">
+                    {e.timePassApplied ? "시간제 이용권 사용" : e.countPassApplied ? "횟수제 이용권 1회" : `-${e.cost.toLocaleString("ko-KR")} 코인`}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

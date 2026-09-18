@@ -13,34 +13,72 @@ export const ping = onRequest((req, res) => {
 // 같은 값으로 유지한다.
 const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
 const ONE_CARD_BASIS = 200;
-const SPREAD_COSTS = { one: 200, three: 300, dual: 400, celtic: 500 } as const;
 
 function rewardPassesForWon(totalWon: number, rate: number): number {
   return Math.round((totalWon * rate) / ONE_CARD_BASIS);
 }
 
-function countAllowances(basis: number): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const [spread, cost] of Object.entries(SPREAD_COSTS)) {
-    const base = Math.round(basis / cost);
-    result[`${spread}-0-0`] = base;
-    result[`${spread}-1-0`] = Math.round(base * 0.85);
-    result[`${spread}-0-1`] = Math.round(base * 0.75);
-    result[`${spread}-1-1`] = Math.round(base * 0.5);
-  }
-  return result;
+// 받은 이용권 수령 가능 기간(지급일로부터 이 기간 내 미수령 시 소멸) — src/lib/tarot/pricing.ts의
+// PENDING_REWARD_CLAIM_WINDOW_MONTHS와 동일한 값(패키지 분리로 값만 복사).
+const PENDING_REWARD_CLAIM_WINDOW_MONTHS = 1;
+
+// src/lib/util/dateMath.ts의 addMonthsClamped와 동일한 로직(패키지 분리로 복사).
+function addMonthsClamped(iso: string, months: number): string {
+  const date = new Date(iso);
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  date.setUTCDate(Math.min(day, lastDay));
+  return date.toISOString();
 }
 
-function rewardPassData(source: "bonus-reward" | "referral-payout", freePasses: number, createdAt: string) {
-  const basis = freePasses * ONE_CARD_BASIS;
+/** 매일 KST 00:10에 저장된 생년월일과 일치하는 사용자에게 생일 쿠폰을 1회 발급한다. */
+export const dailyBirthdayCouponPayout = onSchedule(
+  { schedule: "10 0 * * *", timeZone: "Asia/Seoul", region: "asia-east1" },
+  async () => {
+    const db = getFirestore();
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+    const year = pick("year"), month = pick("month"), day = pick("day");
+    const birthdayKey = `${year}-${month}${day}`;
+    const users = await db.collection("users").get();
+    for (const user of users.docs) {
+      const data = user.data();
+      const birthDate = data.birthInfo?.birthDate;
+      const birthday = typeof data.kakaoBirthday === "string" ? data.kakaoBirthday : typeof birthDate === "string" ? birthDate.slice(5, 10).replace("-", "") : null;
+      if (birthday !== `${month}${day}`) continue;
+      const ledger = user.ref.collection("birthdayCouponGrants").doc(birthdayKey);
+      const reward = user.ref.collection("pendingRewards").doc();
+      await db.runTransaction(async (tx) => {
+        if ((await tx.get(ledger)).exists) return;
+        const issuedAt = new Date().toISOString();
+        tx.set(ledger, { birthdayKey, issuedAt });
+        tx.set(reward, { source: "birthday", status: "pending", birthdayKey, createdAt: issuedAt, claimWindowExpiresAt: addMonthsClamped(issuedAt, 1), options: [{ combo: "tarot-saju", freePasses: 8 }, { combo: "tarot-ziwei", freePasses: 6 }, { combo: "tarot-saju-ziwei", freePasses: 4 }] });
+      });
+    }
+  }
+);
+
+// 2026-09-18부터 이 두 스케줄 함수는 이용권을 즉시 지급하지 않고 "받은 이용권 내역"에서 사용자가
+// 조합(타로전용/+사주/+자미두수/+사주자미두수)을 골라 수령해야 하는 대기(pending) 레코드를 만든다
+// (src/app/api/user/pending-rewards/**, src/lib/referral/code.ts의 grantSignupReferralReward와
+// 동일한 pendingRewards 스키마 공유). 조합별 횟수 계산(countAllowancesForCombo)은 수령 시점에
+// Next 앱 쪽에서 담당하므로 여기서는 더 이상 allowances를 미리 계산해두지 않는다.
+function pendingRewardData(
+  source: "bonus-reward" | "referral-payout",
+  freePasses: number,
+  createdAt: string
+) {
   return {
     source,
-    basis,
-    remaining: 1,
-    allowances: countAllowances(basis),
     freePasses,
+    basis: freePasses * ONE_CARD_BASIS,
+    status: "pending" as const,
     createdAt,
-    expiresAt: null,
+    claimWindowExpiresAt: addMonthsClamped(createdAt, PENDING_REWARD_CLAIM_WINDOW_MONTHS),
+    claimedAt: null,
   };
 }
 
@@ -108,7 +146,7 @@ export const monthlyReferralPayout = onSchedule(
     for (const [referrerUid, freePasses] of passesByReferrerUid) {
       const referrerRef = db.collection("users").doc(referrerUid);
       const payoutRef = referrerRef.collection("referralPayouts").doc(payoutKey);
-      const passRef = referrerRef.collection("countPasses").doc();
+      const rewardRef = referrerRef.collection("pendingRewards").doc();
 
       await db.runTransaction(async (tx) => {
         const [referrerSnap, payoutSnap] = await Promise.all([tx.get(referrerRef), tx.get(payoutRef)]);
@@ -122,7 +160,7 @@ export const monthlyReferralPayout = onSchedule(
           periodEnd: endIso,
           createdAt,
         });
-        tx.set(passRef, rewardPassData("referral-payout", freePasses, createdAt));
+        tx.set(rewardRef, pendingRewardData("referral-payout", freePasses, createdAt));
       });
     }
 
@@ -140,8 +178,6 @@ const PAYMENT_BONUS_REWARD_TIERS: { minWon: number; rate: number }[] = [
   { minWon: 200_000, rate: 0.04 },
   { minWon: 100_000, rate: 0.03 },
   { minWon: 50_000, rate: 0.015 },
-  { minWon: 30_000, rate: 0.01 },
-  { minWon: 0, rate: 0.005 },
 ];
 
 function bonusRewardRateForWon(totalWon: number): number {
@@ -194,7 +230,7 @@ export const monthlyBonusRewardPayout = onSchedule(
 
       const userRef = db.collection("users").doc(uid);
       const payoutRef = userRef.collection("bonusRewardPayouts").doc(payoutKey);
-      const passRef = userRef.collection("countPasses").doc();
+      const rewardRef = userRef.collection("pendingRewards").doc();
 
       await db.runTransaction(async (tx) => {
         const [userSnap, payoutSnap] = await Promise.all([tx.get(userRef), tx.get(payoutRef)]);
@@ -209,7 +245,7 @@ export const monthlyBonusRewardPayout = onSchedule(
           periodEnd: endIso,
           createdAt,
         });
-        tx.set(passRef, rewardPassData("bonus-reward", freePasses, createdAt));
+        tx.set(rewardRef, pendingRewardData("bonus-reward", freePasses, createdAt));
       });
     }
 

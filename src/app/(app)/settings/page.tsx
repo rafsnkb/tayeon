@@ -63,7 +63,7 @@ function SegmentGroup<T extends string | boolean>({
           onClick={() => onChange(opt.value)}
           className={`h-12 flex-1 rounded-2xl text-base font-semibold ${
             value === opt.value
-              ? "bg-point text-white dark:border dark:border-point/50 dark:bg-point-bg dark:text-point"
+              ? "border border-point-strong bg-point text-white"
               : "bg-chip-fill text-white"
           }`}
         >
@@ -274,7 +274,7 @@ export default function SettingsPage() {
           onClick={handleSave}
           disabled={saving || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            isDirty ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-fill text-placeholder"
           } disabled:opacity-60`}
         >
           저장하기

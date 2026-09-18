@@ -8,7 +8,7 @@ import { useRooms } from "@/lib/tarot/RoomsContext";
 import { CompanyFooter } from "@/components/CompanyFooter";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
-import { PAYMENT_BONUS_REWARD_TIERS, COUNT_PACKAGES, availableCount } from "@/lib/tarot/pricing";
+import { PAYMENT_BONUS_REWARD_TIERS, countPassDisplayName, countAllowance, countAllowanceForCombo } from "@/lib/tarot/pricing";
 import {
   SearchIcon,
   InvitePersonIcon,
@@ -89,13 +89,14 @@ function formatWonShort(won: number): string {
 }
 
 // RewardInfoModal의 "리워드 지급 비율" 표 — pricing.ts의 PAYMENT_BONUS_REWARD_TIERS를 그대로
-// 표시용 행으로 변환한다(마지막 구간은 0원 이상이 아니라 "그 위 구간 미만"으로 표기).
-const REWARD_TIER_ROWS = PAYMENT_BONUS_REWARD_TIERS.map((tier, i) => ({
+// 표시용 행으로 변환한다. 전에는 마지막 행만 "그 위 구간 미만"으로 표기했는데, 그건 최하단 구간이
+// 0원(모든 결제가 걸리는 캐치올)일 때만 맞는 문구였다 — 2026-09-18에 하위 2단계(1%/0.5%)를
+// 없애면서 최하단이 5만원 구간이 됐는데, 같은 공식을 그대로 쓰면 "5만원 미만은 1.5%"처럼 실제로는
+// 리워드가 아예 없는 구간(5만원 미만)에 요율이 적용되는 것처럼 잘못 표시된다. 그래서 모든 행을
+// 예외 없이 "X 이상"으로 통일한다.
+const REWARD_TIER_ROWS = PAYMENT_BONUS_REWARD_TIERS.map((tier) => ({
   rate: tier.rate,
-  label:
-    i === PAYMENT_BONUS_REWARD_TIERS.length - 1
-      ? `${formatWonShort(PAYMENT_BONUS_REWARD_TIERS[i - 1].minWon)} 미만`
-      : `${formatWonShort(tier.minWon)} 이상`,
+  label: `${formatWonShort(tier.minWon)} 이상`,
 }));
 
 function describeEnvironment(): string {
@@ -123,23 +124,16 @@ function describeEnvironment(): string {
  * 가는 허브. 친구초대는 /invite로 연결된다. */
 export default function MyPage() {
   const router = useRouter();
-  const { user, nickname, profileImage, email, countPasses } = useRooms();
-  const activeCountPass = [...countPasses]
-    .filter((pass) => availableCount(pass, "one", false, false) > 0)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
-  const activeCountPassName = activeCountPass
-    ? activeCountPass.source === "admin-grant"
-      ? "관리자 지급 이용권"
-      : activeCountPass.source === "signup-free"
-        ? "무료 체험 이용권"
-        : activeCountPass.source === "referral-signup"
-          ? "친구 초대 이용권"
-          : activeCountPass.source === "bonus-reward"
-            ? "보너스 리워드 이용권"
-            : activeCountPass.source === "referral-payout"
-              ? "친구 결제 리워드 이용권"
-              : COUNT_PACKAGES.find((pkg) => pkg.id === activeCountPass.productId)?.name ?? "보유 이용권"
-    : null;
+  const { user, nickname, profileImage, email, activeCountPass } = useRooms();
+  const activeCountPassName = activeCountPass ? countPassDisplayName(activeCountPass) : null;
+  const activeCountPassOneCardCount = activeCountPass
+    ? Math.round(
+        activeCountPass.remaining *
+          (activeCountPass.combo === "any"
+            ? countAllowance(activeCountPass.basis, "one", false, false)
+            : countAllowanceForCombo(activeCountPass.basis, "one", activeCountPass.combo))
+      )
+    : 0;
   const [accountInfoOpen, setAccountInfoOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null);
@@ -200,7 +194,7 @@ export default function MyPage() {
                 <span className="text-sm font-semibold text-icon-muted">횟수제 이용권</span>
                 {activeCountPass && (
                   <span className="text-xs text-icon-muted">
-                    {activeCountPassName} · 원카드 {availableCount(activeCountPass, "one", false, false)}회
+                    {activeCountPassName} · 원카드 {activeCountPassOneCardCount}회
                     {activeCountPass.expiresAt ? ` · ${activeCountPass.expiresAt.slice(0, 10)}까지` : ""}
                   </span>
                 )}
@@ -238,11 +232,10 @@ export default function MyPage() {
             <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={() => router.push("/invite")} />
           </Section>
 
-          <Section title="이용권 구입">
-            <ListRow icon={<CartIcon className="h-5 w-5" />} label="이용권 구입" onClick={() => router.push("/charge")} />
+          <Section title="코인·이용권 구입">
+            <ListRow icon={<CartIcon className="h-5 w-5" />} label="코인·이용권 구입" onClick={() => router.push("/charge")} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
-            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="이용 내역" onClick={() => router.push("/usage-history")} />
-            <ListRow icon={<CardIcon className="h-4 w-5" />} label="자동충전 카드 관리" onClick={() => router.push("/billing")} />
+            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="받은 이용권 내역" onClick={() => router.push("/received-passes")} />
           </Section>
 
           <Section title="프로필">
@@ -272,7 +265,7 @@ export default function MyPage() {
           onClick={() => setAccountInfoOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-[32px] border border-[#e4d8ef] bg-[#fefeff] p-4"
+            className="w-full max-w-sm rounded-[32px] border border-[#e4d8ef] bg-[#fefeff] p-4 dark:border-border dark:bg-topbar"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -282,7 +275,7 @@ export default function MyPage() {
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="rounded-2xl bg-[#f7f4fb] p-4">
+            <div className="rounded-2xl bg-[#f7f4fb] p-4 dark:bg-border">
               <div className="flex flex-col gap-[28px] text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">아이디</span>
@@ -329,50 +322,50 @@ export default function MyPage() {
           >
             <div className="mb-0 flex items-center justify-between pt-3">
               <div className="w-5" />
-              <p className="flex-1 text-center text-lg font-bold text-[#2a1a43]">보너스 리워드 안내</p>
-              <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-[#75628b]">
+              <p className="flex-1 text-center text-lg font-bold text-[#2a1a43] dark:text-bold-text">보너스 리워드 안내</p>
+              <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-[#75628b] dark:text-icon-muted">
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-4 text-center text-sm font-semibold text-[#75628b]">
+            <p className="mb-4 text-center text-sm font-semibold text-[#75628b] dark:text-icon-muted">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
             </p>
-            <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-[#f6f1fb] p-4 text-sm">
+            <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-[#f6f1fb] p-4 text-sm dark:bg-border">
               <div className="flex items-center justify-between">
-                <span className="text-[#75628b]">
+                <span className="text-[#75628b] dark:text-icon-muted">
                   {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
                 </span>
-                <span className="font-semibold text-[#2a1a43]">
+                <span className="font-semibold text-[#2a1a43] dark:text-bold-text">
                   {(bonusReward?.totalWon ?? 0).toLocaleString("ko-KR")}원
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#75628b]">
+                <span className="text-[#75628b] dark:text-icon-muted">
                   {bonusReward ? <>{bonusReward.month}월 예상 리워드<br /><span className="text-xs">(원카드 스프레드 기준)</span></> : "이번 달 예상 리워드"}
                 </span>
-                <span className="font-bold text-[#2a1a43]">
+                <span className="font-bold text-[#2a1a43] dark:text-bold-text">
                   {(bonusReward?.projectedPasses ?? 0).toLocaleString("ko-KR")}회 예상
                 </span>
               </div>
             </div>
-            <p className="mb-2 text-center text-sm font-bold text-[#2a1a43]">리워드 지급 비율</p>
-            <div className="mb-3 overflow-hidden rounded-2xl border border-[#f0eaf6] bg-[#f6f1fb]">
-              <div className="grid grid-cols-2 bg-[#79678f] px-4 py-2 text-xs font-semibold text-white">
+            <p className="mb-2 text-center text-sm font-bold text-[#2a1a43] dark:text-bold-text">리워드 지급 비율</p>
+            <div className="mb-3 overflow-hidden rounded-2xl border border-[#f0eaf6] bg-[#f6f1fb] dark:border-border dark:bg-border">
+              <div className="grid grid-cols-2 bg-[#79678f] px-4 py-2 text-xs font-semibold text-white dark:bg-border dark:text-icon-muted">
                 <span>당월 결제금액</span>
                 <span className="text-right">리워드 비율</span>
               </div>
               {REWARD_TIER_ROWS.map((row) => (
                 <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
-                  <span className="font-semibold text-[#75628b]">{row.label}</span>
+                  <span className="font-semibold text-[#75628b] dark:text-icon-muted">{row.label}</span>
                   <span className="text-right font-bold text-point">
                     {Number((row.rate * 100).toFixed(2))}%
                   </span>
                 </div>
               ))}
             </div>
-            <p className="text-center text-xs text-[#75628b]">보너스 리워드 이용권은 매월 5일에 지급됩니다.</p>
+            <p className="text-center text-xs text-[#75628b] dark:text-icon-muted">보너스 리워드 이용권은 매월 5일에 지급됩니다.</p>
           </div>
         </div>
       )}

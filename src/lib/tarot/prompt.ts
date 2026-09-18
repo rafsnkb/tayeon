@@ -129,6 +129,7 @@ function buildVolatileSystemPrompt(
     compatibilityBlock?: string;
     recentlyUsedCards?: string[];
     today?: string;
+    isFollowUp?: boolean;
   }
 ): string {
   const positions = SPREAD_POSITIONS[spread];
@@ -169,6 +170,18 @@ function buildVolatileSystemPrompt(
     ? `## 오늘 날짜\n오늘은 ${extras.today}입니다. 사주/자미두수를 근거로 특정 시기(월운, 세운, "몇 월부터 몇 월 사이" 같은 기간 등)를 언급할 때는 반드시 이 오늘 날짜를 기준으로 그 시기가 이미 지났는지, 지금 한창 진행 중인지, 아직 오지 않았는지를 판단해서 명시하세요. 이미 지나갔거나 끝나가는 시기를 마치 아직 오지 않은 미래처럼("~한 시기가 올 거예요") 말하지 마세요 — 지난 시기라면 "그 시기는 이미 지나갔다/끝나가는 시점이다"라고, 진행 중이라면 "지금이 바로 그 시기다"라고 분명히 짚어주세요.\n\n`
     : "";
 
+  // 좁은 주제의 후속 질문에서, 위 "절대 규칙"(모든 포지션/카드를 빠짐없이 다루라)이 자연스러운 서술
+  // 흐름에 밀려 무시되는 경우가 실사용에서 반복 발견됨(2026-09-18) — 켈틱크로스(10장)처럼 카드가
+  // 많은 스프레드에서 질문이 특정 포지션 한둘과만 관련 있어 보이면, 모델이 그 포지션 위주로만 답하고
+  // 나머지는 서술에서 자연스럽게 빠뜨림. 문장으로 "다 다루라"고 더 강하게 지시해도(실측 0/8 개선)
+  // 해결이 안 됐고, 답변 맨 앞에 포지션별 한 줄 목록을 기계적으로 먼저 쓰게 하니 실측 8/8로 해결됨 —
+  // 이야기 흐름에 맡기지 않고 형식으로 강제하는 방식만 실제로 효과가 있었음. 처음 리딩(대화 히스토리
+  // 없음)은 기존 방식으로도 이미 안정적으로 전부 다뤄지고 있어(과거 검증 기록 참고), 매 답변에 목록을
+  // 넣으면 불필요하게 장황해지므로 후속 질문일 때만 적용한다.
+  const followUpChecklistBlock = extras?.isFollowUp
+    ? `\n## 후속 질문 응답 형식\n이번 질문은 이미 진행 중인 대화의 후속 질문입니다. 위 "절대 규칙"의 "모든 포지션과 카드를 빠짐없이 다루라"는 규칙을 지키기 위해, 답변 맨 앞에 이번에 새로 뽑힌 카드 전부를 나열하는 목록을 먼저 쓰세요 — 포지션 개수만큼(정확히 ${drawnCards.length}줄), 한 줄에 하나씩 "포지션명: 카드이름(정방향/역방향) — 한 줄 요약" 형식으로 빠짐없이 전부 적으세요(질문과 관련이 적어 보이는 포지션도 생략 금지). 그 목록을 다 쓴 다음, 그 아래에 이번 질문과 가장 관련 있는 카드를 중심으로 자연스럽게 풀어 쓰는 실제 답변을 이어서 작성하세요. 이 목록은 후속 질문이라도 절대 생략하지 마세요.\n`
+    : "";
+
   return `${todayBlock}## 스프레드: ${SPREADS[spread].label}
 ${
   spread === "dual"
@@ -181,7 +194,7 @@ ${cardLines}
 위에 나열된 카드는 정확히 ${drawnCards.length}장, 포지션도 정확히 ${drawnCards.length}개입니다. 이 개수를 벗어나서 해석하지 마세요 — 특히 원카드처럼 카드가 1장뿐인데 "과거/현재/미래"처럼 여러 시간대나 여러 포지션으로 쪼개서 설명하는 것은 절대 금지입니다(이전 대화에 다른 스프레드가 있었더라도 이번 스프레드의 포지션 구성을 따르지 마세요).
 
 ${bannedCardsBlock}
-
+${followUpChecklistBlock}
 ${extraSections}`;
 }
 
@@ -195,6 +208,7 @@ export function buildTarotSystemPrompt(
     compatibilityBlock?: string;
     recentlyUsedCards?: string[];
     today?: string;
+    isFollowUp?: boolean;
   }
 ): { stable: string; volatile: string } {
   return {

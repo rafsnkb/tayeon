@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { AdminPageHeader } from "@/components/AdminPageHeader";
 
 type Notice = { id: string; title: string; body: string; createdAt: string };
 const dateTime = (value: string) => value.replace("T", " ").slice(0, 19);
@@ -64,12 +65,9 @@ export default function NoticesPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7F5FA] px-4 py-5 text-[#302B38] sm:px-6 lg:px-10 lg:py-8">
+    <main className="admin-page px-4 pb-12 text-[#1D1D1F] sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl space-y-6">
-        <header className="relative overflow-hidden rounded-[28px] bg-[#30253A] px-6 py-7 text-white shadow-[0_18px_45px_rgb(53_35_67/16%)] sm:px-8">
-          <div className="absolute -right-12 -top-20 h-56 w-56 rounded-full bg-[#FF007F]/20 blur-3xl" />
-          <div className="relative flex flex-wrap justify-between gap-5"><div><p className="text-xs font-semibold tracking-[0.18em] text-[#E7C9DD]">TAYEON ADMIN</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">공지사항</h1><p className="mt-2 text-sm text-[#D6CDDB]">사용자에게 보여 줄 안내를 작성하고 게시합니다.</p></div><button onClick={() => router.push("/users")} className="h-fit rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/20">사용자 관리</button></div>
-        </header>
+        <AdminPageHeader title="공지" description="사용자에게 보여 줄 안내를 간결하게 작성하고 게시합니다." />
 
         <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
           <form onSubmit={submit} className="rounded-[24px] border border-[#E9E3EF] bg-white p-5 shadow-[0_12px_30px_rgb(57_39_73/5%)] sm:p-6">
