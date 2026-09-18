@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
@@ -38,6 +38,14 @@ export const metadata: Metadata = {
     title: TITLE,
     description: DESCRIPTION,
   },
+};
+
+// iPhone의 노치·홈 인디케이터 영역까지 웹앱 뷰포트에 포함한다.
+// 그래야 fixed 모달 딤드가 안전영역 안에서 끊기지 않고 화면 전체를 덮는다.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
