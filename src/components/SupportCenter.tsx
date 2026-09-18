@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { BackIcon, CheckIcon, CloseIcon } from "@/app/(app)/tarot/icons";
 import { auth } from "@/lib/firebase/client";
@@ -14,7 +14,9 @@ type InquiryDraft = { name: string; nickname: string; email: string; content: st
 const INQUIRY_DRAFT_KEY = "tayeon-support-inquiry-draft";
 
 export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
   const [tab, setTab] = useState<Tab>("faq");
   const [openIndex, setOpenIndex] = useState(0);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -24,6 +26,8 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const attachmentsRef = useRef<Attachment[]>([]);
+  const restoredFromUrlRef = useRef(false);
+  const activeTab: Tab = tabFromUrl === "inquiry" ? "inquiry" : tab;
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -32,24 +36,30 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
   useEffect(() => () => attachmentsRef.current.forEach((attachment) => URL.revokeObjectURL(attachment.url)), []);
 
   useEffect(() => {
-    if (searchParams.get("tab") !== "inquiry") return;
-    setTab("inquiry");
-    const saved = window.sessionStorage.getItem(INQUIRY_DRAFT_KEY);
-    if (!saved) return;
-    try {
-      const draft = JSON.parse(saved) as InquiryDraft;
-      const form = formRef.current;
-      if (!form) return;
-      (form.elements.namedItem("name") as HTMLInputElement).value = draft.name;
-      (form.elements.namedItem("nickname") as HTMLInputElement).value = draft.nickname;
-      (form.elements.namedItem("email") as HTMLInputElement).value = draft.email;
-      (form.elements.namedItem("content") as HTMLTextAreaElement).value = draft.content;
-      setAgreed(draft.agreed);
-      setMessage("입력한 문의 내용이 복원됐어요. 첨부 이미지는 다시 선택해주세요.");
-    } catch {
-      window.sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
-    }
-  }, [searchParams]);
+    if (tabFromUrl !== "inquiry" || activeTab !== "inquiry" || restoredFromUrlRef.current) return;
+    // URL로 문의 탭이 이미 렌더링된 다음 실행한다. setTimeout은 브라우저가 form ref를
+    // 확정한 뒤 상태를 갱신해 React의 동기 effect 상태 변경도 피한다.
+    const timer = window.setTimeout(() => {
+      if (restoredFromUrlRef.current) return;
+      restoredFromUrlRef.current = true;
+      const saved = window.sessionStorage.getItem(INQUIRY_DRAFT_KEY);
+      if (!saved) return;
+      try {
+        const draft = JSON.parse(saved) as InquiryDraft;
+        const form = formRef.current;
+        if (!form) return;
+        (form.elements.namedItem("name") as HTMLInputElement).value = draft.name;
+        (form.elements.namedItem("nickname") as HTMLInputElement).value = draft.nickname;
+        (form.elements.namedItem("email") as HTMLInputElement).value = draft.email;
+        (form.elements.namedItem("content") as HTMLTextAreaElement).value = draft.content;
+        setAgreed(draft.agreed);
+        setMessage("입력한 문의 내용이 복원됐어요. 첨부 이미지는 다시 선택해주세요.");
+      } catch {
+        window.sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, tabFromUrl]);
 
   function saveDraft() {
     const form = formRef.current;
@@ -129,7 +139,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
         </div>
       </div>
       <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto p-4 pt-20 pb-24">
-        {tab === "faq" ? (
+        {activeTab === "faq" ? (
           <section>
             <h1 className="mb-3 text-lg font-semibold text-icon-muted">자주 묻는 질문</h1>
             <div className="divide-y divide-border overflow-hidden rounded-[28px] border border-border bg-surface px-4">
@@ -155,7 +165,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
           </section>
         )}
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 p-4 backdrop-blur-lg"><div className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-2xl bg-chip-fill"><button type="button" onClick={() => setTab("faq")} className={`h-12 text-base font-semibold ${tab === "faq" ? "bg-point text-white" : "text-white"}`}>FAQ</button><button type="button" onClick={() => setTab("inquiry")} className={`h-12 text-base font-semibold ${tab === "inquiry" ? "bg-point text-white" : "text-white"}`}>문의하기</button></div></nav>
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 p-4 backdrop-blur-lg"><div className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-2xl bg-chip-fill"><button type="button" onClick={() => { setTab("faq"); router.replace("/support"); }} className={`h-12 text-base font-semibold ${activeTab === "faq" ? "bg-point text-white" : "text-white"}`}>FAQ</button><button type="button" onClick={() => { setTab("inquiry"); router.replace("/support?tab=inquiry"); }} className={`h-12 text-base font-semibold ${activeTab === "inquiry" ? "bg-point text-white" : "text-white"}`}>문의하기</button></div></nav>
     </div>
   );
 }
