@@ -1,10 +1,11 @@
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { PRIVACY_POLICY_SECTIONS, PRIVACY_POLICY_UPDATED_AT } from "@/lib/legal/content";
 
-export default function PrivacyPage() {
+export default async function PrivacyPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
+  const { from } = await searchParams;
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      <SubPageTopBar title="개인정보 처리방침" />
+      <SubPageTopBar title="개인정보 처리방침" backHref={from === "support" ? "/support?tab=inquiry" : undefined} />
       <main className="mx-auto w-full max-w-2xl flex-1 p-4 pt-20">
         <h1 className="mb-2 text-xl font-bold text-bold-text">개인정보처리방침</h1>
         <p className="mb-6 text-sm text-icon-muted">최종 수정일: {PRIVACY_POLICY_UPDATED_AT}</p>

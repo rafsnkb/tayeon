@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { BackIcon, CheckIcon, CloseIcon } from "@/app/(app)/tarot/icons";
 import { auth } from "@/lib/firebase/client";
@@ -8,8 +9,12 @@ import { auth } from "@/lib/firebase/client";
 type Faq = { question: string; answer: string };
 type Tab = "faq" | "inquiry";
 type Attachment = { file: File; url: string };
+type InquiryDraft = { name: string; nickname: string; email: string; content: string; agreed: boolean };
+
+const INQUIRY_DRAFT_KEY = "tayeon-support-inquiry-draft";
 
 export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("faq");
   const [openIndex, setOpenIndex] = useState(0);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -17,6 +22,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const attachmentsRef = useRef<Attachment[]>([]);
 
   useEffect(() => {
@@ -24,6 +30,40 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
   }, [attachments]);
 
   useEffect(() => () => attachmentsRef.current.forEach((attachment) => URL.revokeObjectURL(attachment.url)), []);
+
+  useEffect(() => {
+    if (searchParams.get("tab") !== "inquiry") return;
+    setTab("inquiry");
+    const saved = window.sessionStorage.getItem(INQUIRY_DRAFT_KEY);
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved) as InquiryDraft;
+      const form = formRef.current;
+      if (!form) return;
+      (form.elements.namedItem("name") as HTMLInputElement).value = draft.name;
+      (form.elements.namedItem("nickname") as HTMLInputElement).value = draft.nickname;
+      (form.elements.namedItem("email") as HTMLInputElement).value = draft.email;
+      (form.elements.namedItem("content") as HTMLTextAreaElement).value = draft.content;
+      setAgreed(draft.agreed);
+      setMessage("입력한 문의 내용이 복원됐어요. 첨부 이미지는 다시 선택해주세요.");
+    } catch {
+      window.sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
+    }
+  }, [searchParams]);
+
+  function saveDraft() {
+    const form = formRef.current;
+    if (!form) return;
+    const values = new FormData(form);
+    const draft: InquiryDraft = {
+      name: String(values.get("name") ?? ""),
+      nickname: String(values.get("nickname") ?? ""),
+      email: String(values.get("email") ?? ""),
+      content: String(values.get("content") ?? ""),
+      agreed,
+    };
+    window.sessionStorage.setItem(INQUIRY_DRAFT_KEY, JSON.stringify(draft));
+  }
 
   function addAttachments(files: FileList | null) {
     if (!files) return;
@@ -44,7 +84,10 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
 
   async function submitInquiry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    // async 요청 뒤에는 React 이벤트의 currentTarget을 다시 읽지 않는다.
+    // 제출 시점의 폼 노드를 보관해 성공 뒤 reset도 안전하게 수행한다.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     if (!agreed) {
       setMessage("개인정보 수집 및 이용에 동의해주세요.");
       return;
@@ -64,7 +107,8 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "문의 접수 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.");
-      event.currentTarget.reset();
+      formElement.reset();
+      window.sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
       attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
       setAttachments([]);
       setAgreed(false);
@@ -98,14 +142,14 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
         ) : (
           <section>
             <p className="mb-4 text-center text-sm leading-5 text-icon-muted">이용 중 문제가 발생했거나 문의사항이 있으신 경우,<br />아래 내용을 입력해주세요.</p>
-            <form onSubmit={submitInquiry} className="rounded-[28px] border border-border bg-surface p-4">
+            <form ref={formRef} onSubmit={submitInquiry} className="rounded-[28px] border border-border bg-surface p-4">
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>이름<span className="text-urgent">*</span></span><input required name="name" placeholder="이름을 입력해주세요" className="h-12 rounded-2xl border border-border bg-bg px-3 text-base text-bold-text outline-none placeholder-placeholder" /></label>
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>사용중인 닉네임<span className="text-urgent">*</span></span><input required name="nickname" placeholder="타연에서 사용중인 닉네임을 입력해주세요" className="h-12 rounded-2xl border border-border bg-bg px-3 text-base text-bold-text outline-none placeholder-placeholder" /></label>
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>이메일<span className="text-urgent">*</span></span><input required type="email" name="email" placeholder="이메일을 입력해주세요" className="h-12 rounded-2xl border border-border bg-bg px-3 text-base text-bold-text outline-none placeholder-placeholder" /><span className="text-xs text-urgent">입력하신 메일로 답변해드립니다.</span></label>
               <label className="mb-4 flex flex-col gap-2 text-sm text-icon-muted"><span>문의 내용<span className="text-urgent">*</span></span><textarea required name="content" rows={5} placeholder="문의 내용을 상세하게 입력해주시면 빠른 처리가 가능합니다" className="resize-none rounded-2xl border border-border bg-bg p-3 text-base text-bold-text outline-none placeholder-placeholder" /></label>
               <div className="mb-4"><p className="mb-2 text-sm text-icon-muted">스크린샷 첨부 <span className="text-xs">(이미지 3장, 장당 2MB 이하)</span></p><input ref={fileInputRef} onChange={(event) => { addAttachments(event.target.files); event.currentTarget.value = ""; }} accept="image/*" multiple type="file" className="sr-only" /><div className="flex min-h-20 flex-wrap items-center gap-2 rounded-2xl bg-bg p-3">{attachments.map((attachment, index) => <div key={attachment.url} className="relative h-14 w-14"><div className="h-full w-full overflow-hidden rounded-lg border border-border"><img src={attachment.url} alt={attachment.file.name} className="h-full w-full object-cover" /></div><button type="button" onClick={() => removeAttachment(index)} aria-label={`${attachment.file.name} 삭제`} className="absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-urgent text-urgent-text"><CloseIcon className="h-2 w-2" /></button></div>)}{attachments.length < 3 && <button type="button" onClick={() => fileInputRef.current?.click()} className="ml-auto rounded-full bg-cta-fill px-6 py-2.5 text-sm font-semibold text-cta-text">파일 첨부하기</button>}</div></div>
-              <label className="flex cursor-pointer items-center gap-2 border-t border-border pt-4 text-sm text-bold-text"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="sr-only" /><span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${agreed ? "bg-point text-white" : "border border-border"}`}><CheckIcon className={`h-3 w-3 ${agreed ? "" : "opacity-50"}`} /></span>[필수] 타연의 <Link href="/privacy" className="text-point underline" onClick={(event) => event.stopPropagation()}>개인정보 수집 및 이용</Link>에 동의합니다.</label>
-              {message && <p role="status" className={`mt-3 text-sm ${message.startsWith("문의가 접수") ? "text-point" : "text-urgent"}`}>{message}</p>}
+              <label className="flex cursor-pointer items-center gap-2 border-t border-border pt-4 text-sm text-bold-text"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="sr-only" /><span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${agreed ? "bg-point text-white" : "border border-border"}`}><CheckIcon className={`h-3 w-3 ${agreed ? "" : "opacity-50"}`} /></span>[필수] 타연의 <Link href="/privacy?from=support" className="text-point underline" onClick={(event) => { event.stopPropagation(); saveDraft(); }}>개인정보 수집 및 이용</Link>에 동의합니다.</label>
+              {message && <p role="status" className={`mt-3 text-sm ${message.startsWith("문의가 접수") || message.startsWith("입력한 문의") ? "text-point" : "text-urgent"}`}>{message}</p>}
               <button disabled={isSubmitting} type="submit" className="mt-4 h-12 w-full rounded-full bg-point text-base font-semibold text-white disabled:cursor-wait disabled:opacity-60">{isSubmitting ? "접수 중..." : "문의 접수하기"}</button>
             </form>
           </section>
