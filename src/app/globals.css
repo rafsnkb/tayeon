@@ -115,10 +115,15 @@ body {
    iOS의 동적 주소창 변화에도 안전영역을 포함한 전체 화면을 덮는다. */
 [data-modal-overlay="true"] {
   position: fixed !important;
-  inset: 0 !important;
-  width: 100vw;
-  height: 100dvh;
-  min-height: 100dvh;
+  /* iOS가 layout viewport를 노치 아래에서 시작시키는 경우에도, safe-area만큼
+     역방향으로 늘려 실제 화면 가장자리까지 딤드가 이어지게 한다. */
+  top: calc(env(safe-area-inset-top) * -1) !important;
+  right: calc(env(safe-area-inset-right) * -1) !important;
+  bottom: calc(env(safe-area-inset-bottom) * -1) !important;
+  left: calc(env(safe-area-inset-left) * -1) !important;
+  width: calc(100vw + env(safe-area-inset-left) + env(safe-area-inset-right));
+  height: calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+  min-height: calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom));
 }
 
 /* Chrome/Safari 자동완성의 밝은 배경이 다크 테마 입력칸을 덮어쓰지 않게 한다.
