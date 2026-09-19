@@ -146,7 +146,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
             <div className="divide-y divide-border overflow-hidden rounded-[28px] border border-border bg-surface px-4">
               {faqs.map((faq, index) => {
                 const open = openIndex === index;
-                return <article key={faq.question} className="py-4"><button type="button" onClick={() => setOpenIndex(open ? -1 : index)} aria-expanded={open} className="flex w-full items-center gap-3 text-left"><span className="min-w-0 flex-1 break-keep text-sm font-semibold leading-5 text-bold-text dark:text-[#dcdee3]">{faq.question}</span><BackIcon className={`h-4 w-2 shrink-0 text-bold-text transition-transform dark:text-[#dcdee3] ${open ? "rotate-90" : "-rotate-90"}`} /></button>{open && <p className="mt-3 whitespace-pre-line rounded-2xl bg-[#f7f4fb] p-4 text-sm leading-5 text-text dark:bg-chip-fill dark:text-[#868b9a]">{faq.answer}</p>}</article>;
+                return <article key={faq.question} className="pt-4 pb-[22px]"><button type="button" onClick={() => setOpenIndex(open ? -1 : index)} aria-expanded={open} className="flex w-full items-center gap-3 text-left"><span className="min-w-0 flex-1 break-keep text-sm font-semibold leading-5 text-bold-text dark:text-[#dcdee3]">{faq.question}</span><BackIcon className={`mr-4 h-4 w-2 shrink-0 text-bold-text transition-transform dark:text-[#dcdee3] ${open ? "rotate-90" : "-rotate-90"}`} /></button>{open && <p className="mt-3 whitespace-pre-line rounded-2xl bg-[#f7f4fb] p-4 text-sm leading-5 text-text dark:bg-chip-fill dark:text-[#868b9a]">{faq.answer}</p>}</article>;
               })}
             </div>
           </section>

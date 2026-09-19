@@ -8,7 +8,7 @@ import { useRooms } from "@/lib/tarot/RoomsContext";
 import { CompanyFooter } from "@/components/CompanyFooter";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
-import { PAYMENT_BONUS_REWARD_TIERS, countPassDisplayName, countAllowance, countAllowanceForCombo } from "@/lib/tarot/pricing";
+import { PAYMENT_BONUS_REWARD_TIERS, countPassDisplayName } from "@/lib/tarot/pricing";
 import {
   SearchIcon,
   InvitePersonIcon,
@@ -126,14 +126,6 @@ export default function MyPage() {
   const router = useRouter();
   const { user, nickname, profileImage, email, activeCountPass } = useRooms();
   const activeCountPassName = activeCountPass ? countPassDisplayName(activeCountPass) : null;
-  const activeCountPassOneCardCount = activeCountPass
-    ? Math.round(
-        activeCountPass.remaining *
-          (activeCountPass.combo === "any"
-            ? countAllowance(activeCountPass.basis, "one", false, false)
-            : countAllowanceForCombo(activeCountPass.basis, "one", activeCountPass.combo))
-      )
-    : 0;
   const [accountInfoOpen, setAccountInfoOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null);
@@ -189,26 +181,16 @@ export default function MyPage() {
                 계정정보
               </button>
             </div>
-            <div className="flex items-center justify-between py-3">
-              <span className="flex flex-col gap-1">
-                <span className="text-sm font-semibold text-icon-muted">횟수제 이용권</span>
-                {activeCountPass && (
-                  <span className="text-xs text-icon-muted">
-                    {activeCountPassName} · 원카드 {activeCountPassOneCardCount}회
-                    {activeCountPass.expiresAt ? ` · ${activeCountPass.expiresAt.slice(0, 10)}까지` : ""}
-                  </span>
-                )}
-              </span>
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="flex items-center gap-1.5">
-                  <span className="max-w-40 text-right text-base font-bold leading-tight text-bold-text dark:text-white">
-                    {activeCountPassName ?? "없음"}
-                  </span>
+            <div className="flex items-center justify-between gap-3 py-3">
+              <span className="min-w-0 truncate text-sm font-semibold text-icon-muted">횟수제 이용권</span>
+              <span className="flex min-w-0 shrink-0 items-center gap-3">
+                <span className="max-w-32 truncate text-right text-base font-bold leading-tight text-bold-text dark:text-white">
+                  {activeCountPassName ?? "없음"}
                 </span>
                 <button
                   type="button"
                   onClick={() => router.push("/charge")}
-                  className="rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
+                  className="shrink-0 whitespace-nowrap rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
                 >
                   구입
                 </button>

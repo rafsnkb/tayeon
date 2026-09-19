@@ -123,7 +123,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         {/* 피그마 "Screen / MenuOpen" 기반 + hori.chat 레이아웃 참조(2026-09-14) — 데스크탑에서
             로고 옆 화살표로 사이드바를 아이콘 전용 레일로 접을 수 있음(hori.chat과 동일 동작) */}
         <div className="shrink-0">
-          <div className={`flex h-16 items-center px-4 ${sidebarCollapsed ? "xl:justify-center xl:px-0" : "justify-between"}`}>
+          <div className={`flex h-16 items-center border-b border-border px-4 ${sidebarCollapsed ? "xl:justify-center xl:px-0" : "justify-between"}`}>
             <span className={sidebarCollapsed ? "xl:hidden" : ""}>
               <BrandBi className="h-7 w-14 translate-y-[2px]" />
             </span>
@@ -138,17 +138,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
               />
             </button>
           </div>
-          <div className="mt-2 h-px bg-border" />
-          {sidebarCollapsed && (
-            <button
-              type="button"
-              onClick={handleNewRoom}
-              aria-label="새 대화"
-              className="mt-2 hidden h-10 w-10 items-center justify-center self-center rounded-full bg-cta-fill text-cta-text xl:mx-auto xl:flex"
-            >
-              <NewChatIcon className="h-4 w-4" />
-            </button>
-          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 py-2">
@@ -175,7 +164,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div
-          className={`flex shrink-0 items-center gap-2 p-4 ${sidebarCollapsed ? "xl:justify-center xl:px-2" : ""}`}
+          className={`flex shrink-0 flex-col gap-2 p-4 ${sidebarCollapsed ? "xl:items-center xl:px-2" : ""}`}
         >
           <button
             type="button"
@@ -183,21 +172,29 @@ function AppShell({ children }: { children: React.ReactNode }) {
               setMenuOpen(false);
               router.push("/me");
             }}
-            aria-label="내 정보"
-            className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-border bg-chip-fill"
+            aria-label="마이 페이지"
+            className={`flex h-12 shrink-0 items-center gap-2.5 overflow-hidden rounded-full border border-border bg-chip-fill pr-4 ${
+              sidebarCollapsed ? "xl:w-12 xl:justify-center xl:pr-0" : "w-fit self-start"
+            }`}
           >
-            {profileImage && (
-              <img src={profileImage} alt="" className="h-full w-full object-cover" />
-            )}
+            <span className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-border">
+              {profileImage && (
+                <img src={profileImage} alt="" className="h-full w-full object-cover" />
+              )}
+            </span>
+            <span className={`truncate text-sm font-semibold text-bold-text ${sidebarCollapsed ? "xl:hidden" : ""}`}>
+              마이 페이지
+            </span>
           </button>
           <button
             type="button"
             onClick={handleNewRoom}
-            className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-cta-fill text-sm font-semibold text-cta-text ${
-              sidebarCollapsed ? "xl:hidden" : ""
+            className={`flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-cta-fill text-sm font-semibold text-cta-text ${
+              sidebarCollapsed ? "xl:w-12" : "w-full"
             }`}
           >
-            <NewChatIcon className="h-4 w-4" />새 대화
+            <NewChatIcon className="h-4 w-4" />
+            <span className={sidebarCollapsed ? "xl:hidden" : ""}>새 대화</span>
           </button>
         </div>
       </div>

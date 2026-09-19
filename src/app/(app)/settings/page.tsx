@@ -260,6 +260,14 @@ export default function SettingsPage() {
 
           <button
             type="button"
+            onClick={() => router.push("/settings/open-source")}
+            className="self-center text-sm font-semibold text-point underline underline-offset-2"
+          >
+            오픈소스 라이선스
+          </button>
+
+          <button
+            type="button"
             onClick={() => setDeleteConfirmOpen(true)}
             disabled={deleting}
             className="self-center text-sm font-semibold text-urgent disabled:opacity-50"
