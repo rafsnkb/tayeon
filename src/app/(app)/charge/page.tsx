@@ -163,7 +163,7 @@ export default function ChargePage() {
         title={selected ? "구입하기" : "횟수ㆍ시간제 이용권 구입"}
         onBack={selected ? () => { setSelected(null); setSelectedCombo(null); } : undefined}
       />
-      <div className={`flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto ${!selected && tab === "time" ? "pb-24" : ""}`}>
+      <div className={`flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto ${!selected && tab === "time" ? "pb-40" : "pb-24"}`}>
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           {notice && (
             <div
@@ -370,7 +370,7 @@ export default function ChargePage() {
           </div>
         </div>
       )}
-      <div className="shrink-0 border-t border-border bg-topbar p-4">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-topbar p-4">
         {selected ? (
           <button
             type="button"
