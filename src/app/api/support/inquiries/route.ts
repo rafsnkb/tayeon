@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SUPPORT_EMAIL } from "@/lib/company";
+import {
+  MAX_SUPPORT_ATTACHMENTS,
+  MAX_SUPPORT_ATTACHMENT_BYTES,
+  MAX_SUPPORT_TOTAL_ATTACHMENT_BYTES,
+} from "@/lib/support/constants";
 
 export const runtime = "nodejs";
-
-const MAX_ATTACHMENTS = 3;
-const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
-const MAX_TOTAL_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 
 function textField(value: FormDataEntryValue | null, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const attachments = form.getAll("attachments").filter((value): value is File => value instanceof File);
   const attachmentBytes = attachments.reduce((sum, file) => sum + file.size, 0);
-  if (attachments.length > MAX_ATTACHMENTS || attachments.some((file) => !file.type.startsWith("image/") || file.size > MAX_ATTACHMENT_BYTES) || attachmentBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
+  if (attachments.length > MAX_SUPPORT_ATTACHMENTS || attachments.some((file) => !file.type.startsWith("image/") || file.size > MAX_SUPPORT_ATTACHMENT_BYTES) || attachmentBytes > MAX_SUPPORT_TOTAL_ATTACHMENT_BYTES) {
     return NextResponse.json({ error: "스크린샷은 이미지 3장까지, 장당 2MB 이하로 첨부해주세요." }, { status: 400 });
   }
 

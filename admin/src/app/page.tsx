@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { TIME_PASS_PACKAGES, type ComboKey } from "@/lib/timePassPackages";
 
 type FlaggedReading = { question: string; createdAt: string; spread: string | null };
 
@@ -42,9 +43,6 @@ const GENDER_LABEL: Record<string, string> = { male: "남성", female: "여성",
 
 type Status = "loading" | "unauthenticated" | "forbidden" | "ok";
 
-// admin/은 타연 본체와 완전히 분리된 별도 앱이라 src/lib/tarot/pricing.ts를 import하지 않음 —
-// 본체의 TIME_PASS_PACKAGES/COMBOS와 값이 바뀌면 이 목록들도 같이 수동으로 맞춰줄 것.
-type ComboKey = "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei";
 const COMBO_OPTIONS: { value: ComboKey; label: string }[] = [
   { value: "tarot", label: "타로 전용" },
   { value: "tarot-saju", label: "타로+사주" },
@@ -52,11 +50,10 @@ const COMBO_OPTIONS: { value: ComboKey; label: string }[] = [
   { value: "tarot-saju-ziwei", label: "타로+사주+자미두수" },
 ];
 
-const TIME_PASS_TIERS = [
-  { label: "15분권 (타로만)", minutes: 15, includesOptions: false, priceWon: 8900 },
-  { label: "30분권 (전부 포함)", minutes: 30, includesOptions: true, priceWon: 19900 },
-  { label: "60분권 (전부 포함)", minutes: 60, includesOptions: true, priceWon: 35900 },
-] as const;
+const TIME_PASS_TIERS = TIME_PASS_PACKAGES.map((pkg) => ({
+  ...pkg,
+  label: `${COMBO_OPTIONS.find((option) => option.value === pkg.combo)?.label ?? pkg.combo} ${pkg.minutes}분권 (${pkg.priceWon.toLocaleString()}원)`,
+}));
 
 function StatsBreakdown({
   title,
@@ -246,9 +243,7 @@ export default function AdminHome() {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          minutes: tier.minutes,
-          includesOptions: tier.includesOptions,
-          priceWon: tier.priceWon,
+          productId: tier.id,
           reason: passReason[uid] ?? "",
         }),
       });
@@ -646,7 +641,7 @@ export default function AdminHome() {
                 className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
               >
                 {TIME_PASS_TIERS.map((tier, i) => (
-                  <option key={tier.minutes} value={i}>
+                  <option key={tier.id} value={i}>
                     {tier.label}
                   </option>
                 ))}

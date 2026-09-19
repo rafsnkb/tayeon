@@ -54,6 +54,16 @@ const GUIDANCE_NO_COMPATIBILITY: Record<ToneKey, (nickname: string) => string> =
 // = 20배속 토큰 생성), 서버에서 유저당 동시 요청 1건으로 강제한다(2026-09-13).
 const READING_LOCK_STALE_MS = 60_000; // 서버가 도중에 죽어서 락을 못 지운 경우를 위한 안전장치
 
+// 비용 방어(2026-09-19): 유효한 이용권만 있으면 순차 반복 호출로 Anthropic 비용을 무제한
+// 유발할 수 있어서, 동시요청 락과 별개로 UID 기준 분당/일당 리딩 시작 횟수와 질문 길이를
+// 서버에서 강제한다. 후보값(질문 1,000자, 분당 10회, 일 100회)은 doc/작업현황.md "비용 방어"
+// 절 기준 — 확정치 아님, 실사용 로그 보고 조정 가능하도록 상수화만 해둔다.
+const READING_QUESTION_MAX_LENGTH = 1000;
+const READING_RATE_LIMIT_PER_MINUTE = 10;
+const READING_RATE_LIMIT_PER_DAY = 100;
+const RATE_LIMIT_MINUTE_MS = 60_000;
+const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
+
 const READING_MODEL = "claude-haiku-4-5";
 const READING_MAX_OUTPUT_TOKENS = 8192;
 // 카드/사주·자미두수 안전장치 실패 시 재생성을 시도하는 최대 횟수(2026-09-12, 2→3회로 확대) —
@@ -64,15 +74,54 @@ const MAX_GENERATE_ATTEMPTS = 3;
 const HISTORY_FETCH_LIMIT = 12;
 const HISTORY_CONTEXT_SIZE = 6;
 
-async function acquireReadingLock(userRef: DocumentReference): Promise<boolean> {
+type ReadingLockResult =
+  | { ok: true }
+  | { ok: false; reason: "locked" }
+  | { ok: false; reason: "rate_limited"; scope: "minute" | "day"; retryAfterSeconds: number };
+
+// 동시요청 락 획득과 분당/일당 리딩 카운터 증가를 한 트랜잭션에서 함께 처리한다 — 두 번의
+// 읽기-쓰기 왕복 대신 하나로 묶어 레이스 컨디션 없이 원자적으로 판단한다. 카운터는 고정 윈도우
+// 방식(fixed window)이라 윈도우 경계에서 이론상 살짝 더 몰릴 수 있지만, 목적이 완벽한 레이트리밋이
+// 아니라 순차 반복 호출로 인한 비용 폭주 방지이므로 충분하다.
+async function acquireReadingLock(userRef: DocumentReference): Promise<ReadingLockResult> {
   return adminDb.runTransaction(async (tx) => {
     const snap = await tx.get(userRef);
-    const lockAt = snap.data()?.readingLockAt as string | undefined;
-    if (lockAt && Date.now() - new Date(lockAt).getTime() < READING_LOCK_STALE_MS) {
-      return false;
+    const data = snap.data() ?? {};
+    const now = Date.now();
+
+    const lockAt = data.readingLockAt as string | undefined;
+    if (lockAt && now - new Date(lockAt).getTime() < READING_LOCK_STALE_MS) {
+      return { ok: false, reason: "locked" };
     }
-    tx.update(userRef, { readingLockAt: new Date().toISOString() });
-    return true;
+
+    const minuteWindowStart = data.readingRateMinuteWindowStart
+      ? new Date(data.readingRateMinuteWindowStart as string).getTime()
+      : 0;
+    const minuteExpired = now - minuteWindowStart >= RATE_LIMIT_MINUTE_MS;
+    const minuteCount = Number(data.readingRateMinuteCount ?? 0);
+    if (!minuteExpired && minuteCount >= READING_RATE_LIMIT_PER_MINUTE) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((minuteWindowStart + RATE_LIMIT_MINUTE_MS - now) / 1000));
+      return { ok: false, reason: "rate_limited", scope: "minute", retryAfterSeconds };
+    }
+
+    const dayWindowStart = data.readingRateDayWindowStart
+      ? new Date(data.readingRateDayWindowStart as string).getTime()
+      : 0;
+    const dayExpired = now - dayWindowStart >= RATE_LIMIT_DAY_MS;
+    const dayCount = Number(data.readingRateDayCount ?? 0);
+    if (!dayExpired && dayCount >= READING_RATE_LIMIT_PER_DAY) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((dayWindowStart + RATE_LIMIT_DAY_MS - now) / 1000));
+      return { ok: false, reason: "rate_limited", scope: "day", retryAfterSeconds };
+    }
+
+    tx.update(userRef, {
+      readingLockAt: new Date(now).toISOString(),
+      readingRateMinuteWindowStart: new Date(minuteExpired ? now : minuteWindowStart).toISOString(),
+      readingRateMinuteCount: minuteExpired ? 1 : minuteCount + 1,
+      readingRateDayWindowStart: new Date(dayExpired ? now : dayWindowStart).toISOString(),
+      readingRateDayCount: dayExpired ? 1 : dayCount + 1,
+    });
+    return { ok: true };
   });
 }
 
@@ -96,6 +145,12 @@ export async function POST(req: NextRequest) {
   if (!question || !question.trim()) {
     return NextResponse.json({ error: "질문을 입력해주세요." }, { status: 400 });
   }
+  if (question.length > READING_QUESTION_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: `질문은 최대 ${READING_QUESTION_MAX_LENGTH}자까지 입력할 수 있어요.` },
+      { status: 400 }
+    );
+  }
   const safeQuestion: string = question;
   if (!isSpreadKey(spread)) {
     return NextResponse.json({ error: "스프레드를 선택해주세요." }, { status: 400 });
@@ -107,11 +162,24 @@ export async function POST(req: NextRequest) {
   const userRef = adminDb.collection("users").doc(uid);
   const roomRef = userRef.collection("rooms").doc(roomId);
 
-  const lockAcquired = await acquireReadingLock(userRef);
-  if (!lockAcquired) {
+  const lockResult = await acquireReadingLock(userRef);
+  if (!lockResult.ok) {
+    if (lockResult.reason === "locked") {
+      return NextResponse.json(
+        { error: "이전 질문에 대한 답변을 생성 중이에요. 잠시 후 다시 시도해주세요." },
+        { status: 429 }
+      );
+    }
     return NextResponse.json(
-      { error: "이전 질문에 대한 답변을 생성 중이에요. 잠시 후 다시 시도해주세요." },
-      { status: 429 }
+      {
+        error:
+          lockResult.scope === "minute"
+            ? "짧은 시간에 너무 많은 리딩 요청을 보냈어요. 잠시 후 다시 시도해주세요."
+            : "오늘 이용 가능한 리딩 요청 횟수를 모두 사용했어요. 내일 다시 시도해주세요.",
+        code: "RATE_LIMITED",
+        retryAfterSeconds: lockResult.retryAfterSeconds,
+      },
+      { status: 429, headers: { "Retry-After": String(lockResult.retryAfterSeconds) } }
     );
   }
 

@@ -55,12 +55,17 @@ export async function findUidByReferralCode(code: string): Promise<string | null
   return typeof uid === "string" ? uid : null;
 }
 
-/** 최초 가입 체험 보상. 고정 문서 ID를 써서 OAuth 콜백 재시도에도 한 번만 지급한다. */
+/** 최초 가입 체험 보상. 고정 문서 ID를 써서 OAuth 콜백 재시도에도 한 번만 지급한다.
+ * uid(=kakao:{카카오ID})는 결정적이라 탈퇴 후 재가입해도 동일하므로, 지급 이력은
+ * users/{uid} 서브트리 밖의 최상위 signupGrants 컬렉션에 남겨 recursiveDelete로도
+ * 지워지지 않게 한다(탈퇴→재가입 반복으로 무료 이용권이 재지급되는 것을 막기 위함). */
 export async function grantSignupFreePass(uid: string): Promise<void> {
+  const grantMarkerRef = adminDb.collection("signupGrants").doc(uid);
   const passRef = adminDb.collection("users").doc(uid).collection("countPasses").doc("signup-free");
 
   await adminDb.runTransaction(async (tx) => {
-    if ((await tx.get(passRef)).exists) return;
+    if ((await tx.get(grantMarkerRef)).exists) return;
+    tx.set(grantMarkerRef, { uid, createdAt: new Date().toISOString() });
     tx.set(passRef, {
       productId: "signup-free",
       source: "signup-free",
@@ -79,17 +84,27 @@ export async function grantSignupFreePass(uid: string): Promise<void> {
 /** 신규 가입 리워드. 추천인과 친구 모두에게 원카드 기준 무료 이용권 5회 상당을 멱등 지급한다.
  * 2026-09-18부터 즉시 지급이 아니라 "받은 이용권 내역"에서 조합을 골라 수령하는 대기(pending)
  * 레코드로 바뀌었다(지급일로부터 1개월 내 미수령 시 소멸) — 월간 결제 리워드(functions/src/index.ts의
- * monthlyReferralPayout)와 동일한 pendingRewards 스키마를 공유한다. */
+ * monthlyReferralPayout)와 동일한 pendingRewards 스키마를 공유한다.
+ *
+ * 지급 이력(친구별 멱등 키 + 추천 인원수 카운터)은 users/{referrerUid} 서브트리가 아니라
+ * 최상위 referralGrants/{referrerUid} 문서(+ friends 서브컬렉션)에 둔다. uid는 카카오ID로
+ * 결정적이라, 탈퇴 후 재가입으로 추천인/친구 문서를 새로 만들어도 이 최상위 문서는 그대로 남아
+ * 같은 추천인-친구 조합에 다시 지급되거나 인원수 상한이 리셋되는 것을 막는다. */
 export async function grantSignupReferralReward(referrerUid: string, newUid: string): Promise<void> {
   if (referrerUid === newUid) return;
   const referrerRef = adminDb.collection("users").doc(referrerUid);
-  const grantRef = referrerRef.collection("referralGrants").doc(newUid);
+  const grantParentRef = adminDb.collection("referralGrants").doc(referrerUid);
+  const grantRef = grantParentRef.collection("friends").doc(newUid);
 
   await adminDb.runTransaction(async (tx) => {
-    const [referrerSnap, grantSnap] = await Promise.all([tx.get(referrerRef), tx.get(grantRef)]);
+    const [referrerSnap, grantParentSnap, grantSnap] = await Promise.all([
+      tx.get(referrerRef),
+      tx.get(grantParentRef),
+      tx.get(grantRef),
+    ]);
     if (grantSnap.exists || !referrerSnap.exists) return;
 
-    const invitedFriends = Number(referrerSnap.data()?.referralSignupFriends ?? 0);
+    const invitedFriends = Number(grantParentSnap.data()?.friendsInvited ?? 0);
     if (invitedFriends >= REFERRAL_SIGNUP_FRIEND_CAP) return;
 
     const now = new Date().toISOString();
@@ -112,6 +127,13 @@ export async function grantSignupReferralReward(referrerUid: string, newUid: str
     tx.set(grantRef, { freePasses: REFERRAL_SIGNUP_FREE_PASSES, createdAt: now });
     tx.set(referrerRewardRef, pendingReward("referrer"));
     tx.set(friendRewardRef, pendingReward("friend"));
-    tx.set(referrerRef, { referralSignupFriends: FieldValue.increment(1) }, { merge: true });
+    tx.set(grantParentRef, { referrerUid, friendsInvited: FieldValue.increment(1) }, { merge: true });
   });
+}
+
+/** 추천인이 지금까지 리워드를 받은 친구 수. users 문서가 아니라 최상위 referralGrants 문서를
+ * 기준으로 삼아 탈퇴→재가입으로 카운터가 리셋되지 않게 한다. `/api/referral/me`에서 사용. */
+export async function getReferralInvitedFriendsCount(referrerUid: string): Promise<number> {
+  const snap = await adminDb.collection("referralGrants").doc(referrerUid).get();
+  return Number(snap.data()?.friendsInvited ?? 0);
 }

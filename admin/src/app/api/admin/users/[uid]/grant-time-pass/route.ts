@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
+import { TIME_PASS_PACKAGES } from "@/lib/timePassPackages";
 
-type ComboKey = "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei";
-const TIME_PRODUCTS = [
-  ["timepass-tarot-15", "tarot", 15, 8900], ["timepass-tarot-30", "tarot", 30, 12900], ["timepass-tarot-60", "tarot", 60, 19900],
-  ["timepass-saju-15", "tarot-saju", 15, 12900], ["timepass-saju-30", "tarot-saju", 30, 19900], ["timepass-saju-60", "tarot-saju", 60, 24900],
-  ["timepass-ziwei-15", "tarot-ziwei", 15, 19900], ["timepass-ziwei-30", "tarot-ziwei", 30, 24900], ["timepass-ziwei-60", "tarot-ziwei", 60, 39900],
-  ["timepass-all-15", "tarot-saju-ziwei", 15, 24900], ["timepass-all-30", "tarot-saju-ziwei", 30, 39900], ["timepass-all-60", "tarot-saju-ziwei", 60, 65900],
-] as const;
-const byProductId = new Map(TIME_PRODUCTS.map(([id, combo, minutes, priceWon]) => [id, { combo: combo as ComboKey, minutes, priceWon }]));
+const byProductId = new Map<string, (typeof TIME_PASS_PACKAGES)[number]>(
+  TIME_PASS_PACKAGES.map((pkg) => [pkg.id, pkg])
+);
 
 export async function POST(
   req: NextRequest,
@@ -29,7 +25,7 @@ export async function POST(
     reason?: string;
   };
 
-  const selected = typeof productId === "string" ? byProductId.get(productId as (typeof TIME_PRODUCTS)[number][0]) : null;
+  const selected = typeof productId === "string" ? byProductId.get(productId) : null;
   // 기존 대시보드의 구형 요청은 중단시키지 않되, 새 UI는 productId만 사용한다.
   if (!selected && (!Number.isInteger(minutes) || minutes! <= 0)) {
     return NextResponse.json({ error: "minutes는 양의 정수여야 합니다." }, { status: 400 });

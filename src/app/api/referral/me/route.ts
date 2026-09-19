@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { ensureReferralCode } from "@/lib/referral/code";
+import { ensureReferralCode, getReferralInvitedFriendsCount } from "@/lib/referral/code";
 import { REFERRAL_SIGNUP_FRIEND_CAP } from "@/lib/tarot/pricing";
 
 export async function GET(req: NextRequest) {
@@ -11,8 +10,7 @@ export async function GET(req: NextRequest) {
   }
 
   const code = await ensureReferralCode(uid);
-  const userSnap = await adminDb.collection("users").doc(uid).get();
-  const invitedFriends = Number(userSnap.data()?.referralSignupFriends ?? 0);
+  const invitedFriends = await getReferralInvitedFriendsCount(uid);
 
   return NextResponse.json({
     code,

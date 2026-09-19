@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SPREADS, type SpreadKey } from "@/lib/tarot/pricing";
 
-const ROOM_LIMIT = 30;
+const USAGE_HISTORY_ROOM_SCAN_LIMIT = 30;
 const READINGS_PER_ROOM = 20;
 const ENTRY_LIMIT = 50;
 
@@ -34,7 +34,11 @@ export async function GET(req: NextRequest) {
   }
 
   const userRef = adminDb.collection("users").doc(uid);
-  const roomsSnap = await userRef.collection("rooms").orderBy("updatedAt", "desc").limit(ROOM_LIMIT).get();
+  const roomsSnap = await userRef
+    .collection("rooms")
+    .orderBy("updatedAt", "desc")
+    .limit(USAGE_HISTORY_ROOM_SCAN_LIMIT)
+    .get();
 
   const entries: UsageEntry[] = [];
   for (const room of roomsSnap.docs) {

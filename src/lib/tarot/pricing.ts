@@ -207,10 +207,11 @@ export function remainingAfterUse(pass: CountPassBalance, spread: SpreadKey, saj
   return Math.round(next * largestAllowance) > 0 ? next : 0;
 }
 
-// 시간제 무제한 상품(구매 시간 내 이용 무제한). 2026-09-19부터 횟수제와 동일하게 조합 4종 ×
-// 시간 3종 = 12개 SKU로 개편 — admin/src/app/api/admin/users/[uid]/grant-time-pass/route.ts의
-// 관리자 지급 카탈로그와 정확히 같은 id·가격을 쓴다(admin은 본체와 분리된 별도 앱이라 값만 복사
-// 유지, admin/AGENTS.md 참고).
+// 시간제 무제한 상품(구매 시간 내 이용 무제한). 조합 4종 × 시간 3종 = 12개 SKU.
+// admin/은 본체와 완전히 분리된 별도 앱(별도 App Hosting backend, Turbopack 빌드 루트도
+// admin/ 하나로 고정돼 있어 리포 루트를 걸치는 공유 모듈을 쓸 수 없음)이라, 이 값을 그대로
+// admin/src/lib/timePassPackages.ts에 복제해서 유지한다 — 이 배열을 바꾸면 그 파일도 반드시
+// 같이 고칠 것(id·priceWon·minutes·combo 전부 동일해야 함).
 export const TIME_PASS_PACKAGES = [
   { id: "timepass-tarot-15", combo: "tarot", priceWon: 8900, minutes: 15 },
   { id: "timepass-tarot-30", combo: "tarot", priceWon: 12900, minutes: 30 },
