@@ -607,12 +607,22 @@ export async function POST(req: NextRequest) {
       // 시도한다 — 대부분의 경우 재시도에서 정상적으로 해결되어 사용자가 실패를 볼 일 자체가 크게
       // 줄어든다(2026-09-11). 최대 시도 횟수를 2→3회로 늘림(2026-09-12) — 1회 재시도까지 실패해서
       // 모델이 완전히 헛도는(카드 언급 없이 "카드 준비 중" 같은 알 수 없는 텍스트를 내놓거나, 금지된
-      // 되묻기를 하는) 응답이 그대로 노출되는 사례가 실사용에서 발견됨. 실패했을 때만 추가 API
-      // 호출이 발생하므로 정상 응답엔 비용·지연 영향 없음.
+      // 되묻기를 하는) 응답이 그대로 노출되는 사례가 실사용에서 발견됨.
+      //
+      // markedNoCharge/markedGuidance면 재시도하지 않고 즉시 멈춘다(2026-09-19 버그 수정) — 이 두
+      // 마커는 모델이 "무관한 질문/인젝션" 또는 "옵션 안내"를 의도적으로, 정확하게 판단했다는
+      // 뜻이라 cardsOk가 false여도 실패가 아니다. 예전 코드는 이 경우도 실패로 취급해서 3번을
+      // 전부 소진했는데, 같은 질문이면 모델이 매번 똑같이 판단하니 재시도는 무의미한 API 호출
+      // 3배·지연 3배만 유발했고, 실제로 이게 쌓여서(약 35초) 인프라 타임아웃으로 500이 나는 사고로
+      // 이어진 사례가 있었다(운영 로그로 확인). 진짜 재시도가 필요한 건 카드/사주/자미두수 누락처럼
+      // 모델이 형식을 놓친 경우뿐이다.
       let attempt = await generate();
       for (
         let i = 1;
-        i < MAX_GENERATE_ATTEMPTS && !(attempt.cardsOk && attempt.sajuOk && attempt.ziweiOk);
+        i < MAX_GENERATE_ATTEMPTS &&
+        !attempt.markedNoCharge &&
+        !attempt.markedGuidance &&
+        !(attempt.cardsOk && attempt.sajuOk && attempt.ziweiOk);
         i++
       ) {
         attempt = await generate();
