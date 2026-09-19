@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import type { BirthInfo, JasiRule } from "@/lib/tarot/birthInfo";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import InfoModal from "@/components/InfoModal";
 
 function ToggleGroup<T extends string>({
   options,
@@ -12,7 +13,7 @@ function ToggleGroup<T extends string>({
   onChange,
 }: {
   options: { value: T; label: string }[];
-  value: T;
+  value: string;
   onChange: (v: T) => void;
 }) {
   return (
@@ -46,6 +47,18 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 
 type CalendarMode = "solar" | "lunar" | "lunarLeap";
 
+type ProfileSnapshot = {
+  nickname: string;
+  calendarMode: CalendarMode;
+  birthDate: string;
+  birthTime: string;
+  timeUnknown: boolean;
+  jasiRule: JasiRule;
+  useTrueSolarTime: boolean;
+  gender: BirthInfo["gender"] | "";
+  birthPlace: string;
+};
+
 function toCalendarMode(calendarType: BirthInfo["calendarType"], isLeapMonth: boolean): CalendarMode {
   if (calendarType === "solar") return "solar";
   return isLeapMonth ? "lunarLeap" : "lunar";
@@ -67,6 +80,18 @@ export default function MyProfilePage() {
   const [birthPlace, setBirthPlace] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState<ProfileSnapshot>({
+    nickname: "",
+    calendarMode: "solar",
+    birthDate: "",
+    birthTime: "",
+    timeUnknown: false,
+    jasiRule: "midnight",
+    useTrueSolarTime: false,
+    gender: "",
+    birthPlace: "",
+  });
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -76,25 +101,51 @@ export default function MyProfilePage() {
       const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
       if (res.ok) {
         const data = await res.json();
-        setNickname(data.nickname ?? "");
+        const nextNickname = data.nickname ?? "";
+        setNickname(nextNickname);
         const info = data.birthInfo as BirthInfo | null;
         if (info) {
-          setCalendarMode(toCalendarMode(info.calendarType, info.isLeapMonth));
-          setBirthDate(info.birthDate ?? "");
-          setBirthTime(info.birthTime ?? "");
-          setTimeUnknown(info.timeUnknown);
-          setJasiRule(info.jasiRule);
-          setUseTrueSolarTime(Boolean(info.useTrueSolarTime));
-          setGender(info.gender);
-          setBirthPlace(info.birthPlace ?? "");
+          const loaded: ProfileSnapshot = {
+            nickname: nextNickname,
+            calendarMode: toCalendarMode(info.calendarType, info.isLeapMonth),
+            birthDate: info.birthDate ?? "",
+            birthTime: info.birthTime ?? "",
+            timeUnknown: info.timeUnknown,
+            jasiRule: info.jasiRule,
+            useTrueSolarTime: Boolean(info.useTrueSolarTime),
+            gender: info.gender,
+            birthPlace: info.birthPlace ?? "",
+          };
+          setCalendarMode(loaded.calendarMode);
+          setBirthDate(loaded.birthDate);
+          setBirthTime(loaded.birthTime);
+          setTimeUnknown(loaded.timeUnknown);
+          setJasiRule(loaded.jasiRule);
+          setUseTrueSolarTime(loaded.useTrueSolarTime);
+          setGender(loaded.gender);
+          setBirthPlace(loaded.birthPlace);
+          setSnapshot(loaded);
+        } else {
+          setSnapshot((prev) => ({ ...prev, nickname: nextNickname }));
         }
       }
     });
   }, []);
 
+  const isDirty =
+    nickname !== snapshot.nickname ||
+    calendarMode !== snapshot.calendarMode ||
+    birthDate !== snapshot.birthDate ||
+    birthTime !== snapshot.birthTime ||
+    timeUnknown !== snapshot.timeUnknown ||
+    jasiRule !== snapshot.jasiRule ||
+    useTrueSolarTime !== snapshot.useTrueSolarTime ||
+    gender !== snapshot.gender ||
+    birthPlace !== snapshot.birthPlace;
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || saving || !gender) return;
+    if (!user || saving || !gender || !isDirty) return;
     setSaving(true);
     setError(null);
     try {
@@ -118,15 +169,19 @@ export default function MyProfilePage() {
       if (!res.ok) {
         const data = await res.json();
         setError(data.error ?? "저장에 실패했어요.");
+        return;
       }
+      setSnapshot({ nickname, calendarMode, birthDate, birthTime, timeUnknown, jasiRule, useTrueSolarTime, gender, birthPlace });
+      setSavedOpen(true);
     } finally {
       setSaving(false);
     }
   }
 
-  const canSave = Boolean(gender && birthDate && nickname.trim());
+  const canSave = Boolean(gender && birthDate && nickname.trim() && isDirty);
 
   return (
+    <>
     <form onSubmit={handleSave} className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="내 프로필 관리" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
@@ -190,7 +245,7 @@ export default function MyProfilePage() {
                 { value: "male", label: "남성" },
                 { value: "unspecified", label: "선택안함" },
               ]}
-              value={gender || "female"}
+              value={gender}
               onChange={setGender}
             />
           </div>
@@ -223,5 +278,7 @@ export default function MyProfilePage() {
         </button>
       </div>
     </form>
+    {savedOpen && <InfoModal title="저장되었습니다" onClose={() => setSavedOpen(false)} />}
+    </>
   );
 }

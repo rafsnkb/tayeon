@@ -1,10 +1,12 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { AdminPageHeader } from "@/components/AdminPageHeader";
+import { COUNT_PACKAGES } from "@/lib/countPassPackages";
+import { TIME_PASS_PACKAGES } from "@/lib/timePassPackages";
 
 type UserItem = {
   uid: string;
@@ -131,36 +133,44 @@ function SuspensionControls({ uid, suspended }: { uid: string; suspended: boolea
   return <div className="flex flex-wrap items-center gap-2"><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="정지 사유" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><input value={days} onChange={(e) => setDays(e.target.value)} type="number" min="1" max="3650" placeholder="일수 (비우면 영구)" className="w-36 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={() => update(true)} className="rounded-xl bg-[#B82958] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "처리 중..." : "정지 적용"}</button>{message && <p className="text-xs text-red-600">{message}</p>}</div>;
 }
 
+const CUSTOM_COUNT_VALUE = "custom";
+
 function CountPassGrantControls({ uid }: { uid: string }) {
+  const [productId, setProductId] = useState<string>(COUNT_PACKAGES[0].id);
   const [count, setCount] = useState("");
   const [combo, setCombo] = useState("tarot");
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const isCustom = productId === CUSTOM_COUNT_VALUE;
   async function grant() {
     const admin = auth.currentUser;
     if (!admin) return;
     setBusy(true); setMessage(null);
     try {
       const token = await admin.getIdToken();
-      const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/grant-count-pass`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ count: Number(count), combo, reason }) });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) return setMessage(body.error ?? "이용권 지급에 실패했습니다.");
+      const body = isCustom ? { count: Number(count), combo, reason } : { productId, combo, reason };
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/grant-count-pass`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+      const responseBody = await response.json().catch(() => ({}));
+      if (!response.ok) return setMessage(responseBody.error ?? "이용권 지급에 실패했습니다.");
       setMessage("횟수제 이용권을 지급했습니다."); setCount(""); setReason("");
     } finally { setBusy(false); }
   }
-  return <div className="flex flex-wrap items-center gap-2"><input value={count} onChange={(e) => setCount(e.target.value)} type="number" min="1" max="10000" placeholder="횟수" className="w-20 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><select value={combo} onChange={(e) => setCombo(e.target.value)} className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]"><option value="tarot">타로</option><option value="tarot-saju">타로+사주</option><option value="tarot-ziwei">타로+자미두수</option><option value="tarot-saju-ziwei">타로+사주+자미두수</option></select><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "횟수제 지급"}</button>{message && <p className="text-xs text-[#B81D6E]">{message}</p>}</div>;
+  return <div className="flex flex-wrap items-center gap-2">
+    <select value={productId} onChange={(e) => setProductId(e.target.value)} className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]">
+      {COUNT_PACKAGES.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} · {pkg.priceWon.toLocaleString("ko-KR")}원</option>)}
+      <option value={CUSTOM_COUNT_VALUE}>직접 입력(커스텀)</option>
+    </select>
+    {isCustom && <input value={count} onChange={(e) => setCount(e.target.value)} type="number" min="1" max="10000" placeholder="횟수" className="w-20 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" />}
+    <select value={combo} onChange={(e) => setCombo(e.target.value)} className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]"><option value="tarot">타로</option><option value="tarot-saju">타로+사주</option><option value="tarot-ziwei">타로+자미두수</option><option value="tarot-saju-ziwei">타로+사주+자미두수</option></select>
+    <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" />
+    <button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "횟수제 지급"}</button>
+    {message && <p className="text-xs text-[#B81D6E]">{message}</p>}
+  </div>;
 }
 
-const TIME_GRANT_PRODUCTS = [
-  ["timepass-tarot-15", "타로 15분 · 8,900원"], ["timepass-tarot-30", "타로 30분 · 12,900원"], ["timepass-tarot-60", "타로 60분 · 19,900원"],
-  ["timepass-saju-15", "타로+사주 15분 · 12,900원"], ["timepass-saju-30", "타로+사주 30분 · 19,900원"], ["timepass-saju-60", "타로+사주 60분 · 24,900원"],
-  ["timepass-ziwei-15", "타로+자미두수 15분 · 19,900원"], ["timepass-ziwei-30", "타로+자미두수 30분 · 24,900원"], ["timepass-ziwei-60", "타로+자미두수 60분 · 39,900원"],
-  ["timepass-all-15", "타로+사주+자미두수 15분 · 24,900원"], ["timepass-all-30", "타로+사주+자미두수 30분 · 39,900원"], ["timepass-all-60", "타로+사주+자미두수 60분 · 65,900원"],
-] as const;
-
 function TimePassGrantControls({ uid }: { uid: string }) {
-  const [productId, setProductId] = useState<string>(TIME_GRANT_PRODUCTS[0][0]);
+  const [productId, setProductId] = useState<string>(TIME_PASS_PACKAGES[0].id);
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -175,7 +185,7 @@ function TimePassGrantControls({ uid }: { uid: string }) {
       setMessage("시간제 이용권을 지급했습니다."); setReason("");
     } finally { setBusy(false); }
   }
-  return <div className="flex flex-wrap items-center gap-2"><select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-64 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]">{TIME_GRANT_PRODUCTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유 (선택)" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "시간제 지급"}</button>{message && <p className="text-xs text-[#B81D6E]">{message}</p>}</div>;
+  return <div className="flex flex-wrap items-center gap-2"><select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-64 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]">{TIME_PASS_PACKAGES.map((pkg) => <option key={pkg.id} value={pkg.id}>{COMBO_LABEL[pkg.combo]} {pkg.minutes}분 · {pkg.priceWon.toLocaleString("ko-KR")}원</option>)}</select><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유 (선택)" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "시간제 지급"}</button>{message && <p className="text-xs text-[#B81D6E]">{message}</p>}</div>;
 }
 
 function UserOverviewPanel({ overview, uid, suspended }: { overview: UserOverview; uid: string; suspended: boolean }) {
@@ -372,8 +382,7 @@ export default function UserDirectoryPage() {
               <tr><td colSpan={8} className="px-4 py-16 text-center text-[#AAA1B0]">표시할 사용자가 없습니다.</td></tr>
             ) : (
               entries.map((entry) => (
-                <Fragment key={entry.uid}>
-                <tr className="transition-colors hover:bg-[#FCF9FC]">
+                <tr key={entry.uid} className={`transition-colors hover:bg-[#FCF9FC] ${openUid === entry.uid ? "bg-[#FCF9FC]" : ""}`}>
                   <td className="px-6 py-4">
                     <p className="font-semibold text-[#342B3D]">{entry.nickname ?? "(닉네임 없음)"}</p>
                     <div className="mt-1 flex items-center gap-2">
@@ -396,23 +405,26 @@ export default function UserDirectoryPage() {
                   <td className="px-4 py-4 text-[#584D61]">{entry.bonusRewardPasses}개</td>
                   <td className="px-6 py-4 text-[#584D61]">{entry.friendInvitePasses}개</td>
                 </tr>
-                {openUid === entry.uid && (
-                  <tr className="bg-[#FCF9FC]">
-                    <td colSpan={8} className="px-6 pb-6 pt-1">
-                      {overviewLoading === entry.uid ? (
-                        <div className="rounded-2xl border border-[#ECE4F0] bg-white px-4 py-8 text-center text-sm text-[#93899A]">상세 정보를 불러오는 중...</div>
-                      ) : overview[entry.uid] ? (
-                        <UserOverviewPanel overview={overview[entry.uid]} uid={entry.uid} suspended={entry.status === "suspended"} />
-                      ) : null}
-                    </td>
-                  </tr>
-                )}
-                </Fragment>
               ))
             )}
           </tbody>
         </table>
           </div>
+          {/* 상세 패널은 가로 스크롤 테이블 밖(폭 제약 없는 영역)에 둔다 — 테이블 셀 안에 두면
+              min-w-[1300px] 제약을 그대로 물려받아 모바일에서 패널 내부 반응형 그리드가 못 펼쳐짐. */}
+          {openUid && (() => {
+            const entry = entries.find((e) => e.uid === openUid);
+            if (!entry) return null;
+            return (
+              <div className="border-t border-[#EEEAF1] bg-[#FCF9FC] px-4 pb-6 pt-4 sm:px-6">
+                {overviewLoading === openUid ? (
+                  <div className="rounded-2xl border border-[#ECE4F0] bg-white px-4 py-8 text-center text-sm text-[#93899A]">상세 정보를 불러오는 중...</div>
+                ) : overview[openUid] ? (
+                  <UserOverviewPanel overview={overview[openUid]} uid={openUid} suspended={entry.status === "suspended"} />
+                ) : null}
+              </div>
+            );
+          })()}
         </section>
 
         <nav className="flex items-center justify-between px-1" aria-label="사용자 목록 페이지">

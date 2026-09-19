@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       claimedAt: data.claimedAt ?? null,
       claimedCombo: data.claimedComboAndPassId?.combo,
       comboAllowances:
-        status === "pending"
+        status === "pending" || status === "claimed"
           ? (Object.fromEntries(
               (Object.keys(COMBOS) as ComboKey[]).map((combo) => [combo, countAllowancesForCombo(data.basis, combo)])
             ) as Record<ComboKey, Record<string, number>>)
@@ -83,6 +83,9 @@ export async function GET(req: NextRequest) {
       claimWindowExpiresAt: null,
       claimedAt: data.createdAt,
       claimedCombo: data.combo,
+      comboAllowances: Object.fromEntries(
+        (Object.keys(COMBOS) as ComboKey[]).map((combo) => [combo, countAllowancesForCombo(data.basis, combo)])
+      ) as Record<ComboKey, Record<string, number>>,
     };
   });
 

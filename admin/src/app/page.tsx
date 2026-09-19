@@ -406,12 +406,12 @@ export default function AdminHome() {
   }
 
   return (
-    <main className="admin-page"><div className="mx-auto max-w-[920px] space-y-7 px-6 pb-12 pt-12">
-      <header className="flex items-end justify-between border-b border-[#D2D2D7] pb-7">
-        <div><p className="mb-2 text-xs font-semibold tracking-wide text-[#86868B]">TAYEON ADMIN</p><h1 className="text-4xl font-semibold tracking-[-.04em] text-[#1D1D1F]">개요</h1><p className="mt-2 text-sm text-[#6E6E73]">오늘 확인할 운영 항목을 빠르게 살펴보세요.</p></div>
+    <main className="admin-page"><div className="mx-auto max-w-[920px] space-y-7 px-4 pb-12 pt-8 sm:px-6 sm:pt-12">
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#D2D2D7] pb-7">
+        <div className="min-w-0"><p className="mb-2 text-xs font-semibold tracking-wide text-[#86868B]">TAYEON ADMIN</p><h1 className="text-3xl font-semibold tracking-[-.04em] text-[#1D1D1F] sm:text-4xl">개요</h1><p className="mt-2 text-sm text-[#6E6E73]">오늘 확인할 운영 항목을 빠르게 살펴보세요.</p></div>
         <button
           onClick={() => signOut(auth)}
-          className="rounded-full bg-[#E8E8ED] px-3.5 py-2 text-xs font-medium text-[#424245]"
+          className="max-w-full shrink-0 truncate rounded-full bg-[#E8E8ED] px-3.5 py-2 text-xs font-medium text-[#424245]"
         >
           로그아웃 ({user?.email})
         </button>

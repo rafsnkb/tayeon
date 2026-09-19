@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
+import {
+  COMBOS,
+  COUNT_PACKAGES,
+  COUNT_PASS_VALIDITY_MONTHS,
+  countAllowancesForCombo,
+  type ComboKey,
+} from "@/lib/countPassPackages";
 
-// src/lib/tarot/pricing.ts의 ComboKey/COMBOS/countAllowance와 동일한 값 — admin은 본체와 완전히
-// 분리된 별도 앱이라(2026-09-18 이용권 조합 고정 개편, admin/AGENTS.md 참고) 값만 그대로 복사한다.
-type ComboKey = "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei";
-const COMBOS: Record<ComboKey, { saju: boolean; ziwei: boolean }> = {
-  tarot: { saju: false, ziwei: false },
-  "tarot-saju": { saju: true, ziwei: false },
-  "tarot-ziwei": { saju: false, ziwei: true },
-  "tarot-saju-ziwei": { saju: true, ziwei: true },
-};
-const SPREAD_COSTS = { one: 200, three: 300, dual: 400, celtic: 500 } as const;
-
-function allowancesForCombo(basis: number, combo: ComboKey): Record<string, number> {
-  const { saju, ziwei } = COMBOS[combo];
-  const multiplier = saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
-  return Object.fromEntries(
-    Object.entries(SPREAD_COSTS).map(([spread, cost]) => [spread, Math.round(Math.round(basis / cost) * multiplier)])
-  );
-}
+const byProductId = new Map<string, (typeof COUNT_PACKAGES)[number]>(COUNT_PACKAGES.map((pkg) => [pkg.id, pkg]));
 
 export async function POST(
   req: NextRequest,
@@ -29,15 +19,19 @@ export async function POST(
   if (!adminUid) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const { uid } = await params;
-  const { count, combo, reason } = (await req.json()) as {
+  const { productId, count, combo, reason } = (await req.json()) as {
+    productId?: string;
     count?: number;
     combo?: ComboKey;
     reason?: string;
   };
   const trimmedReason = reason?.trim() ?? "";
 
-  if (typeof count !== "number" || !Number.isInteger(count) || count < 1 || count > 10_000) {
-    return NextResponse.json({ error: "횟수는 1회 이상 10,000회 이하여야 합니다." }, { status: 400 });
+  const selected = typeof productId === "string" ? byProductId.get(productId) : null;
+  // 상점과 동일한 상품(productId)을 고르면 그 가격표를 그대로 쓰고, 아니면 기존처럼 임의 횟수를
+  // 직접 입력하는 레거시 방식을 허용한다(과거부터 있던 커스텀 지급 요구 — 특정 사건 보상 등).
+  if (!selected && (typeof count !== "number" || !Number.isInteger(count) || count < 1 || count > 10_000)) {
+    return NextResponse.json({ error: "상품을 선택하거나, 횟수를 1~10,000 사이로 입력해주세요." }, { status: 400 });
   }
   if (!combo || !(combo in COMBOS)) {
     return NextResponse.json({ error: "이용권 옵션이 올바르지 않습니다." }, { status: 400 });
@@ -56,30 +50,43 @@ export async function POST(
     return NextResponse.json({ error: "태어난 시간이 없는 사용자에게는 자미두수 포함 이용권을 지급할 수 없어요." }, { status: 409 });
   }
 
+  const basis = selected ? selected.basis : count! * 200;
+  const freePasses = selected ? Math.round(selected.basis / 200) : count!;
+
   const passRef = userRef.collection("countPasses").doc();
   const createdAt = new Date().toISOString();
-  const basis = count * 200;
+  // 상점과 동일한 상품(productId)으로 지급할 땐 실제 구매와 똑같이 12개월 유효기간을 둔다.
+  // 레거시 커스텀 지급(직접 입력한 횟수)은 원래부터 만료 없이 지급해온 동작을 그대로 유지한다.
+  let expiresAt: string | null = null;
+  if (selected) {
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + COUNT_PASS_VALIDITY_MONTHS);
+    expiresAt = expiry.toISOString();
+  }
   await passRef.set({
     source: "admin-grant",
-    productId: null,
+    productId: selected ? selected.id : null,
     combo,
-    freePasses: count,
+    freePasses,
     basis,
     remaining: 1,
-    allowances: allowancesForCombo(basis, combo),
+    usedCount: 0,
+    allowances: countAllowancesForCombo(basis, combo),
     status: "unused",
+    priceWon: selected?.priceWon ?? null,
     reason: trimmedReason,
     grantedByUid: adminUid,
     // 로컬 ADC에서는 Firebase Auth의 사용자 조회가 quota-project 설정을 요구한다.
     // 지급 권한은 이미 ID 토큰의 UID allowlist로 검증했으므로 UID만 감사 기록으로 남긴다.
     grantedByEmail: null,
     createdAt,
-    expiresAt: null,
+    expiresAt,
   });
 
   return NextResponse.json({
     passId: passRef.id,
-    count,
+    productId: selected?.id ?? null,
+    freePasses,
     combo,
   });
 }

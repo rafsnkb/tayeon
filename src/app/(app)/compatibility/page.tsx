@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import InfoModal from "@/components/InfoModal";
 
 type Partner = {
   nickname: string;
@@ -16,6 +17,16 @@ type Partner = {
 };
 
 type CalendarMode = "solar" | "lunar" | "lunarLeap";
+
+type ProfileSnapshot = {
+  nickname: string;
+  calendarMode: CalendarMode;
+  birthDate: string;
+  birthTime: string;
+  timeUnknown: boolean;
+  gender: Partner["gender"];
+  birthPlace: string;
+};
 
 function toCalendarMode(calendarType: Partner["calendarType"], isLeapMonth?: boolean): CalendarMode {
   if (calendarType === "solar") return "solar";
@@ -74,6 +85,16 @@ export default function CompatibilityPage() {
   const [birthPlace, setBirthPlace] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState<ProfileSnapshot>({
+    nickname: "",
+    calendarMode: "solar",
+    birthDate: "",
+    birthTime: "",
+    timeUnknown: false,
+    gender: "unspecified",
+    birthPlace: "",
+  });
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -87,21 +108,40 @@ export default function CompatibilityPage() {
         const data = await res.json();
         const partner = data.partner as Partner | null;
         if (partner) {
-          setNickname(partner.nickname);
-          setCalendarMode(toCalendarMode(partner.calendarType, partner.isLeapMonth));
-          setBirthDate(partner.birthDate ?? "");
-          setBirthTime(partner.birthTime ?? "");
-          setTimeUnknown(!partner.birthTime);
-          setGender(partner.gender);
-          setBirthPlace(partner.birthPlace ?? "");
+          const loaded: ProfileSnapshot = {
+            nickname: partner.nickname,
+            calendarMode: toCalendarMode(partner.calendarType, partner.isLeapMonth),
+            birthDate: partner.birthDate ?? "",
+            birthTime: partner.birthTime ?? "",
+            timeUnknown: !partner.birthTime,
+            gender: partner.gender,
+            birthPlace: partner.birthPlace ?? "",
+          };
+          setNickname(loaded.nickname);
+          setCalendarMode(loaded.calendarMode);
+          setBirthDate(loaded.birthDate);
+          setBirthTime(loaded.birthTime);
+          setTimeUnknown(loaded.timeUnknown);
+          setGender(loaded.gender);
+          setBirthPlace(loaded.birthPlace);
+          setSnapshot(loaded);
         }
       }
     });
   }, []);
 
+  const isDirty =
+    nickname !== snapshot.nickname ||
+    calendarMode !== snapshot.calendarMode ||
+    birthDate !== snapshot.birthDate ||
+    birthTime !== snapshot.birthTime ||
+    timeUnknown !== snapshot.timeUnknown ||
+    gender !== snapshot.gender ||
+    birthPlace !== snapshot.birthPlace;
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !nickname.trim() || submitting) return;
+    if (!user || !nickname.trim() || submitting || !isDirty) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -124,12 +164,15 @@ export default function CompatibilityPage() {
         setError(data.error ?? "저장에 실패했어요.");
         return;
       }
+      setSnapshot({ nickname: nickname.trim(), calendarMode, birthDate, birthTime, timeUnknown, gender, birthPlace });
+      setSavedOpen(true);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
+    <>
     <form onSubmit={handleSave} className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="궁합 상대 프로필 관리" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
@@ -217,14 +260,16 @@ export default function CompatibilityPage() {
       <div className="shrink-0 border-t border-border bg-topbar p-4">
         <button
           type="submit"
-          disabled={!nickname.trim() || submitting}
+          disabled={!nickname.trim() || submitting || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            nickname.trim() ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            nickname.trim() && isDirty ? "bg-point text-white" : "bg-chip-fill text-placeholder"
           } disabled:opacity-60`}
         >
           저장하기
         </button>
       </div>
     </form>
+    {savedOpen && <InfoModal title="저장되었습니다" onClose={() => setSavedOpen(false)} />}
+    </>
   );
 }

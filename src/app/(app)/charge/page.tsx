@@ -210,9 +210,10 @@ export default function ChargePage() {
                         isSelected ? "border-2 border-point" : "border border-border"
                       }`}
                     >
-                      <div className="mb-2 flex items-center justify-center">
-                        <p className="text-sm font-semibold text-bold-text">{COMBOS[combo].label}</p>
-                        <span className={`absolute right-4 top-4 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSelected ? "bg-point" : "bg-[#34363c]"}`}>
+                      <div className="mb-4 flex items-center justify-center gap-2">
+                        <span className="h-6 w-6 shrink-0" aria-hidden="true" />
+                        <p className="flex-1 text-center text-sm font-semibold text-bold-text">{COMBOS[combo].label}</p>
+                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSelected ? "bg-point" : "bg-[#34363c]"}`}>
                           <span className={`h-2.5 w-2.5 rounded-full ${isSelected ? "bg-white" : "bg-[#70747d]"}`} />
                         </span>
                       </div>

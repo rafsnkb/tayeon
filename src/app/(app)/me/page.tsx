@@ -221,7 +221,7 @@ export default function MyPage() {
                 className="flex items-center gap-1.5 text-sm font-semibold text-icon-muted"
               >
                 {bonusReward ? `${bonusReward.month}월 보너스 리워드` : "이번 달 보너스 리워드"}
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text dark:bg-bg dark:text-bold-text">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text">
                   <SearchIcon className="h-2.5 w-2.5" />
                 </span>
               </button>
@@ -352,7 +352,7 @@ export default function MyPage() {
             </div>
             <p className="mb-2 text-center text-sm font-bold text-[#2a1a43] dark:text-bold-text">리워드 지급 비율</p>
             <div className="mb-3 overflow-hidden rounded-2xl border border-[#f0eaf6] bg-[#f6f1fb] dark:border-border dark:bg-border">
-              <div className="grid grid-cols-2 bg-[#79678f] px-4 py-2 text-xs font-semibold text-white dark:bg-border dark:text-icon-muted">
+              <div className="grid grid-cols-2 bg-[#79678f] px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
                 <span>당월 결제금액</span>
                 <span className="text-right">리워드 비율</span>
               </div>

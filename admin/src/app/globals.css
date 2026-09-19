@@ -41,7 +41,7 @@ body {
 .admin-page h1 { color: #1d1d1f; letter-spacing: -.04em; }
 .admin-page button { transition: transform .18s ease, background-color .18s ease, border-color .18s ease; }
 .admin-page button:not(:disabled):active { transform: scale(.98); }
-.admin-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 auto 34px; max-width: 1180px; padding: 48px 24px 0; }
+.admin-page-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px 16px; margin: 0 auto 34px; max-width: 1180px; padding: 48px 24px 0; }
 .admin-page-header p { margin: 0 0 8px; color: #86868b; font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .admin-page-header h1 { margin: 0; font-size: clamp(32px, 5vw, 48px); font-weight: 700; line-height: 1; }
 .admin-page-header span { display: block; max-width: 540px; margin-top: 12px; color: #6e6e73; font-size: 15px; line-height: 1.5; }
