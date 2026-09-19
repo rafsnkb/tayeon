@@ -4,6 +4,7 @@ import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { addMonthsClamped } from "@/lib/util/dateMath";
 import { COMBOS, COUNT_PASS_VALIDITY_MONTHS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
+import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
 
 function isComboKey(value: unknown): value is ComboKey {
   return typeof value === "string" && value in COMBOS;
@@ -24,8 +25,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "이용권 옵션을 선택해주세요." }, { status: 400 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
-  const rewardRef = userRef.collection("pendingRewards").doc(id);
+  const userRef = adminDb.collection(USERS).doc(uid);
+  const rewardRef = userRef.collection(PENDING_REWARDS).doc(id);
 
   try {
     const passId = await adminDb.runTransaction(async (tx) => {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!Number.isFinite(basis) || basis <= 0) throw new Error("INVALID_REWARD");
 
       const now = new Date().toISOString();
-      const passRef = userRef.collection("countPasses").doc();
+      const passRef = userRef.collection(COUNT_PASSES).doc();
       tx.set(passRef, {
         source: data.source,
         basis,

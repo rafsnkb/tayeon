@@ -19,6 +19,7 @@ import {
   countAllowancesForCombo,
   type ComboKey,
 } from "@/lib/tarot/pricing";
+import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
 
 function isComboKey(value: unknown): value is ComboKey {
   return typeof value === "string" && value in COMBOS;
@@ -134,8 +135,8 @@ export async function fulfillPayment(
     return { kind: "rejected", reason: "결제 금액이 상품 가격과 일치하지 않아요." };
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
-  const paymentRef = userRef.collection("payments").doc(paymentId);
+  const userRef = adminDb.collection(USERS).doc(uid);
+  const paymentRef = userRef.collection(PAYMENTS).doc(paymentId);
 
   const alreadyFulfilled = await adminDb.runTransaction(async (tx) => {
     const paymentSnap = await tx.get(paymentRef);
@@ -144,8 +145,8 @@ export async function fulfillPayment(
       return true;
     }
 
-    const timePassRef = product.type === "timePass" ? userRef.collection("timePasses").doc() : null;
-    const countPassRef = product.type === "countPass" ? userRef.collection("countPasses").doc() : null;
+    const timePassRef = product.type === "timePass" ? userRef.collection(TIME_PASSES).doc() : null;
+    const countPassRef = product.type === "countPass" ? userRef.collection(COUNT_PASSES).doc() : null;
     const issuedAt = payment.paidAt ? new Date(payment.paidAt) : new Date();
     const countPassExpiresAt = addMonthsClamped(issuedAt.toISOString(), COUNT_PASS_VALIDITY_MONTHS);
     const timePassUsableUntil = addMonthsClamped(issuedAt.toISOString(), TIME_PASS_VALIDITY_MONTHS);

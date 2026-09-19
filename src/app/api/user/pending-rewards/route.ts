@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { COMBOS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
+import { USERS, PENDING_REWARDS } from "@/lib/firestore/collections";
 
 /** GET /api/user/pending-rewards — "받은 이용권 내역"(결제 리워드/친구초대 리워드) 목록.
  * 조회 시점에 수령 가능 기간(claimWindowExpiresAt)이 지난 미수령 건은 lazy하게 expired로
@@ -14,8 +15,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
-  const snap = await userRef.collection("pendingRewards").orderBy("createdAt", "desc").get();
+  const userRef = adminDb.collection(USERS).doc(uid);
+  const snap = await userRef.collection(PENDING_REWARDS).orderBy("createdAt", "desc").get();
 
   const now = Date.now();
   const expiredIds: string[] = [];
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   if (expiredIds.length > 0) {
     await Promise.all(
-      expiredIds.map((id) => userRef.collection("pendingRewards").doc(id).update({ status: "expired" }))
+      expiredIds.map((id) => userRef.collection(PENDING_REWARDS).doc(id).update({ status: "expired" }))
     );
   }
 

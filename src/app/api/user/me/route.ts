@@ -4,6 +4,7 @@ import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { DEFAULT_TONE } from "@/lib/tarot/tone";
 import { pickActiveCountPass } from "@/lib/tarot/activeCountPass";
 import type { ComboKey, CountPassStatus } from "@/lib/tarot/pricing";
+import { USERS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const snap = await userRef.get();
   const data = snap.data();
 
@@ -25,13 +26,13 @@ export async function GET(req: NextRequest) {
     // billing correctness never depends on this write actually happening.
     await Promise.all([
       userRef.update({ activeTimePass: null }),
-      userRef.collection("timePasses").doc(activeTimePass.passId).update({ status: "expired" }),
+      userRef.collection(TIME_PASSES).doc(activeTimePass.passId).update({ status: "expired" }),
     ]);
     activeTimePass = null;
   }
 
   const timePassesSnap = await userRef
-    .collection("timePasses")
+    .collection(TIME_PASSES)
     .where("status", "==", "unused")
     .get();
   const timePasses = timePassesSnap.docs
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
       combo: (doc.data().combo as ComboKey | undefined) ?? (doc.data().includesOptions ? "tarot-saju-ziwei" : "tarot"),
     }));
 
-  const countPassesSnap = await userRef.collection("countPasses").get();
+  const countPassesSnap = await userRef.collection(COUNT_PASSES).get();
   const activePointerPassId = data?.activeCountPass?.passId as string | undefined;
   const activePass = pickActiveCountPass(countPassesSnap.docs, activePointerPassId);
   const activeCountPass = activePass

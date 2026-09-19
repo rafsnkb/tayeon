@@ -13,6 +13,7 @@ import {
   type SpreadKey,
 } from "@/lib/tarot/pricing";
 import { TIER_TEXTURE, TIME_COMBO_TIER } from "@/lib/tarot/timePassTiers";
+import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { CompanyFooter } from "@/components/CompanyFooter";
 import { buildPortoneCustomer } from "@/lib/payment/customer";
@@ -322,7 +323,7 @@ export default function ChargePage() {
                 <li>구매 시 타로 전용/+사주/+자미두수/+사주+자미두수 중 하나의 옵션을 선택해야 하며, 선택한 옵션으로만 이용할 수 있습니다.</li>
                 <li>이용권은 1개만 보유 가능합니다. 추가 구매를 원하시면 현재 보유 이용권을 소진하셔야 합니다.</li>
                 <li>결제 리워드ㆍ친구 초대로 받은 이용권이 있을 경우, 해당 이용권이 먼저 사용됩니다.</li>
-                <li>구매 후 7일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
+                <li>구매 후 {REFUND_WINDOW_DAYS}일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
                 <li>유효기간은 구입일로부터 1년입니다.</li>
               </>
             ) : (
@@ -330,7 +331,7 @@ export default function ChargePage() {
                 <li>시간제 이용권은 채팅방에서 사용하기를 누른 순간부터 시간 차감이 시작되며, 브라우저를 닫아도 멈추지 않습니다.</li>
                 <li>이용권은 1개만 보유 가능합니다. 추가 구매를 원하시면 현재 보유 이용권을 소진하셔야 합니다.</li>
                 <li>사용중인 리워드 및 횟수제 이용권이 있는 상태에서 시간제 이용권을 사용하면, 시간제 이용권이 먼저 사용됩니다. 해당 시간동안은 리워드 및 횟수제 이용권은 차감되지 않습니다.</li>
-                <li>구매 후 7일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
+                <li>구매 후 {REFUND_WINDOW_DAYS}일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
                 <li>유효기간은 구입일로부터 1년입니다.</li>
               </>
             )}

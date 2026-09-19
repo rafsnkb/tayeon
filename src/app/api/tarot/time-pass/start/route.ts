@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import type { ComboKey } from "@/lib/tarot/pricing";
+import { USERS, TIME_PASSES } from "@/lib/firestore/collections";
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "passId가 필요해요." }, { status: 400 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
-  const passRef = userRef.collection("timePasses").doc(passId);
+  const userRef = adminDb.collection(USERS).doc(uid);
+  const passRef = userRef.collection(TIME_PASSES).doc(passId);
 
   const userSnapForSuspend = await userRef.get();
   const userDataForSuspend = userSnapForSuspend.data();

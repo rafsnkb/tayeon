@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { findUidByReferralCode, grantSignupFreePass, grantSignupReferralReward } from "@/lib/referral/code";
+import { USERS } from "@/lib/firestore/collections";
 
 const KAKAO_REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!;
 const KAKAO_REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!;
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
   const birthday = profile.kakao_account?.birthday ?? null;
   const birthyear = profile.kakao_account?.birthyear ?? null;
 
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const existing = await userRef.get();
   const isNewUser = !existing.exists;
 

@@ -5,6 +5,7 @@ import { resolveProduct } from "@/lib/payment/products";
 import { adminDb } from "@/lib/firebase/admin";
 import { COMBOS, type ComboKey } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
+import { USERS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
 
 function isComboKey(value: unknown): value is ComboKey {
   return typeof value === "string" && value in COMBOS;
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const userSnap = await userRef.get();
   const userData = userSnap.data();
   if (userData?.suspended) {
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
     if (!isComboKey(combo)) {
       return NextResponse.json({ error: "이용권 옵션을 선택해주세요." }, { status: 400 });
     }
-    const passes = await userRef.collection("countPasses").get();
+    const passes = await userRef.collection(COUNT_PASSES).get();
     if (passes.docs.some((doc) => {
       const data = doc.data();
       return data.source === "purchase" && (data.status === "unused" || data.status === "active");
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (product.type === "timePass") {
-    const passes = await userRef.collection("timePasses").get();
+    const passes = await userRef.collection(TIME_PASSES).get();
     if (passes.docs.some((doc) => ["unused", "active"].includes(doc.data().status))) {
       return NextResponse.json({ error: "보유 시간제 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
     }

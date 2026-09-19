@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { COMBOS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
+import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
 
 type ReceivedPass = {
   id: string;
@@ -38,10 +39,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const [rewardsSnap, adminGrantsSnap] = await Promise.all([
-    userRef.collection("pendingRewards").get(),
-    userRef.collection("countPasses").where("source", "==", "admin-grant").get(),
+    userRef.collection(PENDING_REWARDS).get(),
+    userRef.collection(COUNT_PASSES).where("source", "==", "admin-grant").get(),
   ]);
 
   const now = Date.now();

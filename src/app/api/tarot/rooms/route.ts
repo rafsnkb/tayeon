@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
+import { USERS, ROOMS } from "@/lib/firestore/collections";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -9,9 +10,9 @@ export async function GET(req: NextRequest) {
   }
 
   const snap = await adminDb
-    .collection("users")
+    .collection(USERS)
     .doc(uid)
-    .collection("rooms")
+    .collection(ROOMS)
     .orderBy("updatedAt", "desc")
     .get();
 
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const { confirmDeleteOldest } = (await req.json().catch(() => ({}))) as { confirmDeleteOldest?: boolean };
 
-  const roomsRef = adminDb.collection("users").doc(uid).collection("rooms");
+  const roomsRef = adminDb.collection(USERS).doc(uid).collection(ROOMS);
   const countSnap = await roomsRef.count().get();
   if (countSnap.data().count >= ROOM_LIMIT) {
     if (!confirmDeleteOldest) {

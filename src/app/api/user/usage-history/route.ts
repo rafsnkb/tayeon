@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SPREADS, type SpreadKey } from "@/lib/tarot/pricing";
+import { USERS, ROOMS, READINGS } from "@/lib/firestore/collections";
 
 const USAGE_HISTORY_ROOM_SCAN_LIMIT = 30;
 const READINGS_PER_ROOM = 20;
@@ -33,9 +34,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const roomsSnap = await userRef
-    .collection("rooms")
+    .collection(ROOMS)
     .orderBy("updatedAt", "desc")
     .limit(USAGE_HISTORY_ROOM_SCAN_LIMIT)
     .get();
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   const entries: UsageEntry[] = [];
   for (const room of roomsSnap.docs) {
     const readingsSnap = await room.ref
-      .collection("readings")
+      .collection(READINGS)
       .orderBy("createdAt", "desc")
       .limit(READINGS_PER_ROOM)
       .get();

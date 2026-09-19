@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { COUNT_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
+import { USERS, PAYMENTS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
+import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
 
-const REFUND_WINDOW_DAYS = 7;
 const ENTRY_LIMIT = 50;
 
 function productName(productId: string, productType: string): string {
@@ -33,9 +34,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const paymentsSnap = await userRef
-    .collection("payments")
+    .collection(PAYMENTS)
     .orderBy("fulfilledAt", "desc")
     .limit(ENTRY_LIMIT)
     .get();
@@ -46,12 +47,12 @@ export async function GET(req: NextRequest) {
       let badge = "";
       let refundable = false;
       if (data.productType === "countPass" && data.countPassId) {
-        const passSnap = await userRef.collection("countPasses").doc(data.countPassId).get();
+        const passSnap = await userRef.collection(COUNT_PASSES).doc(data.countPassId).get();
         const status = passSnap.data()?.status as string | undefined;
         badge = badgeLabel(status);
         refundable = status === "unused";
       } else if (data.productType === "timePass" && data.timePassId) {
-        const passSnap = await userRef.collection("timePasses").doc(data.timePassId).get();
+        const passSnap = await userRef.collection(TIME_PASSES).doc(data.timePassId).get();
         const status = passSnap.data()?.status as string | undefined;
         badge = badgeLabel(status);
         refundable = status === "unused";

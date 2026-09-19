@@ -31,6 +31,7 @@ import { calculateZiwei, buildZiweiPromptBlock, type ZiweiResult } from "@/lib/z
 import { isValidBirthInfo, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
 import type { DocumentReference } from "firebase-admin/firestore";
+import { USERS, ROOMS, READINGS, COUNT_PASSES } from "@/lib/firestore/collections";
 
 // 궁합 옵션이 꺼진 채 상대방 관계를 묻는 질문을 서버가 결정적으로 차단할 때(LLM 호출 없음) 쓰는
 // 안내 문구 — 사용자가 고른 AI 말투(tone)에 맞춰 4종으로 나눠서, 획일적인 시스템 메시지처럼
@@ -159,8 +160,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "대화방을 선택해주세요." }, { status: 400 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
-  const roomRef = userRef.collection("rooms").doc(roomId);
+  const userRef = adminDb.collection(USERS).doc(uid);
+  const roomRef = userRef.collection(ROOMS).doc(roomId);
 
   const lockResult = await acquireReadingLock(userRef);
   if (!lockResult.ok) {
@@ -211,7 +212,7 @@ export async function POST(req: NextRequest) {
     }
 
     const balance: number = userData?.coins ?? 0;
-    const countPassesSnap = await userRef.collection("countPasses").get();
+    const countPassesSnap = await userRef.collection(COUNT_PASSES).get();
     const countPasses = countPassesSnap.docs;
     const rawTone = userData?.tone;
     const tone = isToneKey(rawTone) ? rawTone : DEFAULT_TONE;
@@ -304,7 +305,7 @@ export async function POST(req: NextRequest) {
     ) {
       const guidance = GUIDANCE_NO_COMPATIBILITY[tone](partner.nickname);
       const now = new Date().toISOString();
-      await roomRef.collection("readings").add({
+      await roomRef.collection(READINGS).add({
         question,
         spread,
         cost: 0,
@@ -393,7 +394,7 @@ export async function POST(req: NextRequest) {
         : undefined;
 
     const recentSnap = await roomRef
-      .collection("readings")
+      .collection(READINGS)
       .orderBy("createdAt", "desc")
       .limit(HISTORY_FETCH_LIMIT)
       .get();
@@ -661,7 +662,7 @@ export async function POST(req: NextRequest) {
         await userRef.update({ coins: FieldValue.increment(-chargedCost) });
       }
 
-      await roomRef.collection("readings").add({
+      await roomRef.collection(READINGS).add({
         question,
         spread,
         cost: chargedCost,

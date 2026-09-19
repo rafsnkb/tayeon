@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
+import { USERS, ROOMS, READINGS } from "@/lib/firestore/collections";
 
 export async function DELETE(
   req: NextRequest,
@@ -12,9 +13,9 @@ export async function DELETE(
   }
 
   const { roomId } = await params;
-  const roomRef = adminDb.collection("users").doc(uid).collection("rooms").doc(roomId);
+  const roomRef = adminDb.collection(USERS).doc(uid).collection(ROOMS).doc(roomId);
 
-  const readingsSnap = await roomRef.collection("readings").get();
+  const readingsSnap = await roomRef.collection(READINGS).get();
   const batch = adminDb.batch();
   readingsSnap.docs.forEach((doc) => batch.delete(doc.ref));
   batch.delete(roomRef);
@@ -39,7 +40,7 @@ export async function PATCH(
   }
 
   const { roomId } = await params;
-  const roomRef = adminDb.collection("users").doc(uid).collection("rooms").doc(roomId);
+  const roomRef = adminDb.collection(USERS).doc(uid).collection(ROOMS).doc(roomId);
   await roomRef.update({ title: title.trim().slice(0, 40), updatedAt: new Date().toISOString() });
 
   return NextResponse.json({ ok: true });

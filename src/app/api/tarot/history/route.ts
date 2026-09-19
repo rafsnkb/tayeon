@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { buildGreeting } from "@/lib/tarot/greeting";
 import { DEFAULT_TONE, isToneKey } from "@/lib/tarot/tone";
+import { USERS, ROOMS, READINGS } from "@/lib/firestore/collections";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -15,9 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "대화방을 선택해주세요." }, { status: 400 });
   }
 
-  const userRef = adminDb.collection("users").doc(uid);
-  const roomRef = userRef.collection("rooms").doc(roomId);
-  const snap = await roomRef.collection("readings").orderBy("createdAt", "asc").get();
+  const userRef = adminDb.collection(USERS).doc(uid);
+  const roomRef = userRef.collection(ROOMS).doc(roomId);
+  const snap = await roomRef.collection(READINGS).orderBy("createdAt", "asc").get();
 
   // 방에 리딩이 하나도 없으면(처음 연 방), 실제 리딩이 아니라 캐릭터가 먼저 건네는 인사말을
   // 합성해서 맨 앞에 끼워 넣는다 — Firestore에 저장하지 않고 매 조회마다 즉석에서 만든다(코인

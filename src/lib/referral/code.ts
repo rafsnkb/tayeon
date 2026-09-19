@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { addMonthsClamped } from "@/lib/util/dateMath";
 import {
@@ -11,10 +11,29 @@ import {
   PENDING_REWARD_CLAIM_WINDOW_MONTHS,
   signupFreePassAllowances,
 } from "@/lib/tarot/pricing";
+import {
+  USERS,
+  REFERRAL_CODES,
+  REFERRAL_GRANTS,
+  REFERRAL_GRANT_FRIENDS,
+  SIGNUP_GRANTS,
+  COUNT_PASSES,
+  PENDING_REWARDS,
+} from "@/lib/firestore/collections";
 
 // 0/O, 1/I/L처럼 화면이나 발음으로 헷갈리기 쉬운 문자는 링크에 그대로 노출되는 코드라 아예 뺀다.
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const CODE_LENGTH = 8;
+
+// 부정 가입 방지 목적으로만 쓰는 최소 식별 마커(signupGrants/*, referralGrants/*/friends/*)의
+// 보유기간. 개인정보 보호법 제15조1항6호(정당한 이익)를 근거로 삼되 무기한 보관은 안 되므로
+// 사용자가 6개월로 확정(2026-09-19, doc/보안점검_작업분할.md T7). Firestore TTL 정책(콘솔/
+// gcloud로 별도 활성화 필요 — 같은 문서 T7 비고 참고)이 이 필드를 기준으로 문서를 자동 삭제한다.
+const GRANT_MARKER_RETENTION_MONTHS = 6;
+
+function markerExpiresAt(fromIso: string): Timestamp {
+  return Timestamp.fromDate(new Date(addMonthsClamped(fromIso, GRANT_MARKER_RETENTION_MONTHS)));
+}
 
 function randomCode(): string {
   const bytes = randomBytes(CODE_LENGTH);
@@ -28,14 +47,14 @@ function randomCode(): string {
 /** users/{uid}.referralCode가 없으면 새로 만들어서 저장하고, 있으면 그대로 반환한다.
  * referralCodes/{code} -> { uid }는 초대 링크 클릭 시 코드→uid 역조회용 인덱스. */
 export async function ensureReferralCode(uid: string): Promise<string> {
-  const userRef = adminDb.collection("users").doc(uid);
+  const userRef = adminDb.collection(USERS).doc(uid);
   const userSnap = await userRef.get();
   const existing = userSnap.data()?.referralCode;
   if (typeof existing === "string" && existing) return existing;
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = randomCode();
-    const codeRef = adminDb.collection("referralCodes").doc(code);
+    const codeRef = adminDb.collection(REFERRAL_CODES).doc(code);
     const created = await adminDb.runTransaction(async (tx) => {
       const codeSnap = await tx.get(codeRef);
       if (codeSnap.exists) return false;
@@ -50,7 +69,7 @@ export async function ensureReferralCode(uid: string): Promise<string> {
 
 export async function findUidByReferralCode(code: string): Promise<string | null> {
   if (!code) return null;
-  const snap = await adminDb.collection("referralCodes").doc(code).get();
+  const snap = await adminDb.collection(REFERRAL_CODES).doc(code).get();
   const uid = snap.data()?.uid;
   return typeof uid === "string" ? uid : null;
 }
@@ -60,12 +79,13 @@ export async function findUidByReferralCode(code: string): Promise<string | null
  * users/{uid} 서브트리 밖의 최상위 signupGrants 컬렉션에 남겨 recursiveDelete로도
  * 지워지지 않게 한다(탈퇴→재가입 반복으로 무료 이용권이 재지급되는 것을 막기 위함). */
 export async function grantSignupFreePass(uid: string): Promise<void> {
-  const grantMarkerRef = adminDb.collection("signupGrants").doc(uid);
-  const passRef = adminDb.collection("users").doc(uid).collection("countPasses").doc("signup-free");
+  const grantMarkerRef = adminDb.collection(SIGNUP_GRANTS).doc(uid);
+  const passRef = adminDb.collection(USERS).doc(uid).collection(COUNT_PASSES).doc("signup-free");
 
   await adminDb.runTransaction(async (tx) => {
     if ((await tx.get(grantMarkerRef)).exists) return;
-    tx.set(grantMarkerRef, { uid, createdAt: new Date().toISOString() });
+    const now = new Date().toISOString();
+    tx.set(grantMarkerRef, { uid, createdAt: now, expiresAt: markerExpiresAt(now) });
     tx.set(passRef, {
       productId: "signup-free",
       source: "signup-free",
@@ -92,9 +112,9 @@ export async function grantSignupFreePass(uid: string): Promise<void> {
  * 같은 추천인-친구 조합에 다시 지급되거나 인원수 상한이 리셋되는 것을 막는다. */
 export async function grantSignupReferralReward(referrerUid: string, newUid: string): Promise<void> {
   if (referrerUid === newUid) return;
-  const referrerRef = adminDb.collection("users").doc(referrerUid);
-  const grantParentRef = adminDb.collection("referralGrants").doc(referrerUid);
-  const grantRef = grantParentRef.collection("friends").doc(newUid);
+  const referrerRef = adminDb.collection(USERS).doc(referrerUid);
+  const grantParentRef = adminDb.collection(REFERRAL_GRANTS).doc(referrerUid);
+  const grantRef = grantParentRef.collection(REFERRAL_GRANT_FRIENDS).doc(newUid);
 
   await adminDb.runTransaction(async (tx) => {
     const [referrerSnap, grantParentSnap, grantSnap] = await Promise.all([
@@ -110,9 +130,9 @@ export async function grantSignupReferralReward(referrerUid: string, newUid: str
     const now = new Date().toISOString();
     const claimWindowExpiresAt = addMonthsClamped(now, PENDING_REWARD_CLAIM_WINDOW_MONTHS);
     const basis = REFERRAL_SIGNUP_FREE_PASSES * SPREADS.one.cost;
-    const referrerRewardRef = referrerRef.collection("pendingRewards").doc();
-    const friendRef = adminDb.collection("users").doc(newUid);
-    const friendRewardRef = friendRef.collection("pendingRewards").doc();
+    const referrerRewardRef = referrerRef.collection(PENDING_REWARDS).doc();
+    const friendRef = adminDb.collection(USERS).doc(newUid);
+    const friendRewardRef = friendRef.collection(PENDING_REWARDS).doc();
     const pendingReward = (recipient: "referrer" | "friend") => ({
       source: "referral-signup" as const,
       recipient,
@@ -124,7 +144,9 @@ export async function grantSignupReferralReward(referrerUid: string, newUid: str
       claimedAt: null,
     });
 
-    tx.set(grantRef, { freePasses: REFERRAL_SIGNUP_FREE_PASSES, createdAt: now });
+    // grantParentRef(friendsInvited 누적 카운터)에는 expiresAt을 두지 않는다 — 친구마다
+    // 만료 시점이 다른데 부모 문서까지 TTL로 지워지면 누적 카운터가 의도치 않게 리셋된다.
+    tx.set(grantRef, { freePasses: REFERRAL_SIGNUP_FREE_PASSES, createdAt: now, expiresAt: markerExpiresAt(now) });
     tx.set(referrerRewardRef, pendingReward("referrer"));
     tx.set(friendRewardRef, pendingReward("friend"));
     tx.set(grantParentRef, { referrerUid, friendsInvited: FieldValue.increment(1) }, { merge: true });
@@ -134,6 +156,6 @@ export async function grantSignupReferralReward(referrerUid: string, newUid: str
 /** 추천인이 지금까지 리워드를 받은 친구 수. users 문서가 아니라 최상위 referralGrants 문서를
  * 기준으로 삼아 탈퇴→재가입으로 카운터가 리셋되지 않게 한다. `/api/referral/me`에서 사용. */
 export async function getReferralInvitedFriendsCount(referrerUid: string): Promise<number> {
-  const snap = await adminDb.collection("referralGrants").doc(referrerUid).get();
+  const snap = await adminDb.collection(REFERRAL_GRANTS).doc(referrerUid).get();
   return Number(snap.data()?.friendsInvited ?? 0);
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { bonusRewardRateForWon, rewardPassesForWon } from "@/lib/tarot/pricing";
+import { USERS, PAYMENTS } from "@/lib/firestore/collections";
 
 /** 피그마 "Screen / RewardInfoModal", MyPage "n월 보너스 리워드" — 아직 정산 전인 이번 달의
  * 실시간 예상치를 보여준다. 실제 지급은 functions/src/index.ts의 monthlyBonusRewardPayout이
@@ -20,9 +21,9 @@ export async function GET(req: NextRequest) {
   const month = periodStart.getUTCMonth() + 1;
 
   const paymentsSnap = await adminDb
-    .collection("users")
+    .collection(USERS)
     .doc(uid)
-    .collection("payments")
+    .collection(PAYMENTS)
     .where("status", "==", "fulfilled")
     .where("paidAt", ">=", periodStart.toISOString())
     .where("paidAt", "<", periodEnd.toISOString())
