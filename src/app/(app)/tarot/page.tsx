@@ -326,7 +326,7 @@ function TimePassCard({ pass, actionLabel, onAction, busy }: {
     >
       <div className="absolute inset-0 bg-[#19191d]/70" />
       <div className="relative flex flex-1 flex-col gap-1">
-        <span className="text-2xl font-bold text-white">{pass.minutes}분 {COMBOS[pass.combo].label}</span>
+        <span className="text-2xl font-bold text-white">{pass.minutes}분 무제한</span>
         <span
           className="w-fit rounded-full px-2 py-0.5 text-sm font-semibold"
           style={{ backgroundColor: tier.tagBg, color: tier.tagText }}
@@ -360,9 +360,9 @@ function HeldTimepassListModal({
   onClose: () => void;
 }) {
   return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[70vh] w-full xl:mx-auto xl:max-w-4xl flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
+        className="flex w-full max-w-sm max-h-[70vh] flex-col gap-4 rounded-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 p-1">
@@ -404,9 +404,9 @@ function HeldTimepassUseModal({
   onClose: () => void;
 }) {
   return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="flex w-full xl:mx-auto xl:max-w-4xl flex-col gap-4 rounded-t-[28px] border border-border bg-topbar p-4"
+        className="flex w-full max-w-sm flex-col gap-4 rounded-[28px] border border-border bg-topbar p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 p-1">
@@ -708,7 +708,6 @@ function TarotChat() {
   const searchParams = useSearchParams();
   const {
     user,
-    setCoins,
     countPasses,
     setCountPasses,
     activeCountPass: activeCountPassInfo,
@@ -728,6 +727,7 @@ function TarotChat() {
     setActiveTimePass,
     timePasses,
     setTimePasses,
+    hasUnreadNotifications,
     pendingReadingRoomIds,
     markReadingPending,
     markReadingDone,
@@ -867,9 +867,14 @@ function TarotChat() {
   // 방금 물어본 질문이 이 방에서 서버 응답을 기다리는 중인지는 RoomsContext(레이아웃 레벨,
   // 재마운트에 영향 안 받음)로 추적한다 — 로딩 중에 다른 페이지로 이동했다가 돌아오면 이
   // TarotChat 인스턴스는 통째로 재마운트되어 로컬 loading/messages state가 초기화되는데,
-  // 그 사이 서버는 리딩 저장·코인 차감을 끝냈을 수 있다. 아무 데도 그 사실을 확인할 방법이
+  // 그 사이 서버는 리딩 저장·이용권 차감을 끝냈을 수 있다. 아무 데도 그 사실을 확인할 방법이
   // 없으면 방금 물어본 질문+답변이 그냥 사라진 것처럼 보인다(2026-09-14, 사용자 리포트).
   const startedHereRef = useRef<Set<string>>(new Set());
+  // 시간제 이용권이 "활성 → 만료"로 바뀌는 순간을 잡아 지금 보고 있는 채팅방에 경고 메시지를
+  // 한 번만 띄우기 위한 플래그(2026-09-20, 사용자 요청) — activeTimePass 자체가 없어서
+  // timePassActive가 처음부터 false인 경우(방을 열었을 때 이미 이용권이 없던 경우)에는
+  // 안 띄워야 하므로, "한때 true였다가 false가 됐는지"만 본다.
+  const wasTimePassActiveRef = useRef(false);
   const prevPendingRef = useRef<{ roomId: string | null; pending: boolean }>({
     roomId: null,
     pending: false,
@@ -1015,7 +1020,6 @@ function TarotChat() {
         return;
       }
 
-      setCoins(data.remainingCoins);
       if (data.countPassApplied) await refreshMe();
       if (data.roomTitle) setRoomTitleLocal(activeRoomId, data.roomTitle);
       setMessages((prev) => [
@@ -1039,7 +1043,7 @@ function TarotChat() {
         },
       ]);
     } catch {
-      // 응답이 오는 도중 연결이 끊기면(모바일에서 흔함), 서버는 이미 리딩 저장·코인 차감까지
+      // 응답이 오는 도중 연결이 끊기면(모바일에서 흔함), 서버는 이미 리딩 저장·이용권 차감까지
       // 끝냈을 수 있다 — 무작정 재요청하면 이중 차감 위험이 있으므로, 대신 방 히스토리를 다시
       // 조회해서 이번 질문이 실제로 처리됐는지 확인한다(2026-09-12).
       const recovered = await fetchRoomHistory(activeRoomId).catch(() => null);
@@ -1057,7 +1061,6 @@ function TarotChat() {
           }).catch(() => null);
           if (meRes?.ok) {
             const meData = await meRes.json();
-            setCoins(meData.coins);
             setCountPasses(meData.countPasses ?? []);
           }
         }
@@ -1077,6 +1080,16 @@ function TarotChat() {
     activeTimePass && new Date(activeTimePass.expiresAt).getTime() > now
   );
   const spreadCoveredDisplay = timePassActive;
+  useEffect(() => {
+    if (timePassActive) {
+      wasTimePassActiveRef.current = true;
+      return;
+    }
+    if (wasTimePassActiveRef.current) {
+      wasTimePassActiveRef.current = false;
+      setMessages((prev) => [...prev, { role: "error", text: "사용중인 시간제 이용권이 종료되었습니다." }]);
+    }
+  }, [timePassActive]);
   // 활성 이용권(서버가 우선순위 큐로 고른 것)의 고정 조합 — combo:"any"(가입 무료체험)만 예외로
   // 생년월일시가 입력된 만큼만 자동 포함한다(src/lib/tarot/activeCountPass.ts의 서버 로직과 동일).
   const activeCountPass = countPasses.find((p) => p.id === activeCountPassInfo?.passId);
@@ -1097,8 +1110,7 @@ function TarotChat() {
   const hasUsableCountPass = countPasses.some(
     (pass) =>
       pass.remaining > 0 &&
-      pass.status !== "exhausted" &&
-      pass.status !== "expired" &&
+      (pass.status === "unused" || pass.status === "active") &&
       (!pass.expiresAt || new Date(pass.expiresAt).getTime() > now)
   );
   const noUsableTicket = roomsLoaded && !timePassActive && timePasses.length === 0 && !hasUsableCountPass;
@@ -1206,9 +1218,12 @@ function TarotChat() {
           type="button"
           onClick={openMenu}
           aria-label="메뉴 열기"
-          className="flex h-16 w-16 shrink-0 items-center justify-center text-icon-muted xl:hidden"
+          className="relative flex h-16 w-16 shrink-0 items-center justify-center text-icon-muted xl:hidden"
         >
           <MenuIcon className="h-3 w-5" />
+          {hasUnreadNotifications && (
+            <span className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-point" />
+          )}
         </button>
         {/* 방 목록은 메뉴 드로어((app)/layout.tsx)에 있음 — 방 이름을 누르면 그 드로어를 연다.
             아직 한 번도 안 쓴 방("새 대화" 기본 제목 그대로)은 피그마 "Screen / Main"처럼 제목 대신
@@ -1402,7 +1417,7 @@ function TarotChat() {
                 </p>
               )}
               {msg.charged && msg.timePassApplied && (
-                <p className="mt-1 w-full px-1 text-xs text-point">이용권으로 이용한 리딩이에요.</p>
+                <p className="mt-1 w-full px-1 text-xs text-point">시간제 이용권으로 이용한 리딩이에요.</p>
               )}
               {msg.charged && i === messages.length - 1 && (msg.suggestions?.length ?? 0) > 0 && (
                 <div className="mt-2 flex w-full flex-col gap-1.5">

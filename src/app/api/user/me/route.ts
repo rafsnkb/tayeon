@@ -4,7 +4,7 @@ import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { DEFAULT_TONE } from "@/lib/tarot/tone";
 import { pickActiveCountPass } from "@/lib/tarot/activeCountPass";
 import type { ComboKey, CountPassStatus } from "@/lib/tarot/pricing";
-import { USERS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
+import { USERS, TIME_PASSES, COUNT_PASSES, PENDING_REWARDS } from "@/lib/firestore/collections";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
       combo: (doc.data().combo as ComboKey | undefined) ?? (doc.data().includesOptions ? "tarot-saju-ziwei" : "tarot"),
     }));
 
-  const countPassesSnap = await userRef.collection(COUNT_PASSES).get();
+  const [countPassesSnap, pendingRewardsSnap] = await Promise.all([
+    userRef.collection(COUNT_PASSES).get(),
+    userRef.collection(PENDING_REWARDS).get(),
+  ]);
   const activePointerPassId = data?.activeCountPass?.passId as string | undefined;
   const activePass = pickActiveCountPass(countPassesSnap.docs, activePointerPassId);
   const activeCountPass = activePass
@@ -77,17 +80,28 @@ export async function GET(req: NextRequest) {
     .filter(
       (pass) =>
         Number(pass.remaining) > 0 &&
-        pass.status !== "exhausted" &&
-        pass.status !== "expired" &&
+        (pass.status === "unused" || pass.status === "active") &&
         (!pass.expiresAt || new Date(pass.expiresAt).getTime() > Date.now())
     );
 
+  // 알림(운영자 지급/리워드 도착) 배지 — asset/Screen/Notification.png. "받은 이용권 내역"
+  // (/api/user/received-passes)과 같은 두 소스(admin-grant countPasses + pendingRewards)를
+  // 훑어서, 마지막으로 알림을 확인한 시각(notificationsSeenAt) 이후 새로 생긴 게 있으면 켠다.
+  const notificationsSeenAt = data?.notificationsSeenAt as string | undefined;
+  const notifiableCreatedAts = [
+    ...countPassesSnap.docs.filter((doc) => doc.data().source === "admin-grant").map((doc) => doc.data().createdAt as string),
+    ...pendingRewardsSnap.docs.map((doc) => doc.data().createdAt as string),
+  ];
+  const hasUnreadNotifications = notifiableCreatedAts.some(
+    (createdAt) => typeof createdAt === "string" && (!notificationsSeenAt || createdAt > notificationsSeenAt)
+  );
+
   return NextResponse.json({
+    hasUnreadNotifications,
     nickname: data?.nickname ?? null,
     profileImage: data?.profileImage ?? null,
     email: data?.email ?? null,
     termsAgreedAt: data?.termsAgreedAt ?? null,
-    coins: data?.coins ?? 0,
     countPasses,
     activeCountPass,
     tone: data?.tone ?? DEFAULT_TONE,

@@ -1,7 +1,7 @@
 "use client";
 
-// 방 목록/코인/시간제 이용권 상태 — 원래 /tarot 페이지에만 있었는데, 피그마 리디자인에서는
-// 메뉴 드로어((app)/layout.tsx)가 어느 페이지에서든 "최근 대화"/코인 잔액/이용권 상태를 보여줘야
+// 방 목록/횟수제·시간제 이용권 상태 — 원래 /tarot 페이지에만 있었는데, 피그마 리디자인에서는
+// 메뉴 드로어((app)/layout.tsx)가 어느 페이지에서든 "최근 대화"/이용권 상태를 보여줘야
 // 해서 페이지 로컬 state로는 안 되고 레이아웃 레벨에서 공유해야 한다(2026-09-14).
 import {
   createContext,
@@ -49,11 +49,9 @@ type RoomsContextValue = {
   nickname: string | null;
   profileImage: string | null;
   email: string | null;
-  coins: number | null;
   countPasses: CountPass[];
   setCountPasses: Dispatch<SetStateAction<CountPass[]>>;
   activeCountPass: ActiveCountPass | null;
-  setCoins: Dispatch<SetStateAction<number | null>>;
   hasBirthInfo: boolean;
   myTimeUnknown: boolean;
   hasPartner: boolean;
@@ -62,6 +60,8 @@ type RoomsContextValue = {
   setActiveTimePass: Dispatch<SetStateAction<ActiveTimePass | null>>;
   timePasses: TimePass[];
   setTimePasses: Dispatch<SetStateAction<TimePass[]>>;
+  hasUnreadNotifications: boolean;
+  setHasUnreadNotifications: Dispatch<SetStateAction<boolean>>;
   rooms: Room[];
   activeRoomId: string | null;
   selectRoom: (roomId: string) => void;
@@ -84,7 +84,6 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [nickname, setNickname] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [coins, setCoins] = useState<number | null>(null);
   const [countPasses, setCountPasses] = useState<CountPass[]>([]);
   const [activeCountPass, setActiveCountPass] = useState<ActiveCountPass | null>(null);
   const [hasBirthInfo, setHasBirthInfo] = useState(false);
@@ -93,6 +92,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [partnerTimeUnknown, setPartnerTimeUnknown] = useState(false);
   const [activeTimePass, setActiveTimePass] = useState<ActiveTimePass | null>(null);
   const [timePasses, setTimePasses] = useState<TimePass[]>([]);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -102,7 +102,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   // 새 인스턴스가 "이 방은 아직 리딩이 안 끝났다"를 알 방법이 로컬 state로는 없어서 방금 물어본
   // 질문+답변이 사라진 것처럼 보이는 버그가 있었음(2026-09-14, 사용자 리포트: 로딩 중 이용권
   // 버튼 눌러서 /charge로 이동 후 뒤로가기하면 방금 대화가 없어진 것처럼 보임). 실제로는 서버가
-  // 리딩 저장·코인 차감까지 다 끝내지만(원래 컴포넌트 인스턴스가 죽어도 fetch 자체는 안 끊김),
+  // 리딩 저장·이용권 차감까지 다 끝내지만(원래 컴포넌트 인스턴스가 죽어도 fetch 자체는 안 끊김),
   // 새로 마운트된 인스턴스가 "언제 다시 히스토리를 조회해야 하는지" 알 방법이 없어서 생긴 문제.
   const [pendingReadingRoomIds, setPendingReadingRoomIds] = useState<Set<string>>(new Set());
 
@@ -129,7 +129,6 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setNickname(data.nickname);
     setProfileImage(data.profileImage ?? null);
     setEmail(data.email ?? null);
-    setCoins(data.coins);
     setCountPasses(data.countPasses ?? []);
     setActiveCountPass(data.activeCountPass ?? null);
     setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
@@ -138,6 +137,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
     setActiveTimePass(data.activeTimePass ?? null);
     setTimePasses(data.timePasses ?? []);
+    setHasUnreadNotifications(Boolean(data.hasUnreadNotifications));
   }, [user]);
 
   useEffect(() => {
@@ -161,7 +161,6 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setNickname(data.nickname);
         setProfileImage(data.profileImage ?? null);
         setEmail(data.email ?? null);
-        setCoins(data.coins);
         setCountPasses(data.countPasses ?? []);
         setActiveCountPass(data.activeCountPass ?? null);
         setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
@@ -170,6 +169,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
         setActiveTimePass(data.activeTimePass ?? null);
         setTimePasses(data.timePasses ?? []);
+        setHasUnreadNotifications(Boolean(data.hasUnreadNotifications));
       }
 
       let roomList: Room[] = [];
@@ -279,11 +279,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         nickname,
         profileImage,
         email,
-        coins,
         countPasses,
         setCountPasses,
         activeCountPass,
-        setCoins,
         hasBirthInfo,
         myTimeUnknown,
         hasPartner,
@@ -292,6 +290,8 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setActiveTimePass,
         timePasses,
         setTimePasses,
+        hasUnreadNotifications,
+        setHasUnreadNotifications,
         rooms,
         activeRoomId,
         selectRoom,

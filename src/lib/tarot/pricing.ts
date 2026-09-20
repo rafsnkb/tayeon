@@ -168,7 +168,7 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
   );
 }
 
-export type CountPassStatus = "unused" | "active" | "exhausted" | "expired";
+export type CountPassStatus = "unused" | "active" | "exhausted" | "expired" | "refunded" | "revoked";
 
 export type CountPassBalance = {
   basis: number;
@@ -186,7 +186,10 @@ export function availableCount(
   ziwei: boolean
 ): number {
   if (pass.remaining <= 0 || (pass.expiresAt && new Date(pass.expiresAt).getTime() <= Date.now())) return 0;
-  if (pass.status === "exhausted" || pass.status === "expired") return 0;
+  // 허용 상태만 열거(거부 목록이 아니라 허용 목록) — 환불/회수 등 새 종료 상태가 추가돼도
+  // 기본값이 "사용 불가"가 되도록 한다(2026-09-20, refunded 상태가 이 체크를 통과해 계속
+  // 사용 가능했던 문제를 고치면서 함께 굳힘).
+  if (pass.status !== "unused" && pass.status !== "active") return 0;
   if (pass.combo === "any") {
     const allowance = pass.allowances[countKey(spread, saju, ziwei)] ?? countAllowance(pass.basis, spread, saju, ziwei);
     return Math.round(pass.remaining * allowance);

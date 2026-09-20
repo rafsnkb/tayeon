@@ -142,14 +142,19 @@ export default function ReceivedPassesPage() {
                 (entry.status === "pending" && Boolean(entry.comboAllowances)) ||
                 (entry.status === "claimed" && Boolean(entry.claimedCombo) && Boolean(entry.comboAllowances));
               return (
-                <section key={entry.id} className="py-4">
+                <section key={entry.id}>
                   <button
                     type="button"
                     onClick={() => canExpand && toggleOpen(entry)}
                     aria-expanded={canExpand ? open : undefined}
-                    className={`flex w-full items-center gap-3 text-left ${canExpand ? "" : "cursor-default"}`}
+                    className={`grid w-full text-left ${canExpand ? "grid-cols-[1fr_auto]" : ""} ${canExpand ? "" : "cursor-default"}`}
                   >
-                    <span className="min-w-0 flex-1">
+                    {/* 화살표 자리를 "행 높이와 같은 폭의 정사각형" 영역으로 두고 그 정중앙에
+                        아이콘을 놓는다(사용자 요청, 2026-09-20) — flex+aspect-square+self-stretch는
+                        flex-basis(너비) 계산이 stretch로 정해질 높이보다 먼저 일어나 아이콘 크기만큼만
+                        좁게 잡히는 경우가 있어(실측으로 확인) grid로 바꿈: grid는 행 높이를 먼저
+                        확정한 뒤 aspect-square 칸의 너비를 그 높이에서 유도해 항상 정사각형이 된다. */}
+                    <span className="min-w-0 py-4">
                       <span className="flex items-center gap-2">
                         <span className="truncate text-base font-semibold text-bold-text">[{entry.label}]</span>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${badge.className}`}>
@@ -159,7 +164,9 @@ export default function ReceivedPassesPage() {
                       <span className="mt-1 block text-sm text-icon-muted">{formatDateTime(entry.createdAt)}</span>
                     </span>
                     {canExpand && (
-                      <BackIcon className={`h-4 w-2 shrink-0 text-bold-text transition-transform ${open ? "rotate-90" : "-rotate-90"}`} />
+                      <span className="flex aspect-square items-center justify-center">
+                        <BackIcon className={`h-4 w-2 text-bold-text transition-transform ${open ? "rotate-90" : "-rotate-90"}`} />
+                      </span>
                     )}
                   </button>
 

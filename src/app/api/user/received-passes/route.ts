@@ -7,6 +7,7 @@ import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collection
 type ReceivedPass = {
   id: string;
   label: string;
+  source: string;
   status: "pending" | "claimed" | "expired";
   freePasses: number;
   basis: number;
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
     return {
       id: doc.id,
       label: `${monthLabelFromCreatedAt(data.createdAt)}월 ${sourceLabel(data.source, data.recipient)}`,
+      source: data.source,
       status,
       freePasses: data.freePasses,
       basis: data.basis,
@@ -73,18 +75,25 @@ export async function GET(req: NextRequest) {
 
   const adminGrants: ReceivedPass[] = adminGrantsSnap.docs.map((doc) => {
     const data = doc.data();
+    // 2026-09-18 조합 고정 개편 이전(또는 수동 테스트 문서)엔 combo/basis가 비어있을 수 있다 —
+    // 이게 그대로면 claimedCombo가 falsy가 돼 canExpand가 꺼지면서(받은 이용권 내역 화면에서만)
+    // 그 행만 펼치기 화살표가 사라져 보인다. 기본값으로 채워서 모든 운영자 지급 행이 똑같이
+    // 펼쳐볼 수 있게 한다.
+    const combo = (data.combo as ComboKey | undefined) ?? "tarot";
+    const basis = typeof data.basis === "number" ? data.basis : 200;
     return {
       id: doc.id,
       label: sourceLabel("admin-grant") + (data.reason ? ` · ${data.reason}` : ""),
+      source: "admin-grant",
       status: "claimed",
-      freePasses: Math.round(Number(data.basis ?? 0) / 200),
-      basis: data.basis,
+      freePasses: Math.round(basis / 200),
+      basis,
       createdAt: data.createdAt,
       claimWindowExpiresAt: null,
       claimedAt: data.createdAt,
-      claimedCombo: data.combo,
+      claimedCombo: combo,
       comboAllowances: Object.fromEntries(
-        (Object.keys(COMBOS) as ComboKey[]).map((combo) => [combo, countAllowancesForCombo(data.basis, combo)])
+        (Object.keys(COMBOS) as ComboKey[]).map((c) => [c, countAllowancesForCombo(basis, c)])
       ) as Record<ComboKey, Record<string, number>>,
     };
   });

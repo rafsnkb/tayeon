@@ -273,6 +273,21 @@ export function InfoCircleIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 // 표준 "영화표" 모양 글리프 — 피그마 원본 export가 아니라 직접 그린 범용 아이콘(쿼터 소진 이후 예외).
+export function BellIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="18" height="20" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path
+        d="M9 1.5C6.51472 1.5 4.5 3.51472 4.5 6V9.1893C4.5 10.0533 4.16295 10.8827 3.56282 11.5041L2.68306 12.4128C1.63611 13.4949 2.29053 15.5 3.78415 15.5H14.2158C15.7095 15.5 16.3639 13.4949 15.3169 12.4128L14.4372 11.5041C13.837 10.8827 13.5 10.0533 13.5 9.1893V6C13.5 3.51472 11.4853 1.5 9 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M6.75 18C7.05 18.75 7.85 19.5 9 19.5C10.15 19.5 10.95 18.75 11.25 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function TicketIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>

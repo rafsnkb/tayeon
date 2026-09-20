@@ -6,7 +6,7 @@ import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
 import { BrandBi } from "@/components/BrandBi";
 import RoomLimitModal from "@/components/RoomLimitModal";
-import { NewChatIcon, ChevronRightIcon } from "./tarot/icons";
+import { NewChatIcon, ChevronRightIcon, BellIcon } from "./tarot/icons";
 
 const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
 
@@ -28,6 +28,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const {
     user,
     profileImage,
+    hasUnreadNotifications,
     rooms,
     activeRoomId,
     selectRoom,
@@ -116,7 +117,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         onClick={() => setMenuOpen(false)}
       />
       <div
-        className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[85%] flex-col bg-topbar transition-transform duration-200 xl:static xl:z-auto xl:max-w-none xl:translate-x-0 xl:border-r xl:border-border ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[85%] flex-col bg-bg transition-transform duration-200 dark:bg-topbar xl:static xl:z-auto xl:max-w-none xl:translate-x-0 xl:border-r xl:border-border ${
           menuOpen ? "translate-x-0" : "-translate-x-full"
         } ${sidebarCollapsed ? "xl:w-20" : "xl:w-[300px]"}`}
       >
@@ -166,26 +167,45 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <div
           className={`flex shrink-0 flex-col gap-2 p-4 ${sidebarCollapsed ? "xl:items-center xl:px-2" : ""}`}
         >
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              router.push("/me");
-            }}
-            aria-label="마이 페이지"
-            className={`flex h-12 shrink-0 items-center gap-2.5 overflow-hidden rounded-full border border-border bg-chip-fill pr-4 ${
-              sidebarCollapsed ? "xl:w-12 xl:justify-center xl:pr-0" : "w-fit self-start"
-            }`}
-          >
-            <span className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-border">
-              {profileImage && (
-                <img src={profileImage} alt="" className="h-full w-full object-cover" />
+          {/* 피그마 "Screen / MenuOpen" — 마이페이지 + 알림 벨이 한 행에 나란히. 데스크탑에서
+              사이드바를 아이콘 레일로 접으면(sidebarCollapsed) 폭이 좁아 나란히 둘 수 없으므로
+              flex-col-reverse로 순서만 뒤집어 벨을 마이페이지 위에 세로로 쌓는다. */}
+          <div className={`flex items-center justify-between gap-2 ${sidebarCollapsed ? "xl:flex-col-reverse xl:justify-center" : ""}`}>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                router.push("/me");
+              }}
+              aria-label="마이 페이지"
+              className={`flex h-12 shrink-0 items-center gap-2.5 overflow-hidden rounded-full border border-border bg-chip-fill pr-4 ${
+                sidebarCollapsed ? "xl:w-12 xl:justify-center xl:pr-0" : "w-fit"
+              }`}
+            >
+              <span className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-border">
+                {profileImage && (
+                  <img src={profileImage} alt="" className="h-full w-full object-cover" />
+                )}
+              </span>
+              <span className={`truncate text-sm font-semibold text-white ${sidebarCollapsed ? "xl:hidden" : ""}`}>
+                마이 페이지
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                router.push("/notifications");
+              }}
+              aria-label="알림"
+              className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-icon-muted text-icon-muted"
+            >
+              <BellIcon className="h-5 w-5" />
+              {hasUnreadNotifications && (
+                <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-point" />
               )}
-            </span>
-            <span className={`truncate text-sm font-semibold text-bold-text ${sidebarCollapsed ? "xl:hidden" : ""}`}>
-              마이 페이지
-            </span>
-          </button>
+            </button>
+          </div>
           <button
             type="button"
             onClick={handleNewRoom}

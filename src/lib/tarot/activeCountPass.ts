@@ -6,8 +6,9 @@ function isExpired(pass: CountPassBalance): boolean {
   return Boolean(pass.expiresAt && new Date(pass.expiresAt).getTime() <= Date.now());
 }
 
+// 허용 상태만 열거(거부 목록이 아니라 허용 목록) — pricing.ts의 availableCount와 동일한 이유.
 function isUsable(pass: CountPassBalance): boolean {
-  return pass.remaining > 0 && pass.status !== "exhausted" && pass.status !== "expired" && !isExpired(pass);
+  return pass.remaining > 0 && (pass.status === "unused" || pass.status === "active") && !isExpired(pass);
 }
 
 /**
