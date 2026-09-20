@@ -1,28 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
+import { scanReadings } from "@/lib/moderation";
+import { countAllowancesForCombo, type ComboKey } from "@/lib/countPassPackages";
 
-const RECENT_READING_LIMIT = 20;
+const REVIEW_SCAN_LIMIT = 100;
 
 function byNewest<T extends { createdAt: string }>(a: T, b: T) {
   return b.createdAt.localeCompare(a.createdAt);
 }
 
-function toPassItem(id: string, data: Record<string, unknown>) {
+/** remaining은 "남은 횟수"가 아니라 전체 이용권 대비 남은 비율(1.0=100%, src/lib/tarot/pricing.ts의
+ * availableCount/remainingAfterUse 참고) — 관리자 화면에서는 그 원시값 대신, 가장 저렴한 스프레드
+ * (원카드) 기준으로 환산한 실제 잔여 횟수를 보여준다. combo:"any"(가입 무료체험)는 옵션과 무관하게
+ * 모든 스프레드가 같은 횟수로 고정돼 있어 어느 키를 골라도 같은 값이 나온다. */
+function remainingCount(data: Record<string, unknown>): number | null {
+  const remaining = typeof data.remaining === "number" ? data.remaining : null;
+  if (remaining === null) return null;
+
+  const allowances = data.allowances as Record<string, number> | undefined;
+  const combo = typeof data.combo === "string" ? data.combo : null;
+  const basis = typeof data.basis === "number" ? data.basis : null;
+
+  const oneCardAllowance =
+    allowances?.one ??
+    allowances?.["one-0-0"] ??
+    (combo && combo !== "any" && basis !== null ? countAllowancesForCombo(basis, combo as ComboKey).one : undefined);
+
+  return typeof oneCardAllowance === "number" ? Math.max(0, Math.round(remaining * oneCardAllowance)) : null;
+}
+
+type PassSourceType = "countPass" | "timePass" | "pendingReward";
+
+function toPassItem(id: string, data: Record<string, unknown>, type: PassSourceType) {
   return {
     id,
+    type,
     source: typeof data.source === "string" ? data.source : "purchase",
     status: typeof data.status === "string" ? data.status : "unknown",
     combo: typeof data.combo === "string" ? data.combo : null,
     minutes: typeof data.minutes === "number" ? data.minutes : null,
-    remaining: typeof data.remaining === "number" ? data.remaining : null,
+    remainingCount: remainingCount(data),
     createdAt: typeof data.createdAt === "string" ? data.createdAt : "",
     expiresAt: typeof data.expiresAt === "string" ? data.expiresAt : null,
     usableUntil: typeof data.usableUntil === "string" ? data.usableUntil : null,
   };
 }
 
-/** 사용자 행을 펼칠 때만 호출한다. 최근 리딩은 사용자 전체에서 최신 20건만 반환한다. */
+/** 사용자 행을 펼칠 때만 호출한다. 무료처리/부정요청 등 검토가 필요한 리딩만(방마다 최근
+ * REVIEW_SCAN_LIMIT건 범위) 반환하며, 일반 리딩은 목록에서 제외한다. */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ uid: string }> }
@@ -37,27 +63,9 @@ export async function GET(
   if (!userSnap.exists) return NextResponse.json({ error: "존재하지 않는 사용자입니다." }, { status: 404 });
 
   try {
-    const roomsSnap = await userRef.collection("rooms").get();
-    const [readingsByRoom, paymentsSnap, countPassesSnap, timePassesSnap, pendingRewardsSnap, suspensionLogSnap] =
+    const [{ noChargeCount, flagged }, paymentsSnap, countPassesSnap, timePassesSnap, pendingRewardsSnap, suspensionLogSnap] =
       await Promise.all([
-        Promise.all(
-          roomsSnap.docs.map(async (room) => {
-            const readings = await room.ref.collection("readings").orderBy("createdAt", "desc").limit(RECENT_READING_LIMIT).get();
-            return readings.docs.map((reading) => {
-              const data = reading.data();
-              return {
-                id: reading.id,
-                roomId: room.id,
-                roomTitle: room.data().title ?? "새 대화",
-                question: data.question ?? "",
-                createdAt: data.createdAt ?? "",
-                charged: data.charged !== false,
-                flaggedForAbuse: data.flaggedForAbuse === true,
-                topic: data.topic ?? null,
-              };
-            });
-          })
-        ),
+        scanReadings(uid, REVIEW_SCAN_LIMIT),
         userRef.collection("payments").get(),
         userRef.collection("countPasses").get(),
         userRef.collection("timePasses").get(),
@@ -65,7 +73,7 @@ export async function GET(
         userRef.collection("suspensionLog").get(),
       ]);
 
-    const recentReadings = readingsByRoom.flat().sort(byNewest).slice(0, RECENT_READING_LIMIT);
+    const reviewReadings = flagged.slice(0, REVIEW_SCAN_LIMIT);
     const livePayments = paymentsSnap.docs
       .map((payment) => ({ id: payment.id, data: payment.data() as Record<string, unknown> }))
       .filter((payment) => payment.data.channelType === "LIVE" && payment.data.isTest !== true)
@@ -82,15 +90,16 @@ export async function GET(
       }));
 
     return NextResponse.json({
-      recentReadings,
-      recentFreeReadings: recentReadings.filter((reading) => !reading.charged).length,
+      reviewReadings,
+      reviewReadingsTotal: noChargeCount,
       purchasedPasses: [
-        ...countPassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data())).filter((pass) => pass.source === "purchase"),
-        ...timePassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data())).filter((pass) => pass.source === "purchase"),
+        ...countPassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data(), "countPass")).filter((pass) => pass.source === "purchase"),
+        ...timePassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data(), "timePass")).filter((pass) => pass.source === "purchase"),
       ].sort(byNewest),
       rewardPasses: [
-        ...countPassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data())).filter((pass) => pass.source !== "purchase"),
-        ...pendingRewardsSnap.docs.map((reward) => toPassItem(reward.id, reward.data())),
+        ...countPassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data(), "countPass")).filter((pass) => pass.source !== "purchase"),
+        ...timePassesSnap.docs.map((pass) => toPassItem(pass.id, pass.data(), "timePass")).filter((pass) => pass.source !== "purchase"),
+        ...pendingRewardsSnap.docs.map((reward) => toPassItem(reward.id, reward.data(), "pendingReward")),
       ].sort(byNewest),
       livePayments,
       suspensionLog: suspensionLogSnap.docs

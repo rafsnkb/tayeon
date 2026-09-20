@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
@@ -26,28 +26,31 @@ type PageData = { users: UserItem[]; nextCursor: string | null };
 
 type PassItem = {
   id: string;
+  type: "countPass" | "timePass" | "pendingReward";
   source: string;
   status: string;
   combo: string | null;
   minutes: number | null;
-  remaining: number | null;
+  remainingCount: number | null;
   createdAt: string;
   expiresAt: string | null;
   usableUntil: string | null;
 };
 
+type ReviewReading = {
+  roomId: string;
+  readingId: string;
+  roomTitle: string | null;
+  question: string;
+  interpretation: string;
+  createdAt: string;
+  spread: string | null;
+  flaggedForAbuse: boolean;
+};
+
 type UserOverview = {
-  recentReadings: Array<{
-    id: string;
-    roomId: string;
-    roomTitle: string;
-    question: string;
-    createdAt: string;
-    charged: boolean;
-    flaggedForAbuse: boolean;
-    topic: string | null;
-  }>;
-  recentFreeReadings: number;
+  reviewReadings: ReviewReading[];
+  reviewReadingsTotal: number;
   purchasedPasses: PassItem[];
   rewardPasses: PassItem[];
   livePayments: Array<{ id: string; orderName: string | null; priceWon: number; status: string; paidAt: string | null }>;
@@ -77,27 +80,112 @@ function shortDate(value: string | null) {
   return value ? value.replace("T", " ").slice(0, 19) : "-";
 }
 
-function PassList({ title, passes, emptyText }: { title: string; passes: PassItem[]; emptyText: string }) {
+type PassCategory = "all" | "purchase" | "reward" | "admin-grant";
+
+const PASS_CATEGORY_LABEL: Record<PassCategory, string> = {
+  all: "모두",
+  purchase: "구매",
+  reward: "리워드",
+  "admin-grant": "운영자 지급",
+};
+
+function matchesPassCategory(pass: PassItem, category: PassCategory) {
+  if (category === "all") return true;
+  if (category === "admin-grant") return pass.source === "admin-grant";
+  if (category === "purchase") return pass.source === "purchase";
+  return pass.source !== "purchase" && pass.source !== "admin-grant";
+}
+
+function HeldPassesPanel({
+  uid,
+  purchasedPasses,
+  rewardPasses,
+  onUpdate,
+}: {
+  uid: string;
+  purchasedPasses: PassItem[];
+  rewardPasses: PassItem[];
+  onUpdate: (uid: string, updater: (prev: UserOverview) => UserOverview) => void;
+}) {
+  const [category, setCategory] = useState<PassCategory>("all");
+  const [revokeBusy, setRevokeBusy] = useState<string | null>(null);
+  const passes = [...purchasedPasses, ...rewardPasses].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const filtered = passes.filter((pass) => matchesPassCategory(pass, category));
+
+  async function revoke(pass: PassItem) {
+    const admin = auth.currentUser;
+    if (!admin || (pass.type !== "countPass" && pass.type !== "timePass")) return;
+    const reason = prompt("회수 사유를 입력하세요.");
+    if (!reason?.trim()) return;
+    if (!confirm("이 이용권을 회수할까요? 되돌릴 수 없습니다.")) return;
+    setRevokeBusy(pass.id);
+    try {
+      const token = await admin.getIdToken();
+      const segment = pass.type === "countPass" ? "count-passes" : "time-passes";
+      const response = await fetch(
+        `/api/admin/users/${encodeURIComponent(uid)}/${segment}/${encodeURIComponent(pass.id)}/revoke`,
+        { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ reason: reason.trim() }) }
+      );
+      if (!response.ok) { alert((await response.json().catch(() => ({}))).error ?? "회수에 실패했습니다."); return; }
+      onUpdate(uid, (prev) => ({
+        ...prev,
+        purchasedPasses: prev.purchasedPasses.filter((p) => p.id !== pass.id),
+        rewardPasses: prev.rewardPasses.filter((p) => p.id !== pass.id),
+      }));
+    } finally {
+      setRevokeBusy(null);
+    }
+  }
+
   return (
-    <section className="rounded-2xl border border-[#EEE8F1] bg-white p-4">
+    <section className="flex h-full flex-col rounded-2xl border border-[#EEE8F1] bg-white p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[#45394F]">{title}</h3>
+        <h3 className="text-sm font-semibold text-[#45394F]">보유 이용권 목록</h3>
         <span className="rounded-full bg-[#F4F0F6] px-2 py-1 text-[11px] font-medium text-[#786D82]">{passes.length}건</span>
       </div>
-      {passes.length === 0 ? (
-        <p className="mt-3 text-xs text-[#A299AA]">{emptyText}</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {(Object.keys(PASS_CATEGORY_LABEL) as PassCategory[]).map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategory(c)}
+            className={
+              category === c
+                ? "rounded-full bg-[#3B2D47] px-2.5 py-1 text-[11px] font-semibold text-white"
+                : "rounded-full border border-[#E4DDE9] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#584D61]"
+            }
+          >
+            {PASS_CATEGORY_LABEL[c]}
+          </button>
+        ))}
+      </div>
+      {filtered.length === 0 ? (
+        <p className="mt-3 text-xs text-[#A299AA]">해당하는 이용권이 없습니다.</p>
       ) : (
-        <ul className="mt-3 max-h-44 space-y-2 overflow-y-auto pr-1">
-          {passes.map((pass) => (
-            <li key={pass.id} className="rounded-xl bg-[#FAF8FB] px-3 py-2 text-xs text-[#665A70]">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-[#4B3D56]">{SOURCE_LABEL[pass.source] ?? pass.source}</span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{pass.status}</span>
-              </div>
-              <p className="mt-1">{pass.minutes ? `${pass.minutes}분 시간제` : pass.combo ? COMBO_LABEL[pass.combo] ?? pass.combo : "횟수제"}{pass.remaining !== null ? ` · 잔여 슬롯 ${pass.remaining}` : ""}</p>
-              <p className="mt-1 text-[11px] text-[#9A90A2]">발급 {shortDate(pass.createdAt)} · 만료 {shortDate(pass.expiresAt ?? pass.usableUntil)}</p>
-            </li>
-          ))}
+        <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {filtered.map((pass) => {
+            const revocable = pass.source === "admin-grant" && pass.status === "unused" && (pass.type === "countPass" || pass.type === "timePass");
+            return (
+              <li key={pass.id} className="rounded-xl bg-[#FAF8FB] px-3 py-2 text-xs text-[#665A70]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-[#4B3D56]">{SOURCE_LABEL[pass.source] ?? pass.source}</span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{pass.status}</span>
+                    {revocable && (
+                      <button
+                        onClick={() => revoke(pass)}
+                        disabled={revokeBusy === pass.id}
+                        className="rounded-full border border-[#E4DDE9] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#B81D6E] disabled:opacity-50"
+                      >
+                        {revokeBusy === pass.id ? "처리 중..." : "회수"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-1">{pass.minutes ? `${pass.minutes}분 시간제` : pass.combo ? COMBO_LABEL[pass.combo] ?? pass.combo : "횟수제"}{pass.remainingCount !== null ? ` · 잔여 ${pass.remainingCount}회 (원카드 기준)` : ""}</p>
+                <p className="mt-1 text-[11px] text-[#9A90A2]">발급 {shortDate(pass.createdAt)} · 만료 {shortDate(pass.expiresAt ?? pass.usableUntil)}</p>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
@@ -188,64 +276,233 @@ function TimePassGrantControls({ uid }: { uid: string }) {
   return <div className="flex flex-wrap items-center gap-2"><select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-64 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]">{TIME_PASS_PACKAGES.map((pkg) => <option key={pkg.id} value={pkg.id}>{COMBO_LABEL[pkg.combo]} {pkg.minutes}분 · {pkg.priceWon.toLocaleString("ko-KR")}원</option>)}</select><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유 (선택)" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "시간제 지급"}</button>{message && <p className="text-xs text-[#B81D6E]">{message}</p>}</div>;
 }
 
-function UserOverviewPanel({ overview, uid, suspended }: { overview: UserOverview; uid: string; suspended: boolean }) {
+type ContextReading = {
+  readingId: string;
+  question: string;
+  interpretation: string;
+  createdAt: string;
+  charged: boolean;
+  flaggedForAbuse: boolean;
+  spread: string | null;
+};
+
+function ReadingReviewModal({
+  uid,
+  reading,
+  busy,
+  onClose,
+  onReview,
+}: {
+  uid: string;
+  reading: ReviewReading;
+  busy: boolean;
+  onClose: () => void;
+  onReview: () => void;
+}) {
+  const [context, setContext] = useState<ContextReading[] | null>(null);
+  const [contextLoading, setContextLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setContextLoading(true);
+      setContext(null);
+      const admin = auth.currentUser;
+      if (!admin) { setContextLoading(false); return; }
+      try {
+        const token = await admin.getIdToken();
+        const response = await fetch(
+          `/api/admin/users/${encodeURIComponent(uid)}/rooms/${encodeURIComponent(reading.roomId)}/readings?before=${encodeURIComponent(reading.createdAt)}`,
+          { headers: { authorization: `Bearer ${token}` } }
+        );
+        if (!response.ok || cancelled) return;
+        const body = await response.json();
+        if (!cancelled) setContext(body.readings);
+      } finally {
+        if (!cancelled) setContextLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [uid, reading.roomId, reading.createdAt]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-[#9A90A2]">{reading.roomTitle ?? "-"} · 이전 대화 맥락 포함(최대 20건)</p>
+          </div>
+          <button onClick={onClose} className="shrink-0 text-sm text-[#9A90A2]">닫기</button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {contextLoading && <p className="text-xs text-[#A299AA]">불러오는 중...</p>}
+          {context && context.map((r) => {
+            const isTarget = r.readingId === reading.readingId;
+            return (
+              <div
+                key={r.readingId}
+                className={
+                  isTarget
+                    ? "rounded-xl border-2 border-[#C46799] bg-[#FCEBF3] p-3"
+                    : "rounded-xl bg-[#FAF8FB] p-3"
+                }
+              >
+                <p className="text-[11px] text-[#9A90A2]">
+                  {shortDate(r.createdAt)}{r.spread ? ` · ${r.spread}` : ""}
+                  {!r.charged && <span className="ml-1.5 rounded-full bg-[#FCEBF3] px-1.5 py-0.5 text-[10px] font-semibold text-[#C02772]">무료</span>}
+                  {r.flaggedForAbuse && <span className="ml-1.5 rounded-full bg-[#FFF2E7] px-1.5 py-0.5 text-[10px] font-semibold text-[#A55A19]">검토</span>}
+                </p>
+                <p className="mt-1.5 whitespace-pre-wrap text-sm text-[#3A2F42]"><span className="font-semibold">Q.</span> {r.question || "(질문 없음)"}</p>
+                {r.interpretation && (
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm text-[#665A70]"><span className="font-semibold">A.</span> {r.interpretation}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button onClick={onReview} disabled={busy} className="rounded-full bg-[#3B2D47] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
+            {busy ? "처리 중..." : "확인 처리"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserOverviewPanel({
+  overview,
+  uid,
+  suspended,
+  onUpdate,
+}: {
+  overview: UserOverview;
+  uid: string;
+  suspended: boolean;
+  onUpdate: (uid: string, updater: (prev: UserOverview) => UserOverview) => void;
+}) {
+  const [modalReading, setModalReading] = useState<ReviewReading | null>(null);
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
+  const [reviewAllBusy, setReviewAllBusy] = useState(false);
+
+  async function reviewOne(reading: ReviewReading) {
+    const admin = auth.currentUser;
+    if (!admin) return;
+    const key = `${reading.roomId}:${reading.readingId}`;
+    setReviewBusy(key);
+    try {
+      const token = await admin.getIdToken();
+      const response = await fetch(
+        `/api/admin/users/${encodeURIComponent(uid)}/rooms/${encodeURIComponent(reading.roomId)}/readings/${encodeURIComponent(reading.readingId)}/review`,
+        { method: "POST", headers: { authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) { alert((await response.json().catch(() => ({}))).error ?? "확인 처리에 실패했습니다."); return; }
+      onUpdate(uid, (prev) => ({
+        ...prev,
+        reviewReadings: prev.reviewReadings.filter((r) => !(r.roomId === reading.roomId && r.readingId === reading.readingId)),
+        reviewReadingsTotal: Math.max(0, prev.reviewReadingsTotal - 1),
+      }));
+      setModalReading(null);
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
+  async function reviewAll() {
+    const admin = auth.currentUser;
+    if (!admin) return;
+    if (!confirm("이 유저의 검토 필요 리딩을 전부 확인 처리할까요?")) return;
+    setReviewAllBusy(true);
+    try {
+      const token = await admin.getIdToken();
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/flagged-readings/review-all`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+      if (!response.ok) { alert((await response.json().catch(() => ({}))).error ?? "일괄 확인 처리에 실패했습니다."); return; }
+      onUpdate(uid, (prev) => ({ ...prev, reviewReadings: [], reviewReadingsTotal: 0 }));
+    } finally {
+      setReviewAllBusy(false);
+    }
+  }
+
   return (
     <div className="rounded-[20px] border border-[#E7DFEC] bg-[#F8F5F9] p-4 shadow-inner shadow-[#E7DFEC]/30">
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="rounded-2xl border border-[#EEE8F1] bg-white p-4 xl:col-span-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="flex h-full flex-col rounded-2xl border border-[#EEE8F1] bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-semibold text-[#45394F]">최근 리딩 20건</h3>
-              <p className="mt-1 text-xs text-[#8D8296]">무료 처리 {overview.recentFreeReadings}건 · 부정 요청 추정은 분홍 배지로 표시</p>
-            </div>
-            <span className="rounded-full bg-[#F9EEF5] px-2.5 py-1 text-[11px] font-semibold text-[#B81D6E]">무료 {overview.recentFreeReadings}건</span>
+            <h3 className="text-sm font-semibold text-[#45394F]">검토 필요 리딩</h3>
+            <span className="rounded-full bg-[#F9EEF5] px-2.5 py-1 text-[11px] font-semibold text-[#B81D6E]">미확인 {overview.reviewReadingsTotal}건</span>
           </div>
-          {overview.recentReadings.length === 0 ? (
-            <p className="mt-4 text-xs text-[#A299AA]">리딩 기록이 없습니다.</p>
+          <p className="mt-1 text-xs text-[#8D8296]">무료 처리·프롬프트 해킹·부정/무관 요청만 표시 · 클릭하면 전문이 열립니다</p>
+          {overview.reviewReadings.length > 0 && (
+            <button onClick={reviewAll} disabled={reviewAllBusy} className="mt-2 self-start rounded-full border border-[#E4DDE9] bg-white px-3 py-1 text-[11px] font-semibold text-[#584D61] disabled:opacity-50">
+              {reviewAllBusy ? "처리 중..." : "전부 확인 처리"}
+            </button>
+          )}
+          {overview.reviewReadings.length === 0 ? (
+            <p className="mt-4 text-xs text-[#A299AA]">검토가 필요한 리딩이 없습니다.</p>
           ) : (
-            <ul className="mt-3 max-h-64 divide-y divide-[#F0ECF2] overflow-y-auto">
-              {overview.recentReadings.map((reading) => (
-                <li key={`${reading.roomId}:${reading.id}`} className="py-2.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-xs font-medium text-[#52435E]">{reading.question || "(질문 없음)"}</p>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      {!reading.charged && <span className="rounded-full bg-[#FCEBF3] px-1.5 py-0.5 text-[10px] font-semibold text-[#C02772]">무료</span>}
-                      {reading.flaggedForAbuse && <span className="rounded-full bg-[#FFF2E7] px-1.5 py-0.5 text-[10px] font-semibold text-[#A55A19]">검토</span>}
+            <ul className="mt-3 min-h-0 flex-1 divide-y divide-[#F0ECF2] overflow-y-auto">
+              {overview.reviewReadings.map((reading) => (
+                <li key={`${reading.roomId}:${reading.readingId}`}>
+                  <button
+                    type="button"
+                    onClick={() => setModalReading(reading)}
+                    className="w-full py-2.5 text-left"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-xs font-medium text-[#52435E]">{reading.question || "(질문 없음)"}</p>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="rounded-full bg-[#FCEBF3] px-1.5 py-0.5 text-[10px] font-semibold text-[#C02772]">무료</span>
+                        {reading.flaggedForAbuse && <span className="rounded-full bg-[#FFF2E7] px-1.5 py-0.5 text-[10px] font-semibold text-[#A55A19]">검토</span>}
+                      </div>
                     </div>
-                  </div>
-                  <p className="mt-1 text-[11px] text-[#9A90A2]">{reading.roomTitle} · {shortDate(reading.createdAt)}{reading.topic ? ` · ${reading.topic}` : ""}</p>
+                    <p className="mt-1 text-[11px] text-[#9A90A2]">{reading.roomTitle ?? "-"} · {shortDate(reading.createdAt)}{reading.spread ? ` · ${reading.spread}` : ""}</p>
+                  </button>
                 </li>
               ))}
             </ul>
           )}
         </section>
 
-        <div className="space-y-4">
-          <PassList title="구매 이용권" passes={overview.purchasedPasses} emptyText="구매 이용권이 없습니다." />
-          <PassList title="리워드·쿠폰 이용권" passes={overview.rewardPasses} emptyText="받은 리워드나 쿠폰이 없습니다." />
-        </div>
-      </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-[#EEE8F1] bg-white p-4">
+        <section className="flex h-full flex-col rounded-2xl border border-[#EEE8F1] bg-white p-4">
           <h3 className="text-sm font-semibold text-[#45394F]">LIVE 결제 내역</h3>
           {overview.livePayments.length === 0 ? <p className="mt-3 text-xs text-[#A299AA]">LIVE 결제가 없습니다.</p> : (
-            <ul className="mt-3 max-h-36 space-y-1.5 overflow-y-auto text-xs">
+            <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto text-xs">
               {overview.livePayments.map((payment) => <li key={payment.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#FAF8FB] px-3 py-2"><span className="truncate text-[#665A70]">{payment.orderName ?? payment.id}</span><span className="shrink-0 font-medium text-[#4B3D56]">{won(payment.priceWon)} · {payment.status}</span></li>)}
             </ul>
           )}
         </section>
-        <section className="rounded-2xl border border-[#EEE8F1] bg-white p-4">
+
+        <HeldPassesPanel uid={uid} purchasedPasses={overview.purchasedPasses} rewardPasses={overview.rewardPasses} onUpdate={onUpdate} />
+
+        <section className="flex h-full flex-col rounded-2xl border border-[#EEE8F1] bg-white p-4">
           <h3 className="text-sm font-semibold text-[#45394F]">정지 이력</h3>
           {overview.suspensionLog.length === 0 ? <p className="mt-3 text-xs text-[#A299AA]">정지 이력이 없습니다.</p> : (
-            <ul className="mt-3 max-h-36 space-y-1.5 overflow-y-auto text-xs">
+            <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto text-xs">
               {overview.suspensionLog.map((log) => <li key={log.id} className="rounded-lg bg-[#FAF8FB] px-3 py-2 text-[#665A70]"><span className="font-semibold">{log.action === "suspended" ? "정지" : "정지 해제"}</span>{log.reason ? ` · ${log.reason}` : ""}<p className="mt-1 text-[11px] text-[#9A90A2]">{shortDate(log.createdAt)}{log.action === "suspended" ? ` · ${log.durationDays ? `${log.durationDays}일 (해제 ${shortDate(log.suspendedUntil)})` : "영구"}` : ""}</p></li>)}
             </ul>
           )}
         </section>
       </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">횟수제 이용권 지급</h3><p className="mt-1 text-xs text-[#8D8296]">자미두수 포함 조합은 태어난 시간이 등록된 사용자에게만 지급할 수 있습니다.</p></div><CountPassGrantControls uid={uid} /></section>
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">시간제 이용권 지급</h3><p className="mt-1 text-xs text-[#8D8296]">12종 상품 중 선택해 지급합니다. 자미두수 포함 상품은 태어난 시간이 필요합니다.</p></div><TimePassGrantControls uid={uid} /></section>
+      </div>
       <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">계정 정지</h3><p className="mt-1 text-xs text-[#8D8296]">로그인·기록 열람은 유지되며, 리딩·결제·보상 수령만 제한됩니다.</p></div><SuspensionControls uid={uid} suspended={suspended} /></section>
-      <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">횟수제 이용권 지급</h3><p className="mt-1 text-xs text-[#8D8296]">자미두수 포함 조합은 태어난 시간이 등록된 사용자에게만 지급할 수 있습니다.</p></div><CountPassGrantControls uid={uid} /></section>
-      <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">시간제 이용권 지급</h3><p className="mt-1 text-xs text-[#8D8296]">12종 상품 중 선택해 지급합니다. 자미두수 포함 상품은 태어난 시간이 필요합니다.</p></div><TimePassGrantControls uid={uid} /></section>
+      {modalReading && (
+        <ReadingReviewModal
+          uid={uid}
+          reading={modalReading}
+          busy={reviewBusy === `${modalReading.roomId}:${modalReading.readingId}`}
+          onClose={() => setModalReading(null)}
+          onReview={() => reviewOne(modalReading)}
+        />
+      )}
     </div>
   );
 }
@@ -261,6 +518,9 @@ export default function UserDirectoryPage() {
   const [openUid, setOpenUid] = useState<string | null>(null);
   const [overview, setOverview] = useState<Record<string, UserOverview>>({});
   const [overviewLoading, setOverviewLoading] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
 
   const loadPage = useCallback(async (firebaseUser: User, cursor: string | null) => {
     setLoading(true);
@@ -302,6 +562,39 @@ export default function UserDirectoryPage() {
     );
   }
 
+  async function runSearch(e: FormEvent) {
+    e.preventDefault();
+    if (!user || !searchQuery.trim()) return;
+    setSearching(true);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/admin/users?q=${encodeURIComponent(searchQuery.trim())}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = (await response.json().catch(() => ({}))) as PageData & { error?: string };
+      if (!response.ok) {
+        setError(body.error ?? "검색에 실패했습니다.");
+        return;
+      }
+      setEntries(body.users);
+      setNextCursor(null);
+      setSearchActive(true);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function clearSearch() {
+    setSearchQuery("");
+    setSearchActive(false);
+    setOpenUid(null);
+    if (user) {
+      setCursorStack([null]);
+      loadPage(user, null);
+    }
+  }
+
   async function toggleOverview(uid: string) {
     if (openUid === uid) {
       setOpenUid(null);
@@ -325,6 +618,14 @@ export default function UserDirectoryPage() {
     } finally {
       setOverviewLoading(null);
     }
+  }
+
+  function updateOverview(uid: string, updater: (prev: UserOverview) => UserOverview) {
+    setOverview((current) => {
+      const prev = current[uid];
+      if (!prev) return current;
+      return { ...current, [uid]: updater(prev) };
+    });
   }
 
   const liveSalesTotal = entries.reduce((total, entry) => total + entry.paymentTotalWon, 0);
@@ -355,10 +656,37 @@ export default function UserDirectoryPage() {
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#EEEAF1] px-5 py-5 sm:px-6">
             <div>
               <h2 className="text-base font-semibold text-[#342B3D]">전체 사용자</h2>
-              <p className="mt-1 text-sm text-[#817789]">한 페이지에 100명씩 표시하며, 결제·환불 금액은 LIVE 결제만 집계합니다.</p>
+              <p className="mt-1 text-sm text-[#817789]">
+                {searchActive ? "검색 결과입니다." : "한 페이지에 100명씩 표시하며, 결제·환불 금액은 LIVE 결제만 집계합니다."}
+              </p>
             </div>
-            <span className="rounded-full bg-[#F9EEF5] px-3 py-1.5 text-xs font-semibold text-[#B81D6E]">UID 순 정렬</span>
+            {!searchActive && <span className="rounded-full bg-[#F9EEF5] px-3 py-1.5 text-xs font-semibold text-[#B81D6E]">UID 순 정렬</span>}
           </div>
+
+          <form onSubmit={runSearch} className="flex flex-wrap gap-2 border-b border-[#EEEAF1] px-5 py-4 sm:px-6">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="kakao:1234567 또는 닉네임 (정확히 일치해야 합니다)"
+              className="min-w-[240px] flex-1 rounded-xl border border-[#DED7E4] px-3 py-2 text-sm outline-none focus:border-[#B291BE]"
+            />
+            <button
+              type="submit"
+              disabled={searching || !searchQuery.trim()}
+              className="rounded-xl bg-[#3B2D47] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {searching ? "검색 중..." : "검색"}
+            </button>
+            {searchActive && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="rounded-xl border border-[#DED7E4] bg-white px-4 py-2 text-sm font-medium text-[#584D61]"
+              >
+                검색 초기화
+              </button>
+            )}
+          </form>
 
           {error && <p className="m-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
           <div className="overflow-x-auto">
@@ -420,14 +748,14 @@ export default function UserDirectoryPage() {
                 {overviewLoading === openUid ? (
                   <div className="rounded-2xl border border-[#ECE4F0] bg-white px-4 py-8 text-center text-sm text-[#93899A]">상세 정보를 불러오는 중...</div>
                 ) : overview[openUid] ? (
-                  <UserOverviewPanel overview={overview[openUid]} uid={openUid} suspended={entry.status === "suspended"} />
+                  <UserOverviewPanel overview={overview[openUid]} uid={openUid} suspended={entry.status === "suspended"} onUpdate={updateOverview} />
                 ) : null}
               </div>
             );
           })()}
         </section>
 
-        <nav className="flex items-center justify-between px-1" aria-label="사용자 목록 페이지">
+        {!searchActive && <nav className="flex items-center justify-between px-1" aria-label="사용자 목록 페이지">
         <button
           disabled={loading || cursorStack.length === 1}
           onClick={() => moveTo(cursorStack.at(-2) ?? null, "previous")}
@@ -442,7 +770,7 @@ export default function UserDirectoryPage() {
         >
           다음 100명
         </button>
-        </nav>
+        </nav>}
       </div>
     </main>
   );

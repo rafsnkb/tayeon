@@ -41,3 +41,21 @@ env:
     value: "8bOaK7MA9ohyqcSqCdlMKx88p2f2"
     availability:
       - RUNTIME
+  # Claude Haiku 4.5 단가 (claude.com/pricing 기준, USD/1M 토큰) — 사용량 분석의 "추정 비용" 계산에 사용.
+  # 모델을 바꾸면 이 값들도 같이 갱신해야 한다.
+  - variable: ANTHROPIC_INPUT_TOKEN_COST_USD_PER_MILLION
+    value: "1"
+    availability:
+      - RUNTIME
+  - variable: ANTHROPIC_OUTPUT_TOKEN_COST_USD_PER_MILLION
+    value: "5"
+    availability:
+      - RUNTIME
+  - variable: ANTHROPIC_CACHE_READ_TOKEN_COST_USD_PER_MILLION
+    value: "0.10"
+    availability:
+      - RUNTIME
+  - variable: ANTHROPIC_CACHE_CREATION_TOKEN_COST_USD_PER_MILLION
+    value: "1.25"
+    availability:
+      - RUNTIME

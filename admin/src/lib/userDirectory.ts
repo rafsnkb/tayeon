@@ -1,4 +1,4 @@
-import type { DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
+import type { DocumentData, DocumentSnapshot } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 
 export const USER_PAGE_SIZE = 100;
@@ -31,7 +31,9 @@ export type UserListItem = {
   friendInvitePasses: number;
 };
 
-async function summarizeUser(user: QueryDocumentSnapshot): Promise<UserListItem> {
+async function summarizeUser(user: DocumentSnapshot): Promise<UserListItem> {
+  const data = user.data();
+  if (!data) throw new Error("USER_NOT_FOUND");
   const userRef = user.ref;
   const [paymentsSnap, countPassesSnap, timePassesSnap, pendingRewardsSnap] = await Promise.all([
     userRef.collection("payments").get(),
@@ -56,7 +58,6 @@ async function summarizeUser(user: QueryDocumentSnapshot): Promise<UserListItem>
   const rewardPasses = heldCountPasses.filter((pass) => pass.data().source !== "purchase");
   const pendingRewards = pendingRewardsSnap.docs.filter((reward) => reward.data().status === "pending");
 
-  const data = user.data();
   return {
     uid: user.id,
     nickname: data.nickname ?? null,
@@ -101,5 +102,18 @@ export async function getUserPage(cursor: string | null) {
     users,
     nextCursor: snapshot.size === USER_PAGE_SIZE ? snapshot.docs.at(-1)?.id ?? null : null,
   };
+}
+
+/** UID(문서 ID) 정확 일치 또는 닉네임 정확 일치로 사용자를 찾는다. */
+export async function searchUsers(q: string): Promise<UserListItem[]> {
+  const matches = new Map<string, DocumentSnapshot>();
+
+  const byUid = await adminDb.collection("users").doc(q).get();
+  if (byUid.exists) matches.set(byUid.id, byUid);
+
+  const byNickname = await adminDb.collection("users").where("nickname", "==", q).limit(20).get();
+  for (const doc of byNickname.docs) matches.set(doc.id, doc);
+
+  return Promise.all(Array.from(matches.values()).map(summarizeUser));
 }
 

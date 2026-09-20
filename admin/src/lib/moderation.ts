@@ -12,6 +12,7 @@ export type FlaggedReading = {
   createdAt: string;
   spread: string | null;
   roomTitle: string | null;
+  flaggedForAbuse: boolean;
 };
 
 // Not an auto-detector — just surfaces NO_CHARGE_MARKER'd readings (injection attempts /
@@ -47,6 +48,7 @@ export async function scanReadings(uid: string, perRoomLimit: number) {
           createdAt: data.createdAt ?? "",
           spread: data.spread ?? null,
           roomTitle: room.data()?.title ?? null,
+          flaggedForAbuse: data.flaggedForAbuse === true,
         });
       }
     }

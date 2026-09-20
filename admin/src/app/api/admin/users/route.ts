@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
-import { getUserPage } from "@/lib/userDirectory";
+import { getUserPage, searchUsers } from "@/lib/userDirectory";
 
-/** 전체 사용자 목록 — 한 페이지 100명, 커서는 직전 마지막 UID. */
+/** 전체 사용자 목록 — 한 페이지 100명, 커서는 직전 마지막 UID.
+ * q가 있으면 UID/닉네임 정확 일치 검색 결과를 대신 반환한다(페이지네이션 없음). */
 export async function GET(req: NextRequest) {
   if (!(await getAdminUidFromRequest(req))) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const q = req.nextUrl.searchParams.get("q")?.trim();
+  if (q) {
+    try {
+      return NextResponse.json({ users: await searchUsers(q), nextCursor: null });
+    } catch (error) {
+      console.error("[admin/users] 사용자 검색 실패", error);
+      return NextResponse.json({ error: "검색에 실패했습니다." }, { status: 500 });
+    }
   }
 
   const cursor = req.nextUrl.searchParams.get("cursor");
