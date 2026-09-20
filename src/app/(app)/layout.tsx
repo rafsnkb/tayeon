@@ -202,7 +202,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             >
               <BellIcon className="h-5 w-5" />
               {hasUnreadNotifications && (
-                <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-point" />
+                <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full bg-point" />
               )}
             </button>
           </div>

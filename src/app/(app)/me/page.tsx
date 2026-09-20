@@ -214,8 +214,8 @@ export default function MyPage() {
             <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={() => router.push("/invite")} />
           </Section>
 
-          <Section title="코인·이용권 구입">
-            <ListRow icon={<CartIcon className="h-5 w-5" />} label="코인·이용권 구입" onClick={() => router.push("/charge")} />
+          <Section title="이용권 구입">
+            <ListRow icon={<CartIcon className="h-5 w-5" />} label="이용권 구입" onClick={() => router.push("/charge")} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
             <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="받은 이용권 내역" onClick={() => router.push("/received-passes")} />
           </Section>
@@ -333,14 +333,19 @@ export default function MyPage() {
               </div>
             </div>
             <p className="mb-2 text-center text-sm font-bold text-[#2a1a43] dark:text-bold-text">리워드 지급 비율</p>
-            <div className="mb-3 overflow-hidden rounded-2xl border border-[#f0eaf6] bg-[#f6f1fb] dark:border-border dark:bg-border">
-              <div className="grid grid-cols-2 bg-[#79678f] px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+            {/* 다크모드 RewardInfoModal.png 실측(sharp 픽셀 샘플, 2026-09-20): 헤더 칩이 바깥 박스
+                가장자리에 딱 붙지 않고 안쪽에 여백을 두고 떠 있는 형태(박스 bg=--border, 헤더 칩
+                bg=--topbar로 안쪽이 더 어둡게 "패인" 느낌). 라이트모드 목업은 헤더가 박스 끝까지
+                꽉 차 있었지만, 사용자 요청(2026-09-20)으로 두 모드 구조를 동일하게 통일함 —
+                라이트도 같은 여백/독립 라운딩을 쓰고, 행 라벨은 톤을 유지한 진한 색(#2a1a43)으로. */}
+            <div className="mb-3 rounded-3xl border border-[#f0eaf6] bg-[#f6f1fb] p-3 dark:border-border dark:bg-border">
+              <div className="grid grid-cols-2 rounded-xl bg-[#79678f] px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
                 <span>당월 결제금액</span>
                 <span className="text-right">리워드 비율</span>
               </div>
               {REWARD_TIER_ROWS.map((row) => (
                 <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
-                  <span className="font-semibold text-[#75628b] dark:text-icon-muted">{row.label}</span>
+                  <span className="font-semibold text-[#2a1a43] dark:text-white">{row.label}</span>
                   <span className="text-right font-bold text-point">
                     {Number((row.rate * 100).toFixed(2))}%
                   </span>

@@ -211,7 +211,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const balance: number = userData?.coins ?? 0;
     const countPassesSnap = await userRef.collection(COUNT_PASSES).get();
     const countPasses = countPassesSnap.docs;
     const rawTone = userData?.tone;
@@ -330,7 +329,6 @@ export async function POST(req: NextRequest) {
         includeCompatibility: false,
         partnerNickname: null,
         interpretation: guidance,
-        remainingCoins: balance,
         charged: false,
         guidanceOnly: true,
         flaggedForAbuse: false,
@@ -668,8 +666,6 @@ export async function POST(req: NextRequest) {
           chargeActiveCountPass(tx, userRef, chosenPass.ref, spread, sajuCharged, ziweiCharged)
         );
         chargedPassId = chosenPass.id;
-      } else if (chargedCost > 0) {
-        await userRef.update({ coins: FieldValue.increment(-chargedCost) });
       }
 
       await roomRef.collection(READINGS).add({
@@ -709,7 +705,6 @@ export async function POST(req: NextRequest) {
         includeCompatibility: compatibilityCharged,
         partnerNickname: compatibilityCharged && partner ? partner.nickname : null,
         interpretation,
-        remainingCoins: cardsOk ? balance - chargedCost : balance,
         countPassApplied: Boolean(chargedPassId),
         charged: cardsOk,
         guidanceOnly,

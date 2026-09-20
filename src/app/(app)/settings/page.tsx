@@ -291,7 +291,7 @@ export default function SettingsPage() {
       {deleteConfirmOpen && (
         <ConfirmModal
           title="타연 탈퇴"
-          description={"탈퇴하면 계정 정보 및 보유한 코인/이용권과\n모든 대화가 삭제되며 복구할 수 없습니다."}
+          description={"탈퇴하면 계정 정보 및 보유한 이용권과\n모든 대화가 삭제되며 복구할 수 없습니다."}
           confirmLabel="탈퇴하기"
           busy={deleting}
           onConfirm={handleDeleteAccount}

@@ -72,7 +72,7 @@ export default function UsageHistoryPage() {
                     </p>
                   </div>
                   <span className="shrink-0 text-base font-bold text-bold-text">
-                    {e.timePassApplied ? "시간제 이용권 사용" : e.countPassApplied ? "횟수제 이용권 1회" : `-${e.cost.toLocaleString("ko-KR")} 코인`}
+                    {e.timePassApplied ? "시간제 이용권 사용" : e.countPassApplied ? "횟수제 이용권 1회" : `-${e.cost.toLocaleString("ko-KR")}원`}
                   </span>
                 </div>
               </div>

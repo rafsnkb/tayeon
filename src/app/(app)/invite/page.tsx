@@ -56,7 +56,7 @@ export default function InvitePage() {
             type="button"
             onClick={handleCopy}
             disabled={!code}
-            className="h-12 w-full rounded-2xl bg-point text-base font-semibold text-white disabled:opacity-60"
+            className="mt-8 h-12 w-full rounded-2xl bg-point text-base font-semibold text-white disabled:opacity-60"
           >
             {copied ? "복사되었어요!" : "초대 링크 복사"}
           </button>

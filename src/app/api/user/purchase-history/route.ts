@@ -13,7 +13,7 @@ function productName(productId: string, productType: string): string {
     const pkg = TIME_PASS_PACKAGES.find((p) => p.id === productId);
     return pkg ? `시간제 이용권 ${pkg.minutes}분 무제한` : "시간제 이용권";
   }
-  return "코인";
+  return "충전 상품";
 }
 
 function badgeLabel(status: string | undefined): string {
