@@ -12,7 +12,34 @@
 import { writeFileSync } from "node:fs";
 import { RAMP, contrast } from "./build-point-ramp.mjs";
 
+// 배경도 브랜드 결정을 따라야 한다. 앞선 시안은 오로라에 라일락(#c9b6ec, 300°)과
+// 딥퍼플(#2a1f4d)을 썼는데, 그건 호리(312°)의 영역이다 — 버튼에서 보라를 피해놓고 배경을
+// 보라로 두면 화면 전체 인상은 그대로 호리 쪽이다. 따뜻한 쪽으로 옮기고 거리를 같이 잰다.
+const HORI_HUE = 312;
+const hueOf = (hex) => {
+  const [, A, B] = rgbToOklab(hexToRgb(hex));
+  let H = (Math.atan2(B, A) * 180) / Math.PI;
+  return H < 0 ? H + 360 : H;
+};
+const horiGap = (hex) => {
+  const x = Math.abs(hueOf(hex) - HORI_HUE) % 360;
+  return x > 180 ? 360 - x : x;
+};
+
 const hex = (h) => h.replace("#", "").match(/../g).map((x) => parseInt(x, 16));
+const hexToRgb = (h) => hex(h).map((v) => v / 255);
+const sLin = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+function rgbToOklab([r, g, b]) {
+  const R = sLin(r), G = sLin(g), B = sLin(b);
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+  const s2 = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s2,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s2,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s2,
+  ];
+}
 const toHex = (rgb) => "#" + rgb.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
 
 /** 반투명 면을 배경 위에 얹었을 때 실제로 보이는 색. blur는 배경을 뭉개므로, 뒤가 그라디언트인
@@ -26,38 +53,45 @@ const composite = (glassHex, alpha, backdropHex) => {
 const THEMES = {
   light: {
     label: "라이트",
-    // 오로라 배경. 브랜드 핑크에서 뽑은 두 단계 + 라일락으로, 유리 뒤에서 색이 움직이게 한다.
-    auroraA: RAMP[200],
-    auroraB: "#c9b6ec",
-    auroraC: RAMP[200],
-    page: "#efe7f7",
+    // 오로라도 코랄 결정을 따른다. 앞선 판에서는 라일락(300°)을 썼는데 그건 호리 영역이라,
+    // 버튼만 보라를 피하고 배경은 그대로 두면 화면 인상이 안 바뀐다.
+    auroraA: "#ffc9d6",
+    auroraB: "#ffd3bb",
+    auroraC: "#ffe0d2",
+    page: "#fdf2ef",
     // blur가 섞고 난 뒤 유리 밑에 깔리는 평균색(대비 계산용)
-    backdropAvg: "#ded0ee",
+    backdropAvg: "#fbd8cf",
     glass: "#ffffff",
     glassAlpha: 0.62,
     glassBorder: "rgba(255,255,255,.75)",
     text: "#2a1a43",
     textMuted: "#5f5378",
-    fill: RAMP[600],
+    // 확정된 자홍 → 코랄. 코랄 끝은 흰 글씨 4.5를 넘기려고 밝기를 0.04 내린 값이다.
+    gradFrom: "#c2005f",
+    gradTo: "#d23c21",
+    fill: "#c2005f",
     onFill: "#ffffff",
-    link: RAMP[700],
+    link: "#ac0053",
     chipGlass: "rgba(255,255,255,.5)",
   },
   dark: {
     label: "다크",
-    auroraA: RAMP[900],
-    auroraB: "#2a1f4d",
+    auroraA: "#5c1030",
+    auroraB: "#5a2412",
     auroraC: "#101114",
     page: "#0e0f12",
-    backdropAvg: "#1d1830",
+    backdropAvg: "#2a1620",
     glass: "#ffffff",
     glassAlpha: 0.08,
     glassBorder: "rgba(255,255,255,.14)",
     text: "#f3f4f6",
-    textMuted: "#a7a3b8",
-    fill: RAMP[400],
+    textMuted: "#c9b3ad",
+    // 다크는 밝은 면 + 어두운 글씨. 같은 코랄~핑크 축을 밝은 쪽에서 쓴다.
+    gradFrom: "#ff8a6b",
+    gradTo: "#ff5993",
+    fill: "#ff5993",
     onFill: "#141517",
-    link: RAMP[400],
+    link: "#ff8a6b",
     chipGlass: "rgba(255,255,255,.1)",
   },
 };
@@ -79,7 +113,8 @@ function frame(key, variant) {
       --page:${t.page}; --glass:rgba(${hex(t.glass).join(",")},${t.glassAlpha});
       --glass-border:${t.glassBorder}; --chip-glass:${t.chipGlass};
       --text:${t.text}; --muted:${t.textMuted};
-      --fill:${t.fill}; --on-fill:${t.onFill}; --link:${t.link};`;
+      --fill:${t.fill}; --on-fill:${t.onFill}; --link:${t.link};
+      --grad:linear-gradient(30deg in oklab, ${t.gradFrom}, ${t.gradTo});`;
 
   return `
   <figure class="frame ${desktop ? "desktop" : ""}">
@@ -149,7 +184,8 @@ function frame(key, variant) {
       <div><dt>유리 위 본문</dt><dd>${ratioChip(onGlass)}</dd></div>
       <div><dt>유리 위 보조 글자</dt><dd>${ratioChip(onGlassMuted)}</dd></div>
       <div><dt>유리 위 링크·강조</dt><dd>${ratioChip(linkOnGlass)}</dd></div>
-      <div><dt>버튼 칠 위 글자</dt><dd>${ratioChip(contrast(t.fill, t.onFill))}</dd></div>
+      <div><dt>그라데이션 위 라벨<small>양 끝 중 불리한 쪽 <code>${t.gradFrom}</code> / <code>${t.gradTo}</code></small></dt><dd>${ratioChip(Math.min(contrast(t.gradFrom, t.onFill), contrast(t.gradTo, t.onFill)))}</dd></div>
+      <div><dt>오로라가 호리와 가까워지는 정도<small>40° 이상이면 안전</small></dt><dd><span class="ratio ${Math.min(horiGap(t.auroraA), horiGap(t.auroraB)) >= 40 ? "pass" : "fail"}">${Math.round(Math.min(horiGap(t.auroraA), horiGap(t.auroraB)))}°</span></dd></div>
     </dl>
   </figure>`;
 }
@@ -226,7 +262,7 @@ const html = `<!doctype html>
     line-height: 1.55; color: var(--text); }
   .bubble.wide { max-width: 94%; }
   .bubble.wide b { display: block; margin-bottom: 4px; color: var(--link); }
-  .bubble.me { align-self: flex-end; background: var(--fill); color: var(--on-fill);
+  .bubble.me { align-self: flex-end; background: var(--grad); color: var(--on-fill);
     border: 0; font-weight: 600; }
   .suggest { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
   .suggest button { text-align: left; font: inherit; font-size: 12px; cursor: pointer;
@@ -239,14 +275,14 @@ const html = `<!doctype html>
   .modes { display: flex; gap: 5px; margin-bottom: 9px; }
   .seg { flex: 1; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
     border: 0; border-radius: 999px; padding: 6px 0; background: transparent; color: var(--muted); }
-  .seg.on { background: var(--fill); color: var(--on-fill); }
+  .seg.on { background: var(--grad); color: var(--on-fill); }
   .input-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 4px 4px 4px 10px; }
   .ph { color: var(--muted); font-size: 13px; }
   .send { width: 38px; height: 38px; border: 0; border-radius: 50%; cursor: pointer;
-    background: var(--fill); color: var(--on-fill); font-size: 16px; }
+    background: var(--grad); color: var(--on-fill); font-size: 16px; }
   .pill-fill { font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; border: 0;
-    border-radius: 999px; padding: 10px; background: var(--fill); color: var(--on-fill); }
+    border-radius: 999px; padding: 10px; background: var(--grad); color: var(--on-fill); }
   .pill-glass { font: inherit; font-weight: 600; font-size: 13px; cursor: pointer;
     border: 1px solid var(--glass-border); border-radius: 999px; padding: 10px;
     background: var(--chip-glass); color: var(--text); }
@@ -280,7 +316,7 @@ const html = `<!doctype html>
     <b>배경 위에 합성한 실제 색</b>으로 계산했다 — 반투명 면을 자기 값으로 재면 실제보다 밝게 나온다.
   </p>
   <ul class="changes">
-    <li><b>오로라 배경</b>을 깔았다. 브랜드 핑크 두 단계 + 라일락. 지금의 단색 <code>--bg</code> 위에서는 유리가 흐린 회색 판이 된다.</li>
+    <li><b>오로라 배경</b>을 깔았다. 코랄 결정에 맞춰 분홍~살구 쪽으로 간다 — 앞선 시안은 라일락을 썼는데 그건 호리 영역이라, 버튼에서 보라를 피하고 배경을 보라로 두면 인상은 그대로였다.</li>
     <li><b>떠 있는 이용권 배지를 상단바로 넣었다.</b> 지금은 상단바 아래 허공에 동그란 버튼이 하나 떠 있는데, 유리 상단바 위에서는 층이 하나 더 생겨 지저분해진다.</li>
     <li><b>컴포저를 바닥에서 띄웠다.</b> 대화가 그 아래로 흘러 들어가야 유리의 depth가 보인다. 붙여두면 그냥 불투명한 바닥 바와 구분이 안 된다.</li>
     <li><b>스프레드 선택을 세그먼트로 꺼냈다.</b> 지금은 "원 카드 모드" 칩을 눌러 바텀시트를 여는 2단계인데, 네 종류뿐이라 한 줄에 들어간다.</li>

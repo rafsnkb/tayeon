@@ -70,7 +70,7 @@
     line-height: 1.55; color: var(--text); }
   .bubble.wide { max-width: 94%; }
   .bubble.wide b { display: block; margin-bottom: 4px; color: var(--link); }
-  .bubble.me { align-self: flex-end; background: var(--fill); color: var(--on-fill);
+  .bubble.me { align-self: flex-end; background: var(--grad); color: var(--on-fill);
     border: 0; font-weight: 600; }
   .suggest { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
   .suggest button { text-align: left; font: inherit; font-size: 12px; cursor: pointer;
@@ -83,14 +83,14 @@
   .modes { display: flex; gap: 5px; margin-bottom: 9px; }
   .seg { flex: 1; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
     border: 0; border-radius: 999px; padding: 6px 0; background: transparent; color: var(--muted); }
-  .seg.on { background: var(--fill); color: var(--on-fill); }
+  .seg.on { background: var(--grad); color: var(--on-fill); }
   .input-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 4px 4px 4px 10px; }
   .ph { color: var(--muted); font-size: 13px; }
   .send { width: 38px; height: 38px; border: 0; border-radius: 50%; cursor: pointer;
-    background: var(--fill); color: var(--on-fill); font-size: 16px; }
+    background: var(--grad); color: var(--on-fill); font-size: 16px; }
   .pill-fill { font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; border: 0;
-    border-radius: 999px; padding: 10px; background: var(--fill); color: var(--on-fill); }
+    border-radius: 999px; padding: 10px; background: var(--grad); color: var(--on-fill); }
   .pill-glass { font: inherit; font-weight: 600; font-size: 13px; cursor: pointer;
     border: 1px solid var(--glass-border); border-radius: 999px; padding: 10px;
     background: var(--chip-glass); color: var(--text); }
@@ -124,7 +124,7 @@
     <b>배경 위에 합성한 실제 색</b>으로 계산했다 — 반투명 면을 자기 값으로 재면 실제보다 밝게 나온다.
   </p>
   <ul class="changes">
-    <li><b>오로라 배경</b>을 깔았다. 브랜드 핑크 두 단계 + 라일락. 지금의 단색 <code>--bg</code> 위에서는 유리가 흐린 회색 판이 된다.</li>
+    <li><b>오로라 배경</b>을 깔았다. 코랄 결정에 맞춰 분홍~살구 쪽으로 간다 — 앞선 시안은 라일락을 썼는데 그건 호리 영역이라, 버튼에서 보라를 피하고 배경을 보라로 두면 인상은 그대로였다.</li>
     <li><b>떠 있는 이용권 배지를 상단바로 넣었다.</b> 지금은 상단바 아래 허공에 동그란 버튼이 하나 떠 있는데, 유리 상단바 위에서는 층이 하나 더 생겨 지저분해진다.</li>
     <li><b>컴포저를 바닥에서 띄웠다.</b> 대화가 그 아래로 흘러 들어가야 유리의 depth가 보인다. 붙여두면 그냥 불투명한 바닥 바와 구분이 안 된다.</li>
     <li><b>스프레드 선택을 세그먼트로 꺼냈다.</b> 지금은 "원 카드 모드" 칩을 눌러 바텀시트를 여는 2단계인데, 네 종류뿐이라 한 줄에 들어간다.</li>
@@ -137,11 +137,12 @@
   <figure class="frame ">
     <figcaption>라이트 · 모바일</figcaption>
     <div class="screen" style="
-      --aurora-a:#ffc6d3; --aurora-b:#c9b6ec; --aurora-c:#ffc6d3;
-      --page:#efe7f7; --glass:rgba(255,255,255,0.62);
+      --aurora-a:#ffc9d6; --aurora-b:#ffd3bb; --aurora-c:#ffe0d2;
+      --page:#fdf2ef; --glass:rgba(255,255,255,0.62);
       --glass-border:rgba(255,255,255,.75); --chip-glass:rgba(255,255,255,.5);
       --text:#2a1a43; --muted:#5f5378;
-      --fill:#d30068; --on-fill:#ffffff; --link:#ac0053;">
+      --fill:#c2005f; --on-fill:#ffffff; --link:#ac0053;
+      --grad:linear-gradient(30deg in oklab, #c2005f, #d23c21);">
       <div class="aurora"></div>
 
       
@@ -190,22 +191,24 @@
     </div>
 
     <dl class="facts">
-      <div><dt>유리 면 실제 색<small>배경 #ded0ee 위에 62% 합성</small></dt><dd><code>#f2edf9</code></dd></div>
-      <div><dt>유리 위 본문</dt><dd><span class="ratio pass">13.76<i>✓</i></span></dd></div>
-      <div><dt>유리 위 보조 글자</dt><dd><span class="ratio pass">6.10<i>✓</i></span></dd></div>
-      <div><dt>유리 위 링크·강조</dt><dd><span class="ratio pass">6.34<i>✓</i></span></dd></div>
-      <div><dt>버튼 칠 위 글자</dt><dd><span class="ratio pass">5.29<i>✓</i></span></dd></div>
+      <div><dt>유리 면 실제 색<small>배경 #fbd8cf 위에 62% 합성</small></dt><dd><code>#fdf0ed</code></dd></div>
+      <div><dt>유리 위 본문</dt><dd><span class="ratio pass">14.21<i>✓</i></span></dd></div>
+      <div><dt>유리 위 보조 글자</dt><dd><span class="ratio pass">6.30<i>✓</i></span></dd></div>
+      <div><dt>유리 위 링크·강조</dt><dd><span class="ratio pass">6.55<i>✓</i></span></dd></div>
+      <div><dt>그라데이션 위 라벨<small>양 끝 중 불리한 쪽 <code>#c2005f</code> / <code>#d23c21</code></small></dt><dd><span class="ratio pass">4.76<i>✓</i></span></dd></div>
+      <div><dt>오로라가 호리와 가까워지는 정도<small>40° 이상이면 안전</small></dt><dd><span class="ratio pass">50°</span></dd></div>
     </dl>
   </figure>
     
   <figure class="frame ">
     <figcaption>다크 · 모바일</figcaption>
     <div class="screen" style="
-      --aurora-a:#62002d; --aurora-b:#2a1f4d; --aurora-c:#101114;
+      --aurora-a:#5c1030; --aurora-b:#5a2412; --aurora-c:#101114;
       --page:#0e0f12; --glass:rgba(255,255,255,0.08);
       --glass-border:rgba(255,255,255,.14); --chip-glass:rgba(255,255,255,.1);
-      --text:#f3f4f6; --muted:#a7a3b8;
-      --fill:#ff5993; --on-fill:#141517; --link:#ff5993;">
+      --text:#f3f4f6; --muted:#c9b3ad;
+      --fill:#ff5993; --on-fill:#141517; --link:#ff8a6b;
+      --grad:linear-gradient(30deg in oklab, #ff8a6b, #ff5993);">
       <div class="aurora"></div>
 
       
@@ -254,22 +257,24 @@
     </div>
 
     <dl class="facts">
-      <div><dt>유리 면 실제 색<small>배경 #1d1830 위에 8% 합성</small></dt><dd><code>#2f2a41</code></dd></div>
-      <div><dt>유리 위 본문</dt><dd><span class="ratio pass">12.49<i>✓</i></span></dd></div>
-      <div><dt>유리 위 보조 글자</dt><dd><span class="ratio pass">5.61<i>✓</i></span></dd></div>
-      <div><dt>유리 위 링크·강조</dt><dd><span class="ratio pass">4.65<i>✓</i></span></dd></div>
-      <div><dt>버튼 칠 위 글자</dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>유리 면 실제 색<small>배경 #2a1620 위에 8% 합성</small></dt><dd><code>#3b2932</code></dd></div>
+      <div><dt>유리 위 본문</dt><dd><span class="ratio pass">12.32<i>✓</i></span></dd></div>
+      <div><dt>유리 위 보조 글자</dt><dd><span class="ratio pass">6.80<i>✓</i></span></dd></div>
+      <div><dt>유리 위 링크·강조</dt><dd><span class="ratio pass">5.87<i>✓</i></span></dd></div>
+      <div><dt>그라데이션 위 라벨<small>양 끝 중 불리한 쪽 <code>#ff8a6b</code> / <code>#ff5993</code></small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>오로라가 호리와 가까워지는 정도<small>40° 이상이면 안전</small></dt><dd><span class="ratio pass">49°</span></dd></div>
     </dl>
   </figure>
     
   <figure class="frame desktop">
     <figcaption>다크 · 데스크톱</figcaption>
     <div class="screen" style="
-      --aurora-a:#62002d; --aurora-b:#2a1f4d; --aurora-c:#101114;
+      --aurora-a:#5c1030; --aurora-b:#5a2412; --aurora-c:#101114;
       --page:#0e0f12; --glass:rgba(255,255,255,0.08);
       --glass-border:rgba(255,255,255,.14); --chip-glass:rgba(255,255,255,.1);
-      --text:#f3f4f6; --muted:#a7a3b8;
-      --fill:#ff5993; --on-fill:#141517; --link:#ff5993;">
+      --text:#f3f4f6; --muted:#c9b3ad;
+      --fill:#ff5993; --on-fill:#141517; --link:#ff8a6b;
+      --grad:linear-gradient(30deg in oklab, #ff8a6b, #ff5993);">
       <div class="aurora"></div>
 
       
@@ -330,11 +335,12 @@
     </div>
 
     <dl class="facts">
-      <div><dt>유리 면 실제 색<small>배경 #1d1830 위에 8% 합성</small></dt><dd><code>#2f2a41</code></dd></div>
-      <div><dt>유리 위 본문</dt><dd><span class="ratio pass">12.49<i>✓</i></span></dd></div>
-      <div><dt>유리 위 보조 글자</dt><dd><span class="ratio pass">5.61<i>✓</i></span></dd></div>
-      <div><dt>유리 위 링크·강조</dt><dd><span class="ratio pass">4.65<i>✓</i></span></dd></div>
-      <div><dt>버튼 칠 위 글자</dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>유리 면 실제 색<small>배경 #2a1620 위에 8% 합성</small></dt><dd><code>#3b2932</code></dd></div>
+      <div><dt>유리 위 본문</dt><dd><span class="ratio pass">12.32<i>✓</i></span></dd></div>
+      <div><dt>유리 위 보조 글자</dt><dd><span class="ratio pass">6.80<i>✓</i></span></dd></div>
+      <div><dt>유리 위 링크·강조</dt><dd><span class="ratio pass">5.87<i>✓</i></span></dd></div>
+      <div><dt>그라데이션 위 라벨<small>양 끝 중 불리한 쪽 <code>#ff8a6b</code> / <code>#ff5993</code></small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>오로라가 호리와 가까워지는 정도<small>40° 이상이면 안전</small></dt><dd><span class="ratio pass">49°</span></dd></div>
     </dl>
   </figure>
   </div>
