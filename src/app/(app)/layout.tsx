@@ -206,6 +206,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </button>
           </div>
+          {/* 피그마 "Screen / MenuOpen" — 마이페이지 행과 "새 대화" 사이의 포인트 컬러 CTA.
+              목업 실측(sharp): 배경 #ff007f(--point), 글자 흰색. 접힌 아이콘 레일에는 이 버튼을
+              넣을 자리가 없어 데스크탑 접힘 상태에서만 숨긴다(모바일 드로어에는 항상 보인다). */}
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              router.push("/charge");
+            }}
+            className={`flex h-12 w-full shrink-0 items-center justify-center rounded-full bg-point text-sm font-bold text-white ${
+              sidebarCollapsed ? "xl:hidden" : ""
+            }`}
+          >
+            이용권 구입하기
+          </button>
           <button
             type="button"
             onClick={handleNewRoom}
