@@ -1,90 +1,110 @@
-# Firebase App Hosting configuration for 타연 (production, tayeon-d5149)
+# Firebase App Hosting configuration — QA 환경 (별도 Firebase 프로젝트)
+#
+# 이 파일은 `qa` 브랜치 전용이다. 프로덕션(`live` 브랜치)의 같은 파일과 구조는 같지만 값이 전부
+# 다르다 — Firebase 프로젝트, 카카오 Redirect URI, 포트원 채널이 모두 QA 것이어야 한다.
+#
+# !! main을 qa로 머지할 때 이 파일이 프로덕션 값으로 덮어써지지 않도록 주의할 것. 머지 충돌이
+#    나면 항상 qa 쪽(ours)을 유지한다.
+#
+# ── 아직 채워야 하는 값 ─────────────────────────────────────────────────────
+# 아래 <QA_...> 자리표시자는 QA Firebase 프로젝트를 만든 뒤 실제 값으로 교체해야 한다.
+# 순서와 방법은 doc/QA환경_구축.md 참고.
+# ────────────────────────────────────────────────────────────────────────────
+
 runConfig:
   minInstances: 0
 
 env:
+  # QA 표식. 이 값이 "qa"일 때만 로그인 허용 목록(src/lib/auth/loginAllowlist.ts)이 동작하고
+  # robots.ts가 크롤링을 막는다. 프로덕션에는 이 변수가 없다.
+  - variable: APP_ENV
+    value: "qa"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # 로그인 허용 카카오 계정 이메일(쉼표 구분). 비워두면 아무도 로그인할 수 없다(fail-closed).
+  - variable: LOGIN_ALLOWED_EMAILS
+    value: "redteart@gmail.com"
+    availability:
+      - RUNTIME
+
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "AIzaSyCRXh6LJL3bcdff4h8qpivwxvFxPff0ikI"
+    value: "<QA_FIREBASE_API_KEY>"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "tayeon-d5149.firebaseapp.com"
+    value: "<QA_PROJECT_ID>.firebaseapp.com"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "tayeon-d5149"
+    value: "<QA_PROJECT_ID>"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "tayeon-d5149.firebasestorage.app"
+    value: "<QA_PROJECT_ID>.firebasestorage.app"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "897620122361"
+    value: "<QA_MESSAGING_SENDER_ID>"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:897620122361:web:4e09d26808e21cee96a028"
+    value: "<QA_APP_ID>"
     availability:
       - BUILD
       - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: "G-PKC7S8QLNV"
-    availability:
-      - BUILD
-      - RUNTIME
+
+  # 카카오는 앱을 새로 만들지 않고 기존 앱에 QA Redirect URI만 추가하면 된다(같은 REST API 키 사용).
   - variable: NEXT_PUBLIC_KAKAO_REST_API_KEY
     value: "e3733ff5647eb49e88c6ff4910189d57"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_KAKAO_REDIRECT_URI
-    value: "https://tayeon.kr/api/auth/kakao/callback"
+    value: "<QA_BACKEND_URL>/api/auth/kakao/callback"
     availability:
       - BUILD
       - RUNTIME
+
   - variable: FIREBASE_SERVICE_ACCOUNT_EMAIL
-    value: "firebase-adminsdk-fbsvc@tayeon-d5149.iam.gserviceaccount.com"
+    value: "firebase-adminsdk-fbsvc@<QA_PROJECT_ID>.iam.gserviceaccount.com"
     availability:
       - RUNTIME
 
-  # 포트원(PortOne) V2 — 스토어 ID와 채널 키는 클라이언트 번들에 그대로 실리는 공개값이라
-  # 시크릿이 아니다. 다만 BUILD 단계에 없으면 Next.js가 NEXT_PUBLIC_ 값을 인라인하지 못해
-  # 브라우저에서 undefined가 되고 결제창이 아예 열리지 않으므로, BUILD/RUNTIME 둘 다 필요하다.
-  #
-  # 실연동 채널 "타연_이니시스"(MID MOI6983921, PG_PROVIDER_INICIS_V2).
-  # 카드사 심사가 실운영 모드에서 진행되어야 해서 테스트 채널(INIpayTest)에서 되돌렸다
-  # (2026-09-21). 이제 이 도메인의 결제는 실제 카드 승인이 일어난다.
-  # 로컬 개발은 .env.local의 테스트 채널(channel-key-9643e0f9-…)을 계속 쓴다 — 실연동 키를
-  # .env.local에 넣지 말 것.
+  # 포트원은 계정을 새로 만들지 않고 기존 테스트 채널을 그대로 쓴다 — QA에서 실제 카드가
+  # 승인되면 안 되므로 실연동 채널 키를 여기에 넣지 말 것.
   - variable: NEXT_PUBLIC_PORTONE_STORE_ID
     value: "store-7dc1cefa-bad0-4cf6-b8b4-52d669e4ac8d"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_PORTONE_CHANNEL_KEY
-    value: "channel-key-e80d28cc-c6b2-4385-bb63-275c9dbaa5f4"
+    value: "channel-key-9643e0f9-47d8-4116-9906-2ae04ba29ee5"
     availability:
       - BUILD
       - RUNTIME
 
-  # Secret-backed values — created via `firebase apphosting:secrets:set`, values live in Secret Manager only
+  - variable: RESEND_FROM_EMAIL
+    value: "Tayeon QA <support@tayeon.kr>"
+    availability:
+      - RUNTIME
+  - variable: RESEND_ADMIN_EMAIL
+    value: "tayeon@rafraum.com"
+    availability:
+      - RUNTIME
+
+  # Secret-backed values — QA 프로젝트에서 `firebase apphosting:secrets:set`으로 따로 등록한다
+  # (프로덕션 Secret Manager와 프로젝트가 달라 공유되지 않는다).
   - variable: KAKAO_CLIENT_SECRET
     secret: KAKAO_CLIENT_SECRET
   - variable: ANTHROPIC_API_KEY
     secret: ANTHROPIC_API_KEY
-  - variable: PG_REVIEW_TEST_ID
-    secret: PG_REVIEW_TEST_ID
-  - variable: PG_REVIEW_TEST_PASSWORD
-    secret: PG_REVIEW_TEST_PASSWORD
-  # 포트원 V2 API Secret(결제 재조회·취소)과 웹훅 서명 검증 키. 서버 전용이라 시크릿으로 둔다.
-  # 이 둘이 없으면 결제창은 떠도 /api/payment/complete와 웹훅이 실패해 이용권이 지급되지 않는다.
-  # 배포 전에 `firebase apphosting:secrets:set`으로 먼저 등록해야 롤아웃이 실패하지 않는다.
   - variable: PORTONE_API_SECRET
     secret: PORTONE_API_SECRET
     availability:
@@ -93,16 +113,7 @@ env:
     secret: PORTONE_WEBHOOK_SECRET
     availability:
       - RUNTIME
-  # 고객센터 문의 전달용. `firebase apphosting:secrets:set RESEND_API_KEY`로 먼저 등록한다.
   - variable: RESEND_API_KEY
     secret: RESEND_API_KEY
-    availability:
-      - RUNTIME
-  - variable: RESEND_FROM_EMAIL
-    value: "Tayeon Support <support@tayeon.kr>"
-    availability:
-      - RUNTIME
-  - variable: RESEND_ADMIN_EMAIL
-    value: "tayeon@rafraum.com"
     availability:
       - RUNTIME
