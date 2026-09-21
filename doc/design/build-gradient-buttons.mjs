@@ -102,6 +102,34 @@ function analyse(fromHex, toHex, labelHex) {
 // 안에서만 움직인다. 각 후보의 "호리와의 거리"를 같이 재서, 브랜드가 가까워지는지 본다.
 const CANDIDATES = [
   {
+    id: "coral-deep-light",
+    theme: "light",
+    name: "코랄핑크 · 진한 (라이트)",
+    from: "#ad004d",
+    to: "#db2c2f",
+    label: "#ffffff",
+    note: "흰 글씨를 유지하면서 코랄 쪽으로 갈 수 있는 한계. 두 기준 모두 통과하지만 밝은 코랄보다 장밋빛에 가깝다.",
+  },
+  {
+    id: "coral-bright-light",
+    theme: "light",
+    name: "코랄핑크 · 밝은 (라이트, 어두운 글씨)",
+    from: "#ff6a93",
+    to: "#ffa097",
+    label: "#2a1a43",
+    note: "진짜 코랄핑크는 이 밝기여야 나온다. 글자는 읽히는데 칠이 배경에서 안 떠오른다 — 아래 배경분리 확인.",
+  },
+  {
+    id: "coral-bright-bordered",
+    theme: "light",
+    name: "코랄핑크 · 밝은 + 테두리 (라이트)",
+    from: "#ff6a93",
+    to: "#ffa097",
+    label: "#2a1a43",
+    border: "#b0003f",
+    note: "위와 같은 칠에 진한 테두리로 경계를 세운 안. WCAG 1.4.11은 컨트롤을 식별하는 시각 정보가 3:1이면 되므로, 칠 대신 테두리가 그 역할을 맡는다.",
+  },
+  {
     id: "magenta-coral-light",
     theme: "light",
     name: "자홍 → 코랄 (라이트)",
@@ -189,7 +217,9 @@ const BG = { light: "#efe7f7", dark: "#141517" };
 const rows = CANDIDATES.map((c) => {
   const a = analyse(c.from, c.to, c.label);
   const fillSeparation = Math.min(contrast(c.from, BG[c.theme]), contrast(c.to, BG[c.theme]));
-  return { ...c, ...a, fillSeparation, horiFrom: horiDistance(c.from), horiTo: horiDistance(c.to),
+  // 테두리를 두면 컨트롤 경계는 테두리가 책임진다 — 둘 중 잘 보이는 쪽을 경계 근거로 쓴다.
+  const boundary = c.border ? Math.max(fillSeparation, contrast(c.border, BG[c.theme])) : fillSeparation;
+  return { ...c, ...a, fillSeparation, boundary, horiFrom: horiDistance(c.from), horiTo: horiDistance(c.to),
     tayeonFrom: tayeonDistance(c.from), tayeonTo: tayeonDistance(c.to) };
 });
 
@@ -204,10 +234,10 @@ const cards = rows
     <h3>${r.name}</h3>
     <p class="note">${r.note}</p>
     <div class="stage" style="--bg:${BG[r.theme]}">
-      <button class="grad" style="background:linear-gradient(30deg in oklab, ${r.from}, ${r.to}); color:${r.label}">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, ${r.from}, ${r.to}); color:${r.label}${r.border ? `; border:1.5px solid ${r.border}` : ""}">
         이용권 구입하기
       </button>
-      <button class="grad sm" style="background:linear-gradient(30deg in oklab, ${r.from}, ${r.to}); color:${r.label}">
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, ${r.from}, ${r.to}); color:${r.label}${r.border ? `; border:1.5px solid ${r.border}` : ""}">
         환불 가능
       </button>
     </div>
@@ -219,7 +249,7 @@ const cards = rows
     <dl class="facts">
       <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>${r.worstAt}</code> (${Math.round(r.worstT * 100)}% 지점)</small></dt><dd>${chipHtml(r.min, 4.5)}</dd></div>
       <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">${fmt(r.ends[0])} / ${fmt(r.ends[1])}</span></dd></div>
-      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd>${chipHtml(r.fillSeparation, 3)}</dd></div>
+      <div><dt>컨트롤 경계가 보이는 정도<small>비텍스트 3:1${r.border ? ` · 테두리 <code>${r.border}</code>가 담당` : " · 칠 자체로 판정"}</small></dt><dd>${chipHtml(r.boundary, 3)}</dd></div>
       <div><dt>호리와 가장 가까워지는 지점<small>양 끝 ${Math.round(r.horiFrom)}° / ${Math.round(r.horiTo)}° · <b>경로 전체 최솟값</b></small></dt><dd><span class="ratio ${r.horiPath >= 40 ? "pass" : "fail"}">${Math.round(r.horiPath)}°</span></dd></div>
       <div><dt>타연 핑크에서 멀어진 정도<small>0°면 그대로 · 클수록 다른 브랜드</small></dt><dd><span class="ratio note">${Math.round(r.tayeonFrom)}° / ${Math.round(r.tayeonTo)}°</span></dd></div>
     </dl>
@@ -303,7 +333,7 @@ console.log("wrote doc/design/gradient-buttons.html\n");
 console.log("후보                              최솟값  배경분리  호리(경로최소)  타연거리");
 for (const r of rows) {
   console.log(
-    `${r.name.padEnd(30)} ${fmt(r.min).padStart(6)}  ${fmt(r.fillSeparation).padStart(6)}   ` +
+    `${r.name.padEnd(30)} ${fmt(r.min).padStart(6)}  ${fmt(r.boundary).padStart(6)}   ` +
       `${String(Math.round(r.horiPath)).padStart(9)}°   ` +
       `${Math.round(r.tayeonFrom)}°/${Math.round(r.tayeonTo)}°`,
   );
