@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
+import { ROOM_LIMIT } from "@/lib/tarot/limits";
 import { USERS, ROOMS } from "@/lib/firestore/collections";
 
 export async function GET(req: NextRequest) {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ rooms });
 }
 
-const ROOM_LIMIT = 100;
+
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);

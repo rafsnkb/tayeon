@@ -22,6 +22,15 @@ function rewardPassesForWon(totalWon: number, rate: number): number {
 // PENDING_REWARD_CLAIM_WINDOW_MONTHS와 동일한 값(패키지 분리로 값만 복사).
 const PENDING_REWARD_CLAIM_WINDOW_MONTHS = 1;
 
+// 생일 쿠폰 수령 시 고를 수 있는 조합과 무료 횟수. 예전에는 이 표가 이 파일과
+// src/lib/rewards/birthday.ts 양쪽에 그대로 복제돼 있었는데, 후자는 호출하는 곳이 없는 죽은
+// 코드였다(2026-09-21 삭제). 지금은 생일 쿠폰을 발급하는 곳이 이 스케줄 함수 하나뿐이다.
+const BIRTHDAY_COUPON_OPTIONS = [
+  { combo: "tarot-saju", freePasses: 8 },
+  { combo: "tarot-ziwei", freePasses: 6 },
+  { combo: "tarot-saju-ziwei", freePasses: 4 },
+];
+
 // src/lib/util/dateMath.ts의 addMonthsClamped와 동일한 로직(패키지 분리로 복사).
 function addMonthsClamped(iso: string, months: number): string {
   const date = new Date(iso);
@@ -55,7 +64,14 @@ export const dailyBirthdayCouponPayout = onSchedule(
         if ((await tx.get(ledger)).exists) return;
         const issuedAt = new Date().toISOString();
         tx.set(ledger, { birthdayKey, issuedAt });
-        tx.set(reward, { source: "birthday", status: "pending", birthdayKey, createdAt: issuedAt, claimWindowExpiresAt: addMonthsClamped(issuedAt, 1), options: [{ combo: "tarot-saju", freePasses: 8 }, { combo: "tarot-ziwei", freePasses: 6 }, { combo: "tarot-saju-ziwei", freePasses: 4 }] });
+        tx.set(reward, {
+          source: "birthday",
+          status: "pending",
+          birthdayKey,
+          createdAt: issuedAt,
+          claimWindowExpiresAt: addMonthsClamped(issuedAt, PENDING_REWARD_CLAIM_WINDOW_MONTHS),
+          options: BIRTHDAY_COUPON_OPTIONS,
+        });
       });
     }
   }

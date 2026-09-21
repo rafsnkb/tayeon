@@ -43,6 +43,8 @@ function paymentMethodSummary(method: unknown): { type: string; label: string } 
 export type FulfillOutcome =
   | { kind: "fulfilled"; alreadyFulfilled: boolean; uid: string; productType: "coin" | "countPass" | "timePass" }
   | { kind: "not_paid"; status: string }
+  /** 이미 같은 종류의 이용권을 보유 중이라 지급하지 않고 결제를 자동 취소한 경우. */
+  | { kind: "duplicate_cancelled"; uid: string; cancelled: boolean }
   | { kind: "rejected"; reason: string };
 
 /**
@@ -138,11 +140,47 @@ export async function fulfillPayment(
   const userRef = adminDb.collection(USERS).doc(uid);
   const paymentRef = userRef.collection(PAYMENTS).doc(paymentId);
 
-  const alreadyFulfilled = await adminDb.runTransaction(async (tx) => {
+  const outcome = await adminDb.runTransaction(async (tx): Promise<"already" | "duplicate" | "granted"> => {
     const paymentSnap = await tx.get(paymentRef);
     if (paymentSnap.exists) {
       // 멱등성: 콜백/웹훅 중 먼저 도착한 쪽이 이미 처리했다면 스킵.
-      return true;
+      return "already";
+    }
+
+    // 약관상 구매한 횟수제ㆍ시간제 이용권은 각각 1개까지만 보유할 수 있다. prepare에서 한 번
+    // 막지만 그건 결제창을 열기 "전"의 검사라, 결제창을 두 개 띄워두면 둘 다 통과한다. 지급
+    // 직전에 트랜잭션 안에서 다시 확인해야 실제로 1개가 보장된다.
+    // (이 결제로 만들어질 이용권은 아직 없으므로 paymentId로 자기 자신을 걸러낼 필요는 없지만,
+    //  웹훅 재시도로 이 지점에 다시 오는 경우는 위 멱등성 검사에서 이미 걸러진다.)
+    const heldCollection =
+      product.type === "countPass" ? COUNT_PASSES : product.type === "timePass" ? TIME_PASSES : null;
+    if (heldCollection) {
+      const heldSnap = await tx.get(
+        userRef.collection(heldCollection).where("status", "in", ["unused", "active"])
+      );
+      const conflict = heldSnap.docs.some((doc) => {
+        const data = doc.data();
+        // 리워드로 받은 횟수제 이용권은 여러 개 보유가 정상이라 구매분만 본다(시간제는 구매분뿐).
+        return product.type === "countPass" ? data.source === "purchase" : true;
+      });
+      if (conflict) {
+        console.error("[payment] 보유 제한 위반 — 지급하지 않고 결제를 취소한다", paymentId, product.type);
+        tx.set(paymentRef, {
+          status: "duplicate_cancelled",
+          productId: product.productId,
+          productType: product.type,
+          priceWon: product.priceWon,
+          orderName: payment.orderName,
+          channelType: payment.channel?.type ?? null,
+          isTest: payment.channel?.type === "TEST",
+          paymentMethod: paymentMethodSummary(payment.method),
+          paidAt: payment.paidAt,
+          blockedAt: new Date().toISOString(),
+          blockedReason: "이미 같은 종류의 이용권을 보유 중이어서 지급하지 않음",
+          blockedVia: via,
+        });
+        return "duplicate";
+      }
     }
 
     const timePassRef = product.type === "timePass" ? userRef.collection(TIME_PASSES).doc() : null;
@@ -201,8 +239,21 @@ export async function fulfillPayment(
       });
     }
 
-    return false;
+    return "granted";
   });
 
-  return { kind: "fulfilled", alreadyFulfilled, uid, productType: product.type };
+  if (outcome === "duplicate") {
+    // 돈은 이미 승인된 상태라 거절만 하면 "결제했는데 아무것도 못 받는" 상태가 된다. 자동으로
+    // 취소해서 환불까지 끝낸다. 취소가 실패하면 로그만 남기고 운영자가 수동 환불하도록 둔다.
+    const cancelled = await portone
+      .cancelPayment({ paymentId, reason: "이용권 보유 제한(1개)으로 지급 불가 — 자동 취소" })
+      .then(() => true)
+      .catch((error) => {
+        console.error("[payment] 보유 제한 자동 취소 실패 — 수동 환불 필요", paymentId, error);
+        return false;
+      });
+    return { kind: "duplicate_cancelled", uid, cancelled };
+  }
+
+  return { kind: "fulfilled", alreadyFulfilled: outcome === "already", uid, productType: product.type };
 }

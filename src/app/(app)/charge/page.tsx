@@ -11,6 +11,9 @@ import {
   countAllowanceForCombo,
   type ComboKey,
   type SpreadKey,
+  COUNT_PASS_VALIDITY_MONTHS,
+  TIME_PASS_VALIDITY_MONTHS,
+  formatMonths,
 } from "@/lib/tarot/pricing";
 import { TIER_TEXTURE, TIME_COMBO_TIER } from "@/lib/tarot/timePassTiers";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
@@ -314,7 +317,7 @@ export default function ChargePage() {
                 <li>이용권은 1개만 보유 가능합니다. 추가 구매를 원하시면 현재 보유 이용권을 소진하셔야 합니다.</li>
                 <li>결제 리워드ㆍ친구 초대로 받은 이용권이 있을 경우, 해당 이용권이 먼저 사용됩니다.</li>
                 <li>구매 후 {REFUND_WINDOW_DAYS}일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
-                <li>유효기간은 구입일로부터 1년입니다.</li>
+                <li>유효기간은 구입일로부터 {formatMonths(COUNT_PASS_VALIDITY_MONTHS)}입니다.</li>
               </>
             ) : (
               <>
@@ -322,7 +325,7 @@ export default function ChargePage() {
                 <li>이용권은 1개만 보유 가능합니다. 추가 구매를 원하시면 현재 보유 이용권을 소진하셔야 합니다.</li>
                 <li>사용중인 리워드 및 횟수제 이용권이 있는 상태에서 시간제 이용권을 사용하면, 시간제 이용권이 먼저 사용됩니다. 해당 시간동안은 리워드 및 횟수제 이용권은 차감되지 않습니다.</li>
                 <li>구매 후 {REFUND_WINDOW_DAYS}일 이내 미사용 시 전액 환불 가능합니다. (부분 환불 불가)</li>
-                <li>유효기간은 구입일로부터 1년입니다.</li>
+                <li>유효기간은 구입일로부터 {formatMonths(TIME_PASS_VALIDITY_MONTHS)}입니다.</li>
               </>
             )}
             <li>

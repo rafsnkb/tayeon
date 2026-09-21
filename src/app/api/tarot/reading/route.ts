@@ -32,6 +32,7 @@ import { isValidBirthInfo, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
 import type { DocumentReference } from "firebase-admin/firestore";
 import { USERS, ROOMS, READINGS, COUNT_PASSES } from "@/lib/firestore/collections";
+import { blockIfSuspended } from "@/lib/auth/suspension";
 
 // 궁합 옵션이 꺼진 채 상대방 관계를 묻는 질문을 서버가 결정적으로 차단할 때(LLM 호출 없음) 쓰는
 // 안내 문구 — 사용자가 고른 AI 말투(tone)에 맞춰 4종으로 나눠서, 획일적인 시스템 메시지처럼
@@ -193,23 +194,13 @@ export async function POST(req: NextRequest) {
 
     const userData = userSnap.data();
 
-    if (userData?.suspended) {
-      const suspendedUntil = Date.parse(userData.suspendedUntil ?? "");
-      if (Number.isFinite(suspendedUntil) && suspendedUntil <= Date.now()) {
-        // 기간 정지는 첫 보호 대상 요청에서 원자적으로 정상 상태로 되돌린다.
-        await userRef.update({ suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
-      } else {
-        return NextResponse.json(
-          {
-            error: "이용이 제한된 계정이에요. 고객센터로 문의해주세요.",
-            code: "SUSPENDED",
-            reason: userData.suspendedReason ?? null,
-            suspendedUntil: userData.suspendedUntil ?? null,
-          },
-          { status: 403 }
-        );
-      }
-    }
+    // 기간 정지는 첫 보호 대상 요청에서 정상 상태로 되돌린다(blockIfSuspended가 처리).
+    const suspendedResponse = await blockIfSuspended(
+      userRef,
+      userData,
+      "이용이 제한된 계정이에요. 고객센터로 문의해주세요."
+    );
+    if (suspendedResponse) return suspendedResponse;
 
     const countPassesSnap = await userRef.collection(COUNT_PASSES).get();
     const countPasses = countPassesSnap.docs;

@@ -5,7 +5,14 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { BackIcon } from "@/app/(app)/tarot/icons";
-import { COMBOS, type ComboKey, type SpreadKey } from "@/lib/tarot/pricing";
+import {
+  COMBOS,
+  COUNT_PASS_VALIDITY_MONTHS,
+  PENDING_REWARD_CLAIM_WINDOW_MONTHS,
+  formatMonths,
+  type ComboKey,
+  type SpreadKey,
+} from "@/lib/tarot/pricing";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import NoBirthTimePopup from "@/components/NoBirthTimePopup";
 import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
@@ -178,9 +185,9 @@ export default function ReceivedPassesPage() {
                             획득하실 {entry.label} 이용권의 옵션을 선택해주세요.
                           </p>
                           <p className="mb-3 text-center text-xs font-semibold text-urgent">
-                            이 이용권의 수령 가능 기간은 지급일로부터 1개월이며, 미수령 시 소멸됩니다.
+                            이 이용권의 수령 가능 기간은 지급일로부터 {formatMonths(PENDING_REWARD_CLAIM_WINDOW_MONTHS)}이며, 미수령 시 소멸됩니다.
                             <br />
-                            수령 후 유효기간은 수령일로부터 1년입니다.
+                            수령 후 유효기간은 수령일로부터 {formatMonths(COUNT_PASS_VALIDITY_MONTHS)}입니다.
                           </p>
                           {error && <p className="mb-2 text-center text-sm text-urgent">{error}</p>}
                           <div className="flex flex-col gap-3">

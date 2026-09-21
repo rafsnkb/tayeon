@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import type { ComboKey } from "@/lib/tarot/pricing";
 import { USERS, TIME_PASSES } from "@/lib/firestore/collections";
+import { blockIfSuspended } from "@/lib/auth/suspension";
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -19,23 +20,12 @@ export async function POST(req: NextRequest) {
   const passRef = userRef.collection(TIME_PASSES).doc(passId);
 
   const userSnapForSuspend = await userRef.get();
-  const userDataForSuspend = userSnapForSuspend.data();
-  if (userDataForSuspend?.suspended) {
-    const suspendedUntilMs = Date.parse(userDataForSuspend.suspendedUntil ?? "");
-    if (Number.isFinite(suspendedUntilMs) && suspendedUntilMs <= Date.now()) {
-      await userRef.update({ suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
-    } else {
-      return NextResponse.json(
-        {
-          error: "정지 중에는 이용권을 사용할 수 없어요.",
-          code: "SUSPENDED",
-          reason: userDataForSuspend.suspendedReason ?? null,
-          suspendedUntil: userDataForSuspend.suspendedUntil ?? null,
-        },
-        { status: 403 }
-      );
-    }
-  }
+  const suspended = await blockIfSuspended(
+    userRef,
+    userSnapForSuspend.data(),
+    "정지 중에는 이용권을 사용할 수 없어요."
+  );
+  if (suspended) return suspended;
 
   // 가드 체크(이미 활성 이용권 있는지/이 이용권이 사용 가능한지)와 두 문서 쓰기를 하나의
   // 트랜잭션으로 묶는다 — 이전엔 각자 따로 읽고 두 update()를 Promise.all로만 묶어서, 동시에

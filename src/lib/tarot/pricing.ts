@@ -125,6 +125,12 @@ export const TIME_PASS_VALIDITY_MONTHS = 12;
 // 받은 이용권(결제 리워드/친구초대 리워드)의 수령 가능 기간 — 지급일로부터 이 기간 내 미수령 시 소멸.
 export const PENDING_REWARD_CLAIM_WINDOW_MONTHS = 1;
 
+/** 안내 문구가 위 상수를 그대로 반영하도록, 개월 수를 사람이 읽는 표현으로 바꾼다.
+ *  12의 배수는 "1년"처럼 연 단위로 읽는 게 자연스러워서 나눠 쓴다. */
+export function formatMonths(months: number): string {
+  return months % 12 === 0 ? `${months / 12}년` : `${months}개월`;
+}
+
 export function countAllowance(
   basis: number,
   spread: SpreadKey,

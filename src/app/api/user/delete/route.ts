@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { USERS, PAYMENTS, PAYMENT_ARCHIVE } from "@/lib/firestore/collections";
-import { addMonthsClamped } from "@/lib/util/dateMath";
-
 // 전자상거래법 시행령 제6조: 대금결제 기록 5년 보존 의무(같은 시행령 제5조의2가 개인정보
 // 보호법 제21조 파기 원칙의 명시적 예외로 지정) — 탈퇴로 이 기록이 사라지면 안 된다.
-const PAYMENT_RECORD_RETENTION_MONTHS = 60;
+// 반대로 5년이 지나면 실제로 파기돼야 해서, TTL이 읽을 수 있는 Timestamp로 만료 시각을 심는다.
+import { PAYMENT_RECORD_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -31,7 +30,7 @@ export async function POST(req: NextRequest) {
         ...data,
         uid,
         archivedAt,
-        retainUntil: addMonthsClamped(issuedAt, PAYMENT_RECORD_RETENTION_MONTHS),
+        retainUntil: retentionExpiresAt(issuedAt, PAYMENT_RECORD_RETENTION_MONTHS),
       });
     }
     await batch.commit();

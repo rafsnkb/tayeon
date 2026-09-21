@@ -26,6 +26,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "PAID", alreadyFulfilled: outcome.alreadyFulfilled });
     case "not_paid":
       return NextResponse.json({ status: outcome.status });
+    case "duplicate_cancelled":
+      // 지급은 막혔지만 결제는 자동 취소됐다(실패 시 수동 환불 대상). 어느 쪽이든 사용자에게는
+      // 왜 못 받았는지와 돈이 어떻게 되는지를 분명히 알려준다.
+      return NextResponse.json(
+        {
+          error: outcome.cancelled
+            ? "이미 보유 중인 이용권이 있어 지급되지 않았어요. 결제는 자동으로 취소됐습니다."
+            : "이미 보유 중인 이용권이 있어 지급되지 않았어요. 결제 취소가 지연되고 있으니 고객센터로 문의해주세요.",
+          code: "DUPLICATE_PASS",
+        },
+        { status: 409 }
+      );
     case "rejected":
       return NextResponse.json({ error: outcome.reason }, { status: 400 });
   }

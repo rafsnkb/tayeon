@@ -6,6 +6,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { COMBOS, type ComboKey } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
+import { blockIfSuspended } from "@/lib/auth/suspension";
 
 function isComboKey(value: unknown): value is ComboKey {
   return typeof value === "string" && value in COMBOS;
@@ -29,22 +30,8 @@ export async function POST(req: NextRequest) {
   const userRef = adminDb.collection(USERS).doc(uid);
   const userSnap = await userRef.get();
   const userData = userSnap.data();
-  if (userData?.suspended) {
-    const suspendedUntil = Date.parse(userData.suspendedUntil ?? "");
-    if (Number.isFinite(suspendedUntil) && suspendedUntil <= Date.now()) {
-      await userRef.update({ suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
-    } else {
-      return NextResponse.json(
-        {
-          error: "정지 중에는 결제할 수 없어요.",
-          code: "SUSPENDED",
-          reason: userData.suspendedReason ?? null,
-          suspendedUntil: userData.suspendedUntil ?? null,
-        },
-        { status: 403 }
-      );
-    }
-  }
+  const suspended = await blockIfSuspended(userRef, userData, "정지 중에는 결제할 수 없어요.");
+  if (suspended) return suspended;
 
   const { productId, combo } = (await req.json()) as { productId?: string; combo?: string };
   const product = resolveProduct(productId);

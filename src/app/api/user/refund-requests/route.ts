@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { USERS, PAYMENTS, COUNT_PASSES, TIME_PASSES, REFUND_REQUESTS } from "@/lib/firestore/collections";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
+import { DISPUTE_RECORD_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
 
 const WINDOW_MS = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
@@ -24,7 +25,10 @@ export async function POST(req: NextRequest) {
   if (!passCollection || !passId || (await userRef.collection(passCollection).doc(passId).get()).data()?.status !== "unused") return NextResponse.json({ error: "미사용 이용권만 환불을 요청할 수 있어요." }, { status: 409 });
   const requestRef = adminDb.collection(REFUND_REQUESTS).doc(paymentId);
   try {
-    await requestRef.create({ uid, paymentId, reason: reason.trim().slice(0, 1000), status: "pending", requestedAt: new Date().toISOString(), productId: payment.productId ?? null, orderName: payment.orderName ?? null, productType: payment.productType ?? null, priceWon: payment.priceWon ?? 0, paidAt: payment.paidAt ?? null, paymentMethod: payment.paymentMethod ?? null });
+    const requestedAt = new Date().toISOString();
+    await requestRef.create({ uid, paymentId, reason: reason.trim().slice(0, 1000), status: "pending", requestedAt,
+      // 소비자 불만·분쟁처리 기록 3년(개인정보처리방침 제3조).
+      expiresAt: retentionExpiresAt(requestedAt, DISPUTE_RECORD_RETENTION_MONTHS), productId: payment.productId ?? null, orderName: payment.orderName ?? null, productType: payment.productType ?? null, priceWon: payment.priceWon ?? 0, paidAt: payment.paidAt ?? null, paymentMethod: payment.paymentMethod ?? null });
   } catch (error) {
     const code = typeof error === "object" && error && "code" in error ? (error as { code?: unknown }).code : null;
     if (code === 6 || code === "already-exists") return NextResponse.json({ error: "이미 환불 요청이 접수되어 있어요." }, { status: 409 });

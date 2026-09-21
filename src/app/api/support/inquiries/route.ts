@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SUPPORT_EMAIL } from "@/lib/company";
+import { DISPUTE_RECORD_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
 import {
   MAX_SUPPORT_ATTACHMENTS,
   MAX_SUPPORT_ATTACHMENT_BYTES,
@@ -70,7 +71,10 @@ export async function POST(req: NextRequest) {
   const attachments = form.getAll("attachments").filter((value): value is File => value instanceof File);
   const attachmentBytes = attachments.reduce((sum, file) => sum + file.size, 0);
   if (attachments.length > MAX_SUPPORT_ATTACHMENTS || attachments.some((file) => !file.type.startsWith("image/") || file.size > MAX_SUPPORT_ATTACHMENT_BYTES) || attachmentBytes > MAX_SUPPORT_TOTAL_ATTACHMENT_BYTES) {
-    return NextResponse.json({ error: "스크린샷은 이미지 3장까지, 장당 2MB 이하로 첨부해주세요." }, { status: 400 });
+    return NextResponse.json(
+      { error: `스크린샷은 이미지 ${MAX_SUPPORT_ATTACHMENTS}장까지, 장당 ${MAX_SUPPORT_ATTACHMENT_BYTES / 1024 / 1024}MB 이하로 첨부해주세요.` },
+      { status: 400 }
+    );
   }
 
   const uid = await getUidFromRequest(req);
@@ -87,6 +91,8 @@ export async function POST(req: NextRequest) {
     emailDeliveryStatus: "pending",
     createdAt,
     updatedAt: createdAt,
+    // 소비자 불만·분쟁처리 기록 3년(개인정보처리방침 제3조). Firestore TTL이 이 필드를 보고 파기한다.
+    expiresAt: retentionExpiresAt(createdAt, DISPUTE_RECORD_RETENTION_MONTHS),
   });
 
   try {

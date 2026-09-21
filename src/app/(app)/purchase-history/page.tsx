@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { REFUND_PROCESSING_BUSINESS_DAYS } from "@/lib/payment/refundPolicy";
 import { CloseIcon } from "@/app/(app)/tarot/icons";
 
 type PurchaseEntry = {
@@ -125,7 +126,7 @@ export default function PurchaseHistoryPage() {
               </button>
             </div>
             <p className="whitespace-pre-line text-center text-sm font-semibold text-icon-muted">
-              {"해당 이용권을 환불하시겠어요?\n신청한 날짜로부터 3영업일 내에 환불됩니다."}
+              {`해당 이용권을 환불하시겠어요?\n신청한 날짜로부터 ${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`}
             </p>
             <p className="mb-5 mt-3 text-center text-base font-bold text-bold-text">{selected.productName}</p>
             <label className="mb-7 flex flex-col gap-1">

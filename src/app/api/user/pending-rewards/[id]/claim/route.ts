@@ -5,6 +5,7 @@ import { addMonthsClamped } from "@/lib/util/dateMath";
 import { COMBOS, COUNT_PASS_VALIDITY_MONTHS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
+import { checkSuspension, SUSPENSION_CLEARED } from "@/lib/auth/suspension";
 
 function isComboKey(value: unknown): value is ComboKey {
   return typeof value === "string" && value in COMBOS;
@@ -36,18 +37,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // 트랜잭션이 통째로 실패한다 — 읽기를 여기서 다 끝내둔다.
       const snap = await tx.get(rewardRef);
       const userData = userSnap.data();
-      let liftExpiredSuspension = false;
-      if (userData?.suspended) {
-        const suspendedUntil = Date.parse(userData.suspendedUntil ?? "");
-        if (Number.isFinite(suspendedUntil) && suspendedUntil <= Date.now()) {
-          liftExpiredSuspension = true;
-        } else {
-          throw Object.assign(new Error("SUSPENDED"), {
-            reason: userData.suspendedReason ?? null,
-            suspendedUntil: userData.suspendedUntil ?? null,
-          });
-        }
+      const verdict = checkSuspension(userData);
+      if (verdict.kind === "blocked") {
+        throw Object.assign(new Error("SUSPENDED"), {
+          reason: verdict.reason,
+          suspendedUntil: verdict.suspendedUntil,
+        });
       }
+      const liftExpiredSuspension = verdict.kind === "expired";
       // 자미두수 포함 조합은 태어난 시간이 없으면 정확한 계산이 불가능하다 — 구매 이용권과 동일하게
       // 보상 수령도 서버에서 막는다(2026-09-19).
       if (COMBOS[combo].ziwei) {
@@ -57,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
       if (liftExpiredSuspension) {
-        tx.update(userRef, { suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
+        tx.update(userRef, SUSPENSION_CLEARED);
       }
       if (!snap.exists) throw new Error("NOT_FOUND");
       const data = snap.data()!;

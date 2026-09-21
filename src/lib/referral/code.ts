@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { addMonthsClamped } from "@/lib/util/dateMath";
+import { GRANT_MARKER_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
 import {
   REFERRAL_SIGNUP_FRIEND_CAP,
   REFERRAL_SIGNUP_FREE_PASSES,
@@ -26,13 +27,10 @@ const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const CODE_LENGTH = 8;
 
 // 부정 가입 방지 목적으로만 쓰는 최소 식별 마커(signupGrants/*, referralGrants/*/friends/*)의
-// 보유기간. 개인정보 보호법 제15조1항6호(정당한 이익)를 근거로 삼되 무기한 보관은 안 되므로
-// 사용자가 6개월로 확정(2026-09-19, doc/보안점검_작업분할.md T7). Firestore TTL 정책(콘솔/
-// gcloud로 별도 활성화 필요 — 같은 문서 T7 비고 참고)이 이 필드를 기준으로 문서를 자동 삭제한다.
-const GRANT_MARKER_RETENTION_MONTHS = 6;
-
+// 만료 시각. 보유기간과 Timestamp 변환은 개인정보처리방침의 다른 보관기간과 함께
+// src/lib/legal/retention.ts에 모아두었다. TTL 정책은 두 컬렉션 모두 ACTIVE 상태다.
 function markerExpiresAt(fromIso: string): Timestamp {
-  return Timestamp.fromDate(new Date(addMonthsClamped(fromIso, GRANT_MARKER_RETENTION_MONTHS)));
+  return retentionExpiresAt(fromIso, GRANT_MARKER_RETENTION_MONTHS);
 }
 
 function randomCode(): string {
