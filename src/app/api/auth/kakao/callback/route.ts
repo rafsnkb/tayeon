@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { findUidByReferralCode, grantSignupFreePass, grantSignupReferralReward } from "@/lib/referral/code";
 import { USERS } from "@/lib/firestore/collections";
 import { normalizeBirthdayMMDD } from "@/lib/user/birthday";
+import { isLoginAllowed } from "@/lib/auth/loginAllowlist";
 
 const KAKAO_REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!;
 const KAKAO_REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!;
@@ -57,6 +58,12 @@ export async function GET(req: NextRequest) {
     properties?: { nickname?: string; profile_image?: string };
     kakao_account?: { email?: string; is_email_valid?: boolean; is_email_verified?: boolean; birthday?: string; birthyear?: string; birthday_type?: string; is_leap_month?: boolean };
   };
+
+  // QA 환경은 허용 목록에 있는 계정만 로그인시킨다(프로덕션에서는 항상 통과).
+  // 사용자 문서를 만들기 전에 막아야 거부된 계정의 흔적이 남지 않는다.
+  if (!isLoginAllowed(profile.kakao_account?.email)) {
+    return NextResponse.redirect(new URL("/login?error=not_allowed", APP_ORIGIN));
+  }
 
   const uid = `kakao:${profile.id}`;
   const nickname = profile.properties?.nickname ?? null;

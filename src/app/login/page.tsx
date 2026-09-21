@@ -42,7 +42,15 @@ export default async function LoginPage({
           상담해보세요
         </p>
 
-        {error && <p className="text-center text-sm text-urgent">로그인에 실패했어요. 다시 시도해주세요.</p>}
+        {error && (
+          <p className="text-center text-sm text-urgent">
+            {/* QA 환경은 허용된 계정만 로그인된다(src/lib/auth/loginAllowlist.ts) — 그 경우
+                "다시 시도"를 안내하면 계속 헛돌게 되므로 사유를 구분해서 보여준다. */}
+            {error === "not_allowed"
+              ? "이 계정은 접근이 허용되지 않았어요."
+              : "로그인에 실패했어요. 다시 시도해주세요."}
+          </p>
+        )}
 
         <p className="rounded-2xl bg-[#f5f1fa] px-4 py-2.5 text-center text-sm font-semibold leading-5 text-[#74628a]">
           최초 가입 시 무료 4회(모든 기능 무제한) 지급
