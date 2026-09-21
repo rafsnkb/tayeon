@@ -107,7 +107,9 @@
     background:var(--raise); border:1px solid var(--line); border-radius:12px; padding:10px 13px; }
   /* 내 말풍선도 브랜드 채움 — 다만 그림자 없음, 그라데이션 없음 */
   .msg.me .body { background:var(--brand); color:var(--on-brand); border:0; font-weight:600; }
-  .card-name { margin:0 0 6px; font-size:19px; font-weight:700; color:var(--brand-text); }
+  /* 악센트에 #ff007f를 쓰려면 라이트에서 "큰 글자"여야 한다 — WCAG 하한은 14pt 볼드,
+     즉 18.66px. 19px는 아슬아슬해서 20px로 올렸다. */
+  .card-name { margin:0 0 6px; font-size:20px; font-weight:700; color:var(--brand-text); }
 
   .suggest { display:flex; flex-direction:column; gap:6px; }
   .suggest-label { margin:0 0 0 2px; font-size:11.5px; color:var(--muted); }
@@ -218,13 +220,13 @@
     다크의 <code>content-brand-weaker</code>(4.99)와 라이트의 <code>content-brand-weak</code>(3.76)를
     풀면 둘 다 <code>#ff007f</code>가 나온다. 밝은 악센트 글자 자리는 그보다 옅은 핑크가 맡는다 —
     치지직이 <code>#00ffa3</code>을 쓰는 자리에 <code>#ffd5df</code>를 넣으면 흰색에 가까워지므로
-    한 단계 아래 <code>#ff92b0</code>를 악센트로 쓴다.
+    한 단계 아래 <code>#ff007f</code>를 악센트로 쓴다.
   </p>
 
   <h2>무엇을 가져왔고 무엇을 바꿨나</h2>
   <table>
     <thead><tr><th>요소</th><th>치지직 실측</th><th>적용</th><th>비고</th></tr></thead>
-    <tbody><tr><td><b>폰트</b></td><td class="src">Pretendard Variable</td><td>동일</td><td class="why">이미 쓰고 있다</td></tr><tr><td><b>모서리</b></td><td class="src">4 · 6 · 8px 중심 / 원형</td><td>동일</td><td class="why">지금 999px 알약을 줄인다</td></tr><tr><td><b>그림자</b></td><td class="src"><b>없음</b></td><td>없음</td><td class="why">깊이는 명도 계단으로만</td></tr><tr><td><b>그라데이션</b></td><td class="src"><b>UI에 없음</b></td><td>없음</td><td class="why">글래스 느낌의 주범이었다</td></tr><tr><td><b>면</b></td><td class="src">무채색 사다리 7단</td><td>그대로</td><td class="why">면에 색을 넣지 않는다</td></tr><tr><td><b>테두리</b></td><td class="src">알파 #ffffff0d~4d</td><td>그대로</td><td class="why">선 색을 따로 안 만든다</td></tr><tr><td><b>글자</b></td><td class="src">흰색 + cool 회색 사다리</td><td>그대로</td><td class="why">면은 무채, 글자만 차갑다</td></tr><tr><td><b>브랜드 사다리</b></td><td class="src">전 단계 최대 채도의 <b>99%</b></td><td>동일</td><td class="why">#ff007f도 99% — 같은 규칙</td></tr><tr><td><b>브랜드 글자</b></td><td class="src">#00ffa3 <small>(13.78)</small></td><td>#ff92b0 <small>(9.13)</small></td><td class="why">대비를 맞춰 푼 자리</td></tr><tr><td><b>브랜드 채움</b></td><td class="src">#009962 <small>형광 아님</small></td><td>#ff007f</td><td class="why"><b>여기가 #ff007f 자리</b></td></tr><tr><td><b>채움 위 글자</b></td><td class="src">—</td><td>#141517</td><td class="why">흰 글자는 3.78로 미달</td></tr><tr><td><b>아이콘 버튼</b></td><td class="src">아이콘만</td><td>아이콘 + 글자</td><td class="why"><b>안 따름</b> · 50대 테스터</td></tr><tr><td><b>가장 옅은 글자</b></td><td class="src">#697183 <small>(cool-weak)</small></td><td>#9da5b6 한 단계 위</td><td class="why"><b>안 따름</b> · 다크에서 3.92</td></tr></tbody>
+    <tbody><tr><td><b>폰트</b></td><td class="src">Pretendard Variable</td><td>동일</td><td class="why">이미 쓰고 있다</td></tr><tr><td><b>모서리</b></td><td class="src">4 · 6 · 8px 중심 / 원형</td><td>동일</td><td class="why">지금 999px 알약을 줄인다</td></tr><tr><td><b>그림자</b></td><td class="src"><b>없음</b></td><td>없음</td><td class="why">깊이는 명도 계단으로만</td></tr><tr><td><b>그라데이션</b></td><td class="src"><b>UI에 없음</b></td><td>없음</td><td class="why">글래스 느낌의 주범이었다</td></tr><tr><td><b>면</b></td><td class="src">무채색 사다리 7단</td><td>그대로</td><td class="why">면에 색을 넣지 않는다</td></tr><tr><td><b>테두리</b></td><td class="src">알파 #ffffff0d~4d</td><td>그대로</td><td class="why">선 색을 따로 안 만든다</td></tr><tr><td><b>글자</b></td><td class="src">흰색 + cool 회색 사다리</td><td>그대로</td><td class="why">면은 무채, 글자만 차갑다</td></tr><tr><td><b>브랜드 사다리</b></td><td class="src">전 단계 최대 채도의 <b>99%</b></td><td>동일</td><td class="why">#ff007f도 99% — 같은 규칙</td></tr><tr><td><b>브랜드 악센트</b></td><td class="src">#00ffa3 <small>(13.78)</small></td><td>#ff007f <small>(다크 5.08 · 라이트 3.78)</small></td><td class="why"><b>치지직처럼 원색 그대로</b></td></tr><tr><td><b>└ 라이트 작은 글자</b></td><td class="src">—</td><td>#de006e <small>(4.85)</small></td><td class="why">3.78은 본문 4.5에 미달</td></tr><tr><td><b>브랜드 채움</b></td><td class="src">#009962 <small>형광 아님</small></td><td>#ff007f</td><td class="why"><b>여기가 #ff007f 자리</b></td></tr><tr><td><b>채움 위 글자</b></td><td class="src">—</td><td>#141517</td><td class="why">흰 글자는 3.78로 미달</td></tr><tr><td><b>아이콘 버튼</b></td><td class="src">아이콘만</td><td>아이콘 + 글자</td><td class="why"><b>안 따름</b> · 50대 테스터</td></tr><tr><td><b>가장 옅은 글자</b></td><td class="src">#697183 <small>(cool-weak)</small></td><td>#9da5b6 한 단계 위</td><td class="why"><b>안 따름</b> · 다크에서 3.92</td></tr></tbody>
   </table>
 
   <h2>메인화면 — 첨부 이미지 레이아웃</h2>
@@ -236,7 +238,8 @@
       --page:#0e0f10; --base:#141517; --raise:#1c1d1f; --control:#202224;
       --control-hi:#2a2c2f; --line:#ffffff1a; --line-hi:#ffffff26;
       --text:#ffffff; --text-sub:#dfe2ea; --muted:#9da5b6; --faint:#697183;
-      --brand:#ff007f; --on-brand:#141517; --brand-text:#ff92b0;
+      --brand:#ff007f; --on-brand:#141517; --brand-text:#ff007f;
+      --brand-text-sm:#ff007f;
       --brand-surface:#520125; --brand-surface-hi:#55142b;">
       
       <div class="col">
@@ -271,7 +274,8 @@
       --page:#ffffff; --base:#ffffff; --raise:#f0f1f2; --control:#e8e9eb;
       --control-hi:#e1e1e5; --line:#d0d1d3; --line-hi:#c0c1c2;
       --text:#0e0f10; --text-sub:#202224; --muted:#4d4d4d; --faint:#6d6e70;
-      --brand:#ff007f; --on-brand:#141517; --brand-text:#de006e;
+      --brand:#ff007f; --on-brand:#141517; --brand-text:#ff007f;
+      --brand-text-sm:#de006e;
       --brand-surface:#f7f1f2; --brand-surface-hi:#f4ebed;">
       
       <div class="col">
@@ -306,7 +310,8 @@
       --page:#0e0f10; --base:#141517; --raise:#1c1d1f; --control:#202224;
       --control-hi:#2a2c2f; --line:#ffffff1a; --line-hi:#ffffff26;
       --text:#ffffff; --text-sub:#dfe2ea; --muted:#9da5b6; --faint:#697183;
-      --brand:#ff007f; --on-brand:#141517; --brand-text:#ff92b0;
+      --brand:#ff007f; --on-brand:#141517; --brand-text:#ff007f;
+      --brand-text-sm:#ff007f;
       --brand-surface:#520125; --brand-surface-hi:#55142b;">
       
       <div class="col">
@@ -361,7 +366,8 @@
       --page:#ffffff; --base:#ffffff; --raise:#f0f1f2; --control:#e8e9eb;
       --control-hi:#e1e1e5; --line:#d0d1d3; --line-hi:#c0c1c2;
       --text:#0e0f10; --text-sub:#202224; --muted:#4d4d4d; --faint:#6d6e70;
-      --brand:#ff007f; --on-brand:#141517; --brand-text:#de006e;
+      --brand:#ff007f; --on-brand:#141517; --brand-text:#ff007f;
+      --brand-text-sm:#de006e;
       --brand-surface:#f7f1f2; --brand-surface-hi:#f4ebed;">
       
       <div class="col">
@@ -418,7 +424,11 @@
     <div><dt>보조 글자</dt><dd class="pass">6.82</dd></div>
     <div><dt>회사 정보 · placeholder<small>muted</small></dt><dd class="pass">7.76</dd></div>
     <div><dt>치지직 faint를 그대로 썼다면<small>#697183 — 안 쓴 이유</small></dt><dd class="fail">3.92</dd></div>
-    <div><dt>브랜드 글자<small>페이지 위</small></dt><dd class="pass">9.13</dd></div>
+    <div><dt>악센트 #ff007f · 큰 글자/아이콘<small>페이지 위 · 비텍스트·큰글자 기준 3.0</small></dt><dd class="pass">5.08</dd></div>
+    <div><dt>악센트 #ff007f를 작은 글자로 쓴다면<small>본문 기준 4.5</small></dt><dd class="pass">5.08</dd></div>
+    <div><dt>작은 악센트 글자에 실제로 쓰는 값<small>#ff007f</small></dt><dd class="pass">5.08</dd></div>
+    <div><dt>칩 안 화살표<small>컨트롤 면 위 · 비텍스트 3.0</small></dt><dd class="pass">4.22</dd></div>
+    <div><dt>악센트를 올린 면 위에 둔다면<small>거기엔 두지 않는다</small></dt><dd class="fail">4.46</dd></div>
     <div><dt>채움 버튼 글자<small>#ff007f 면 위</small></dt><dd class="pass">4.84</dd></div>
     <div><dt>채움 버튼이 배경에서 갈리는 정도<small>비텍스트 3:1</small></dt><dd class="pass">5.08</dd></div>
     <div><dt>입력 카드가 페이지에서 갈리는 정도<small>OKLab 밝기차 · 0.02면 충분(면끼리)</small></dt>
@@ -430,7 +440,11 @@
     <div><dt>보조 글자</dt><dd class="pass">7.47</dd></div>
     <div><dt>회사 정보 · placeholder<small>muted</small></dt><dd class="pass">8.45</dd></div>
     <div><dt>치지직 faint를 그대로 썼다면<small>#697183 — 안 쓴 이유</small></dt><dd class="pass">5.10</dd></div>
-    <div><dt>브랜드 글자<small>페이지 위</small></dt><dd class="pass">4.85</dd></div>
+    <div><dt>악센트 #ff007f · 큰 글자/아이콘<small>페이지 위 · 비텍스트·큰글자 기준 3.0</small></dt><dd class="pass">3.78</dd></div>
+    <div><dt>악센트 #ff007f를 작은 글자로 쓴다면<small>본문 기준 4.5</small></dt><dd class="fail">3.78</dd></div>
+    <div><dt>작은 악센트 글자에 실제로 쓰는 값<small>#de006e</small></dt><dd class="pass">4.85</dd></div>
+    <div><dt>칩 안 화살표<small>컨트롤 면 위 · 비텍스트 3.0</small></dt><dd class="pass">3.11</dd></div>
+    <div><dt>악센트를 올린 면 위에 둔다면<small>거기엔 두지 않는다</small></dt><dd class="fail">3.34</dd></div>
     <div><dt>채움 버튼 글자<small>#ff007f 면 위</small></dt><dd class="pass">4.84</dd></div>
     <div><dt>채움 버튼이 배경에서 갈리는 정도<small>비텍스트 3:1</small></dt><dd class="pass">3.78</dd></div>
     <div><dt>입력 카드가 페이지에서 갈리는 정도<small>OKLab 밝기차 · 0.02면 충분(면끼리)</small></dt>
@@ -438,11 +452,20 @@
   </dl></div>
 
   <footer>
-    <b>남는 맞바꿈 하나.</b> 대비 역할을 맞추면 악센트 핑크가 옅어지고, 채도를 지키면 대비가
-    내려간다. 둘을 동시에 가질 수 없는 건 sRGB의 제약이다 — 핑크의 채도 경계선이 L 0.645에서
-    가장 불룩하기 때문이다. 지금은 대비 쪽을 택해 악센트에 <code>#ff92b0</code>(다크
-    9.13)를 쓴다. 더 쨍하게 가려면
-    <code>#ff007f</code>를 글자에도 쓰면 되고, 그때 다크 대비는 4.84로 내려간다.
+    <b>악센트를 원색으로 갔다.</b> 대비를 맞춰 풀면 악센트가
+    <code>#ff92b0</code>(다크 9.13)처럼 옅어진다. 치지직이 형광 초록을
+    그대로 쓰듯 <code>#ff007f</code>를 그대로 쓰기로 했고, 대신 어디에 놓을 수 있는지가
+    좁아진다.
+    <br><br>
+    <b>다크</b>는 페이지 위 5.08이라 크기 제한 없이 쓴다. 다만 올린 면
+    (<code>#1c1d1f</code>) 위에서는 4.46으로 본문 기준에 못 미쳐서, 악센트를 카드 안에는
+    두지 않는다.
+    <br><br>
+    <b>라이트</b>는 흰 배경 위 3.78이다. 본문 기준 4.5에는 못 미치고, 큰 글자(14pt 볼드 =
+    18.66px 이상)와 비텍스트에 적용되는 3.0은 넘는다. 그래서 카드 이름·아이콘·알림 점에만
+    쓰고, 카드 이름은 19px에서 <b>20px</b>로 올려 하한에 여유를 뒀다. 작은 악센트 글자가
+    필요하면 한 단계 진한 <code>#de006e</code>(4.85)를 쓴다.
+    칩 안 화살표는 컨트롤 면 위 3.11로 비텍스트 기준을 간신히 넘는다 — 여유가 없는 자리다.
     <br><br>
     채움 버튼 위 글자는 <b>흰색이 아니라 <code>#141517</code></b>이다. 흰 글자는 3.78로 떨어진다.
     <br><br>

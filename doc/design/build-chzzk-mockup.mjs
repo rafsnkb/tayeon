@@ -150,8 +150,11 @@ const T = {
     src: CHZZK.dark,
     brand: PINK,        // 채움. weaker 자리에 그대로 앉는다(4.98 ↔ 4.84).
     onBrand: "#141517", // 흰 글자는 3.78로 미달
-    // 악센트 글자는 weak 자리. strong(#ffd5df, 13.78)까지 가면 흰색에 가까워진다.
-    brandText: BRAND_LADDER.dark.out.weak,
+    // 치지직이 #00ffa3을 쓰는 자리 — 핑크도 그냥 #ff007f를 쓴다. 페이지 위 5.08로
+    // 본문 기준을 넘는다. 다만 올린 면(#1c1d1f) 위에서는 4.46이라 거기엔 두지 않는다.
+    brandText: PINK,
+    brandTextSmall: PINK, // 다크는 작은 글자도 그대로 된다
+    brandTextLadder: BRAND_LADDER.dark.out.weak, // 대비를 맞췄을 때의 값 — 비교용
     brandSurface: rehueByRatio("#003321"),
     brandSurfaceHi: rehueByRatio("#11382c"),
   },
@@ -159,9 +162,14 @@ const T = {
     ...CHZZK.light,
     label: "라이트",
     src: CHZZK.light,
-    brand: PINK,        // 라이트에서는 weak 자리(3.76) — 글자로 쓰기엔 모자라고 면으로는 된다
+    brand: PINK,
     onBrand: "#141517",
-    brandText: BRAND_LADDER.light.out.strong,
+    // 라이트에서도 악센트는 #ff007f다. 흰 배경 위 3.78 — 본문 4.5에는 못 미치고
+    // 큰 글자(14pt 볼드 = 18.66px 이상)와 비텍스트의 3.0은 넘는다. 그래서 카드 이름·
+    // 아이콘·점에만 쓰고, 작은 악센트 글자에는 한 단계 진한 걸 쓴다.
+    brandText: PINK,
+    brandTextSmall: BRAND_LADDER.light.out.strong, // #de006e, 4.85
+    brandTextLadder: BRAND_LADDER.light.out.strong,
     brandSurface: rehueByRatio("#e8f7f1"),
     brandSurfaceHi: rehueByRatio("#ddf4ea"),
   },
@@ -181,7 +189,8 @@ const MAP = [
   { what: "테두리", src: "알파 #ffffff0d~4d", ours: "그대로", note: "선 색을 따로 안 만든다" },
   { what: "글자", src: "흰색 + cool 회색 사다리", ours: "그대로", note: "면은 무채, 글자만 차갑다" },
   { what: "브랜드 사다리", src: "전 단계 최대 채도의 <b>99%</b>", ours: "동일", note: "#ff007f도 99% — 같은 규칙" },
-  { what: "브랜드 글자", src: "#00ffa3 <small>(13.78)</small>", ours: `${T.dark.brandText} <small>(${fmt(contrast(T.dark.page, T.dark.brandText))})</small>`, note: "대비를 맞춰 푼 자리" },
+  { what: "브랜드 악센트", src: "#00ffa3 <small>(13.78)</small>", ours: "#ff007f <small>(다크 5.08 · 라이트 3.78)</small>", note: "<b>치지직처럼 원색 그대로</b>" },
+  { what: "└ 라이트 작은 글자", src: "—", ours: `${T.light.brandTextSmall} <small>(${fmt(contrast(T.light.page, T.light.brandTextSmall))})</small>`, note: "3.78은 본문 4.5에 미달" },
   { what: "브랜드 채움", src: "#009962 <small>형광 아님</small>", ours: "#ff007f", note: "<b>여기가 #ff007f 자리</b>" },
   { what: "채움 위 글자", src: "—", ours: "#141517", note: "흰 글자는 3.78로 미달" },
   { what: "아이콘 버튼", src: "아이콘만", ours: "아이콘 + 글자", note: "<b>안 따름</b> · 50대 테스터" },
@@ -275,6 +284,7 @@ function frame(key, kind) {
       --control-hi:${t.controlHi}; --line:${t.line}; --line-hi:${t.lineHi};
       --text:${t.text}; --text-sub:${t.textSub}; --muted:${t.muted}; --faint:${t.faint};
       --brand:${t.brand}; --on-brand:${t.onBrand}; --brand-text:${t.brandText};
+      --brand-text-sm:${t.brandTextSmall};
       --brand-surface:${t.brandSurface}; --brand-surface-hi:${t.brandSurfaceHi};`;
   return `
   <figure class="frame">
@@ -294,7 +304,11 @@ function facts(key) {
     <div><dt>보조 글자</dt>${chip(contrast(t.raise, t.muted))}</div>
     <div><dt>회사 정보 · placeholder<small>muted</small></dt>${chip(contrast(t.page, t.muted))}</div>
     <div><dt>치지직 faint를 그대로 썼다면<small>#697183 — 안 쓴 이유</small></dt>${chip(contrast(t.page, t.faint))}</div>
-    <div><dt>브랜드 글자<small>페이지 위</small></dt>${chip(contrast(t.page, t.brandText))}</div>
+    <div><dt>악센트 #ff007f · 큰 글자/아이콘<small>페이지 위 · 비텍스트·큰글자 기준 3.0</small></dt>${chip(contrast(t.page, t.brandText), 3)}</div>
+    <div><dt>악센트 #ff007f를 작은 글자로 쓴다면<small>본문 기준 4.5</small></dt>${chip(contrast(t.page, t.brand))}</div>
+    <div><dt>작은 악센트 글자에 실제로 쓰는 값<small>${t.brandTextSmall}</small></dt>${chip(contrast(t.page, t.brandTextSmall))}</div>
+    <div><dt>칩 안 화살표<small>컨트롤 면 위 · 비텍스트 3.0</small></dt>${chip(contrast(t.control, t.brandText), 3)}</div>
+    <div><dt>악센트를 올린 면 위에 둔다면<small>거기엔 두지 않는다</small></dt>${chip(contrast(t.raise, t.brandText))}</div>
     <div><dt>채움 버튼 글자<small>#ff007f 면 위</small></dt>${chip(contrast(t.brand, t.onBrand))}</div>
     <div><dt>채움 버튼이 배경에서 갈리는 정도<small>비텍스트 3:1</small></dt>${chip(contrast(t.brand, t.page), 3)}</div>
     <div><dt>입력 카드가 페이지에서 갈리는 정도<small>OKLab 밝기차 · 0.02면 충분(면끼리)</small></dt>
@@ -439,7 +453,9 @@ const html = `<!doctype html>
     background:var(--raise); border:1px solid var(--line); border-radius:12px; padding:10px 13px; }
   /* 내 말풍선도 브랜드 채움 — 다만 그림자 없음, 그라데이션 없음 */
   .msg.me .body { background:var(--brand); color:var(--on-brand); border:0; font-weight:600; }
-  .card-name { margin:0 0 6px; font-size:19px; font-weight:700; color:var(--brand-text); }
+  /* 악센트에 #ff007f를 쓰려면 라이트에서 "큰 글자"여야 한다 — WCAG 하한은 14pt 볼드,
+     즉 18.66px. 19px는 아슬아슬해서 20px로 올렸다. */
+  .card-name { margin:0 0 6px; font-size:20px; font-weight:700; color:var(--brand-text); }
 
   .suggest { display:flex; flex-direction:column; gap:6px; }
   .suggest-label { margin:0 0 0 2px; font-size:11.5px; color:var(--muted); }
@@ -530,11 +546,20 @@ const html = `<!doctype html>
   <div class="factrow">${facts("dark")}${facts("light")}</div>
 
   <footer>
-    <b>남는 맞바꿈 하나.</b> 대비 역할을 맞추면 악센트 핑크가 옅어지고, 채도를 지키면 대비가
-    내려간다. 둘을 동시에 가질 수 없는 건 sRGB의 제약이다 — 핑크의 채도 경계선이 L 0.645에서
-    가장 불룩하기 때문이다. 지금은 대비 쪽을 택해 악센트에 <code>${T.dark.brandText}</code>(다크
-    ${fmt(contrast(T.dark.page, T.dark.brandText))})를 쓴다. 더 쨍하게 가려면
-    <code>#ff007f</code>를 글자에도 쓰면 되고, 그때 다크 대비는 4.84로 내려간다.
+    <b>악센트를 원색으로 갔다.</b> 대비를 맞춰 풀면 악센트가
+    <code>${T.dark.brandTextLadder}</code>(다크 9.13)처럼 옅어진다. 치지직이 형광 초록을
+    그대로 쓰듯 <code>#ff007f</code>를 그대로 쓰기로 했고, 대신 어디에 놓을 수 있는지가
+    좁아진다.
+    <br><br>
+    <b>다크</b>는 페이지 위 5.08이라 크기 제한 없이 쓴다. 다만 올린 면
+    (<code>#1c1d1f</code>) 위에서는 4.46으로 본문 기준에 못 미쳐서, 악센트를 카드 안에는
+    두지 않는다.
+    <br><br>
+    <b>라이트</b>는 흰 배경 위 3.78이다. 본문 기준 4.5에는 못 미치고, 큰 글자(14pt 볼드 =
+    18.66px 이상)와 비텍스트에 적용되는 3.0은 넘는다. 그래서 카드 이름·아이콘·알림 점에만
+    쓰고, 카드 이름은 19px에서 <b>20px</b>로 올려 하한에 여유를 뒀다. 작은 악센트 글자가
+    필요하면 한 단계 진한 <code>${T.light.brandTextSmall}</code>(4.85)를 쓴다.
+    칩 안 화살표는 컨트롤 면 위 3.11로 비텍스트 기준을 간신히 넘는다 — 여유가 없는 자리다.
     <br><br>
     채움 버튼 위 글자는 <b>흰색이 아니라 <code>#141517</code></b>이다. 흰 글자는 3.78로 떨어진다.
     <br><br>
