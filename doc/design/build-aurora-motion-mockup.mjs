@@ -1,0 +1,360 @@
+// Aurora UI + Motion-Driven 조합 시안 (자홍 → 코랄).
+//   node doc/design/build-aurora-motion-mockup.mjs  →  doc/design/aurora-motion-mockup.html
+//
+// 글래스모피즘과 결정적으로 다른 점: 콘텐츠 면이 반투명이 아니다. Aurora UI는 배경이 흐르고
+// 그 위에 불투명한 면을 얹는다. 다크에서 유리가 탁해 보이던 문제가 여기서 사라진다 — 면이
+// 불투명하면 대비가 뒤에 무엇이 오든 변하지 않으므로, 수치도 추정이 아니라 확정값이 된다.
+//
+// 스킬 스펙 요약
+//   Aurora UI     : 메시 그라디언트, 8~12초 루프, background-size 200%, saturate(1.2), 색 레이어로 깊이
+//   Motion-Driven : 진입 애니메이션, 호버 300~400ms, 패럴랙스 3~5겹, GPU 가속,
+//                   prefers-reduced-motion 반드시 존중
+//
+// 움직임은 정지 이미지로 전달되지 않는다. 브라우저에서 직접 열어야 한다.
+
+import { writeFileSync } from "node:fs";
+import { contrast } from "./build-point-ramp.mjs";
+
+// 카드는 --page 위가 아니라 흐르는 오로라 위에 놓인다. 그래서 면이 떠 보이는 정도는
+// page가 아니라 "오로라가 실제로 깔아놓는 색" 중 가장 불리한 것으로 재야 한다.
+// 오로라 레이어는 blur + opacity로 page 위에 합성되므로 그 결과색을 먼저 만든다.
+const toRgb = (h) => h.replace("#", "").match(/../g).map((x) => parseInt(x, 16));
+const toHex = (c) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+const over = (fg, bg, alpha) => {
+  const f = toRgb(fg);
+  const b = toRgb(bg);
+  return toHex(f.map((v, i) => alpha * v + (1 - alpha) * b[i]));
+};
+const worstBackdrop = (t) =>
+  t.aurora
+    .map((a) => over(a, t.page, t.auroraOpacity))
+    .reduce((worst, c) => (contrast(t.surface, c) < contrast(t.surface, worst) ? c : worst));
+
+const THEMES = {
+  light: {
+    label: "라이트",
+    page: "#fff7f4",
+    surface: "#ffffff",
+    surfaceAlt: "#fff1ec",
+    border: "#f3ddd5",
+    text: "#2a1320",
+    muted: "#7a5c60",
+    chip: "#f6e4de",
+    // 확정된 자홍 → 코랄
+    gradFrom: "#c2005f",
+    gradTo: "#d23c21",
+    onGrad: "#ffffff",
+    link: "#ac0053",
+    // 오로라 레이어. 서로 다른 속도로 흐르게 해서 색이 고정돼 보이지 않게 한다.
+    aurora: ["#ff9ec4", "#ffb38a", "#ffd6a5", "#ff7f9e"],
+    auroraOpacity: 0.55,
+  },
+  dark: {
+    label: "다크",
+    page: "#120c10",
+    surface: "#1e161b",
+    surfaceAlt: "#2a1e24",
+    border: "#3a2a31",
+    text: "#f7eff1",
+    muted: "#c2a8ae",
+    chip: "#2f2229",
+    gradFrom: "#ff8a6b",
+    gradTo: "#ff5993",
+    onGrad: "#140d11",
+    link: "#ff9d86",
+    aurora: ["#7a1038", "#8a3416", "#3d1030", "#a8264a"],
+    auroraOpacity: 0.62,
+  },
+};
+
+const fmt = (n) => n.toFixed(2);
+const chip = (n, floor = 4.5) =>
+  `<span class="ratio ${n >= floor ? "pass" : "fail"}">${fmt(n)}<i>${n >= floor ? "✓" : "✗"}</i></span>`;
+
+function frame(key, variant) {
+  const t = THEMES[key];
+  const desktop = variant === "desktop";
+  const onGrad = Math.min(contrast(t.gradFrom, t.onGrad), contrast(t.gradTo, t.onGrad));
+
+  const style = `
+      --page:${t.page}; --surface:${t.surface}; --surface-alt:${t.surfaceAlt};
+      --line:${t.border}; --text:${t.text}; --muted:${t.muted}; --chip:${t.chip};
+      --grad:linear-gradient(30deg in oklab, ${t.gradFrom}, ${t.gradTo});
+      --on-grad:${t.onGrad}; --link:${t.link}; --aurora-op:${t.auroraOpacity};
+      --a1:${t.aurora[0]}; --a2:${t.aurora[1]}; --a3:${t.aurora[2]}; --a4:${t.aurora[3]};`;
+
+  return `
+  <figure class="frame ${desktop ? "desktop" : ""}">
+    <figcaption>${t.label}${desktop ? " · 데스크톱" : " · 모바일"}</figcaption>
+    <div class="screen" style="${style}">
+      <!-- 패럴랙스 3겹: 서로 다른 주기로 흘러 색이 멈춰 보이지 않는다. -->
+      <div class="aurora l1"></div>
+      <div class="aurora l2"></div>
+      <div class="aurora l3"></div>
+
+      ${desktop ? `
+      <aside class="rail">
+        <div class="rail-top">타연</div>
+        <nav>
+          <a class="room active">이직 고민 상담</a>
+          <a class="room">올해 연애운</a>
+          <a class="room">새 대화</a>
+        </nav>
+        <div class="rail-bottom">
+          <button class="pill-grad">이용권 구입하기</button>
+          <button class="pill-plain">새 대화</button>
+        </div>
+      </aside>` : ""}
+
+      <div class="col">
+        <header class="topbar">
+          <span class="ic">☰</span>
+          <b>새 대화</b>
+          <span class="ticket">스탠다드 · 14회</span>
+        </header>
+
+        <div class="stream">
+          <div class="bubble in" style="--d:0ms">안녕하세요! 저는 루미예요.</div>
+          <div class="bubble in" style="--d:90ms">밝고 순수한 마음으로 당신의 이야기를 들어드릴게요.</div>
+          <div class="bubble me in" style="--d:180ms">올해 이직해도 괜찮을까?</div>
+          <div class="bubble wide in" style="--d:270ms">
+            <b>현재 — 완드 7</b>
+            지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+            버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.
+          </div>
+          <div class="suggest in" style="--d:360ms">
+            <button>1. 지금 준비해야 할 건 뭘까?</button>
+            <button>2. 올해 안에 결정해도 될까?</button>
+          </div>
+          <div class="bubble me in" style="--d:450ms">준비할 걸 더 알려줘</div>
+          <!-- 리딩 대기: Motion-Driven의 "상태를 움직임으로 알린다" -->
+          <div class="bubble thinking in" style="--d:540ms">
+            <i></i><i></i><i></i>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="modes">
+            <button class="seg on">원 카드</button>
+            <button class="seg">쓰리 카드</button>
+            <button class="seg">양자택일</button>
+            <button class="seg">켈틱</button>
+          </div>
+          <div class="input-row">
+            <span class="ph">궁금한 것을 물어보세요</span>
+            <button class="send">↑</button>
+          </div>
+        </div>
+        <p class="footnote"><a>회사 정보</a></p>
+      </div>
+    </div>
+
+    <dl class="facts">
+      <div><dt>본문 <small>불투명 면 <code>${t.surface}</code> 위 — 뒤가 무엇이든 고정</small></dt><dd>${chip(contrast(t.surface, t.text))}</dd></div>
+      <div><dt>보조 글자</dt><dd>${chip(contrast(t.surface, t.muted))}</dd></div>
+      <div><dt>링크·강조</dt><dd>${chip(contrast(t.surface, t.link))}</dd></div>
+      <div><dt>그라데이션 위 라벨<small>양 끝 중 불리한 쪽</small></dt><dd>${chip(onGrad)}</dd></div>
+      <div><dt>전송 버튼이 컴포저에서 떠 보이는 정도<small>비텍스트 3:1 — 컨트롤이라 판정 대상</small></dt><dd>${chip(Math.max(contrast(t.gradFrom, t.surface), contrast(t.gradTo, t.surface)), 3)}</dd></div>
+      <div><dt>카드가 오로라에서 떠 보이는 정도<small>가장 불리한 오로라 <code>${worstBackdrop(t)}</code> 기준. 말풍선·카드는 컨트롤이 아니라 컨테이너여서 3:1 대상이 아니다 — 참고값</small></dt><dd><span class="ratio note">${fmt(Math.max(contrast(t.surface, worstBackdrop(t)), contrast(t.border, worstBackdrop(t))))}</span></dd></div>
+    </dl>
+  </figure>`;
+}
+
+const html = `<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>타연 — Aurora UI + Motion-Driven (자홍 → 코랄)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 20px 64px; background:#140f12; color:#f2e9ec;
+    font:500 14px/1.6 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1320px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .lede { margin:0 0 8px; color:#bda7ae; max-width:76ch; }
+  .changes { margin:0 0 26px; padding-left:18px; color:#bda7ae; max-width:76ch; }
+  .changes li { margin-bottom:4px; }
+  .changes b { color:#f2e9ec; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size:12px; }
+
+  .frames { display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+  .frame { margin:0; }
+  figcaption { font-size:12px; color:#bda7ae; margin-bottom:8px; }
+
+  .screen { position:relative; width:390px; height:760px; overflow:hidden;
+    border-radius:26px; background:var(--page); display:flex;
+    box-shadow:0 18px 50px rgba(0,0,0,.5); }
+  .frame.desktop .screen { width:820px; }
+
+  /* Aurora UI: 메시 그라디언트 3겹이 서로 다른 주기로 흐른다. background-size를 키워
+     position을 움직이는 방식이라 레이아웃을 건드리지 않고 GPU에서 처리된다. */
+  .aurora { position:absolute; inset:-30%; opacity:var(--aurora-op);
+    filter:saturate(1.2) blur(38px); will-change:transform, background-position;
+    background-size:200% 200%; }
+  .aurora.l1 { background-image:
+      radial-gradient(38% 30% at 20% 18%, var(--a1) 0%, transparent 68%),
+      radial-gradient(42% 32% at 82% 30%, var(--a2) 0%, transparent 70%);
+    animation:drift1 11s ease-in-out infinite alternate; }
+  .aurora.l2 { background-image:
+      radial-gradient(46% 30% at 68% 74%, var(--a3) 0%, transparent 72%),
+      radial-gradient(40% 26% at 24% 62%, var(--a4) 0%, transparent 70%);
+    animation:drift2 9s ease-in-out infinite alternate; }
+  .aurora.l3 { background-image:
+      radial-gradient(60% 34% at 50% 108%, var(--a1) 0%, transparent 74%);
+    animation:drift3 13s ease-in-out infinite alternate; opacity:.5; }
+  @keyframes drift1 { from { background-position:0% 0%; transform:translate3d(0,0,0) }
+                      to   { background-position:100% 60%; transform:translate3d(-3%,2%,0) } }
+  @keyframes drift2 { from { background-position:100% 100%; transform:translate3d(0,0,0) }
+                      to   { background-position:0% 30%; transform:translate3d(3%,-2%,0) } }
+  @keyframes drift3 { from { background-position:50% 100%; transform:scale(1) }
+                      to   { background-position:50% 0%; transform:scale(1.08) } }
+
+  .col { position:relative; display:flex; flex-direction:column; flex:1; min-width:0; }
+
+  /* 콘텐츠는 전부 불투명하다 — Aurora UI가 글래스모피즘과 갈리는 지점. */
+  .rail { position:relative; width:236px; display:flex; flex-direction:column;
+    background:var(--surface); border-right:1px solid var(--line); padding:14px 12px; }
+  .rail-top { font-weight:800; font-size:17px; color:var(--text); padding:6px 8px 14px; }
+  .rail nav { display:flex; flex-direction:column; gap:4px; flex:1; }
+  .room { display:block; border-radius:10px; padding:9px 10px; font-size:13px; color:var(--muted);
+    transition:background 300ms ease, color 300ms ease; }
+  .room:hover { background:var(--chip); color:var(--text); }
+  .room.active { background:var(--chip); color:var(--text); font-weight:600; }
+  .rail-bottom { display:flex; flex-direction:column; gap:8px; }
+
+  .topbar { position:relative; display:flex; align-items:center; gap:10px; height:56px;
+    padding:0 14px; background:var(--surface); border-bottom:1px solid var(--line); }
+  .topbar .ic { color:var(--text); font-size:15px; }
+  .topbar b { flex:1; text-align:center; color:var(--text); font-size:15px; }
+  .ticket { font-size:11px; font-weight:600; color:var(--text); background:var(--chip);
+    border-radius:999px; padding:5px 10px; white-space:nowrap; }
+
+  .stream { position:relative; flex:1; overflow:hidden; padding:14px 14px 150px;
+    display:flex; flex-direction:column; gap:9px; align-items:flex-start; }
+  .bubble { max-width:84%; border-radius:18px; padding:10px 13px; font-size:13px; line-height:1.55;
+    color:var(--text); background:var(--surface); border:1px solid var(--line); }
+  .bubble.wide { max-width:94%; }
+  .bubble.wide b { display:block; margin-bottom:4px; color:var(--link); }
+  .bubble.me { align-self:flex-end; background:var(--grad); color:var(--on-grad);
+    border:0; font-weight:600; }
+
+  /* Motion-Driven: 진입. 말풍선이 한 박자씩 밀려 들어온다. */
+  .in { animation:rise 420ms cubic-bezier(.22,.9,.3,1) both; animation-delay:var(--d,0ms); }
+  @keyframes rise { from { opacity:0; transform:translate3d(0,10px,0) } to { opacity:1; transform:none } }
+
+  /* 리딩 대기 — 상태를 글자 대신 움직임으로 알린다. */
+  .thinking { display:flex; gap:5px; align-items:center; padding:13px 15px; }
+  .thinking i { width:6px; height:6px; border-radius:50%; background:var(--muted); display:block;
+    animation:bounce 1.1s ease-in-out infinite; }
+  .thinking i:nth-child(2) { animation-delay:.14s }
+  .thinking i:nth-child(3) { animation-delay:.28s }
+  @keyframes bounce { 0%,60%,100% { transform:translateY(0); opacity:.5 } 30% { transform:translateY(-5px); opacity:1 } }
+
+  .suggest { display:flex; flex-direction:column; gap:6px; }
+  .suggest button { text-align:left; font:inherit; font-size:12px; cursor:pointer;
+    background:var(--surface-alt); color:var(--link); border:1px solid var(--line);
+    border-radius:999px; padding:7px 13px; transition:transform 300ms ease, background 300ms ease; }
+  .suggest button:hover { transform:translateX(3px); background:var(--chip); }
+
+  .composer { position:absolute; left:12px; right:12px; bottom:34px; border-radius:24px;
+    padding:10px; background:var(--surface); border:1px solid var(--line);
+    box-shadow:0 10px 30px rgba(0,0,0,.14); }
+  .modes { display:flex; gap:5px; margin-bottom:9px; }
+  .seg { flex:1; font:inherit; font-size:11px; font-weight:600; cursor:pointer; border:0;
+    border-radius:999px; padding:6px 0; background:transparent; color:var(--muted);
+    transition:background 300ms ease, color 300ms ease; }
+  .seg:hover { background:var(--chip); color:var(--text); }
+  .seg.on { background:var(--grad); color:var(--on-grad); }
+  .input-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:4px 4px 4px 10px; }
+  .ph { color:var(--muted); font-size:13px; }
+  .send { width:38px; height:38px; border:0; border-radius:50%; cursor:pointer;
+    background:var(--grad); color:var(--on-grad); font-size:16px;
+    transition:transform 320ms cubic-bezier(.22,.9,.3,1), box-shadow 320ms ease; }
+  .send:hover { transform:translateY(-2px) scale(1.06); box-shadow:0 8px 18px rgba(194,0,95,.34); }
+  .send:active { transform:scale(.94); }
+
+  .pill-grad, .pill-plain { font:inherit; font-weight:700; font-size:13px; cursor:pointer;
+    border:0; border-radius:999px; padding:11px;
+    transition:transform 320ms cubic-bezier(.22,.9,.3,1), box-shadow 320ms ease; }
+  .pill-grad { background:var(--grad); color:var(--on-grad); }
+  .pill-grad:hover { transform:translateY(-2px); box-shadow:0 10px 22px rgba(194,0,95,.34); }
+  .pill-plain { background:var(--chip); color:var(--text); font-weight:600; }
+  .pill-plain:hover { transform:translateY(-2px); }
+
+  .footnote { position:absolute; left:0; right:0; bottom:0; margin:0; padding:6px 0 10px; text-align:center; }
+  .footnote a { font-size:11px; color:var(--muted); text-decoration:underline; }
+
+  /* Motion-Driven 체크리스트의 필수 항목. 움직임을 줄이면 최종 상태만 남는다. */
+  @media (prefers-reduced-motion: reduce) {
+    .aurora, .in, .thinking i { animation:none !important; }
+    .in { opacity:1; transform:none; }
+    * { transition-duration:1ms !important; }
+  }
+
+  .facts { margin:12px 0 0; display:grid; gap:5px; width:390px; }
+  .frame.desktop .facts { width:820px; }
+  .facts > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    border-top:1px solid #2e2126; padding-top:5px; }
+  .facts dt { font-size:12px; color:#bda7ae; }
+  .facts dt small { display:block; opacity:.75; font-size:11px; }
+  .facts dd { margin:0; }
+  .ratio { font-variant-numeric:tabular-nums; font-weight:700; font-size:12px;
+    border-radius:999px; padding:2px 8px; }
+  .ratio i { font-style:normal; margin-left:4px; }
+  .ratio.pass { background:#1e4023; color:#b9f0c0; }
+  .ratio.fail { background:#4a1f1c; color:#ffc9c4; }
+  .ratio.note { background:rgba(180,150,160,.2); color:#f2e9ec; }
+
+  footer { margin-top:30px; color:#bda7ae; font-size:12px; max-width:76ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Aurora UI + Motion-Driven · 자홍 → 코랄</h1>
+  <p class="lede">
+    <b>움직입니다.</b> 정지 화면으로는 절반만 보입니다 — 배경이 9·11·13초 주기로 흐르고, 말풍선이
+    차례로 밀려 들어오고, 버튼은 눌리고 떠오릅니다. 커서를 버튼과 추천 질문 위에 올려보세요.
+  </p>
+  <ul class="changes">
+    <li><b>유리를 걷어냈다.</b> Aurora UI는 배경만 흐르고 콘텐츠는 불투명한 면에 얹힌다. 다크가 탁해 보이던 건 반투명 면 때문이었다.</li>
+    <li><b>대비가 확정값이 된다.</b> 면이 불투명하면 뒤에 무엇이 오든 수치가 변하지 않는다 — 글래스 시안에서 "오로라 평균 기준"이라고 단서를 달아야 했던 부분이 사라진다.</li>
+    <li><b>오로라 3겹이 서로 다른 주기로</b> 흐른다(패럴랙스). 같은 속도면 그림 한 장이 흔들리는 것처럼 보인다.</li>
+    <li><b>리딩 대기를 점 세 개로</b> 바꿨다. 지금은 "이전 대화를 불러오는 중..." 같은 문장인데, 상태는 움직임으로 알리는 편이 빠르다.</li>
+    <li><b>진입 애니메이션</b>은 90ms씩 밀린다. 한꺼번에 나타나면 순서가 안 읽힌다.</li>
+    <li><b><code>prefers-reduced-motion</code></b>을 존중한다. OS에서 모션 줄이기를 켜면 전부 최종 상태로 고정된다 — 스펙의 필수 항목이다.</li>
+  </ul>
+
+  <div class="frames">
+    ${frame("light", "mobile")}
+    ${frame("dark", "mobile")}
+    ${frame("dark", "desktop")}
+  </div>
+
+  <footer>
+    Aurora UI 스펙은 8~12초 루프, <code>background-size:200%</code>, <code>saturate(1.2)</code>,
+    색 레이어로 깊이를 만들 것을 요구한다. Motion-Driven은 호버 300~400ms, 패럴랙스 3~5겹,
+    GPU 가속, 그리고 모션 감소 존중을 요구한다. 위 화면은 그 항목들을 그대로 따른다.
+    <br><br>
+    비용: 애니메이션은 <code>transform</code>과 <code>background-position</code>만 건드리므로
+    레이아웃을 다시 계산하지 않는다. 글래스모피즘의 <code>backdrop-filter</code>와 달리 스크롤 중
+    면마다 뒤를 다시 흐릴 필요도 없다 — 움직이는 쪽이 오히려 가볍다.
+    <br><br>
+    생성: <code>node doc/design/build-aurora-motion-mockup.mjs</code>
+  </footer>
+</div>
+</body>
+</html>
+`;
+
+writeFileSync("doc/design/aurora-motion-mockup.html", html);
+console.log("wrote doc/design/aurora-motion-mockup.html");
+for (const [, t] of Object.entries(THEMES)) {
+  console.log(
+    `${t.label.padEnd(4)} 본문 ${fmt(contrast(t.surface, t.text))}  보조 ${fmt(contrast(t.surface, t.muted))}` +
+      `  링크 ${fmt(contrast(t.surface, t.link))}` +
+      `  그라데이션 ${fmt(Math.min(contrast(t.gradFrom, t.onGrad), contrast(t.gradTo, t.onGrad)))}` +
+      `  전송버튼 ${fmt(Math.max(contrast(t.gradFrom, t.surface), contrast(t.gradTo, t.surface)))}`,
+  );
+}
