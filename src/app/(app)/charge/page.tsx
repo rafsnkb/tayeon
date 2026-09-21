@@ -20,6 +20,7 @@ import { buildPortoneCustomer } from "@/lib/payment/customer";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import NoBirthTimePopup from "@/components/NoBirthTimePopup";
 import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
+import InfoModal from "@/components/InfoModal";
 
 type Tab = "count" | "time";
 type TimeDuration = 15 | 30 | 60;
@@ -165,18 +166,6 @@ export default function ChargePage() {
       />
       <div className={`flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto ${!selected && tab === "time" ? "pb-40" : "pb-24"}`}>
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-          {notice && (
-            <div
-              className={`rounded-2xl border p-3 text-center text-sm ${
-                notice.type === "error"
-                  ? "border-urgent bg-urgent/10 text-urgent"
-                  : "border-point bg-point-bg text-point"
-              }`}
-            >
-              {notice.message}
-            </div>
-          )}
-
           {selected && (
             <>
               <div
@@ -405,6 +394,9 @@ export default function ChargePage() {
       </div>
       {noBirthTimeOpen && <NoBirthTimePopup onClose={() => setNoBirthTimeOpen(false)} />}
       {suspension && <SuspensionModal info={suspension} onClose={() => setSuspension(null)} />}
+      {notice && (
+        <InfoModal title={notice.message} tone={notice.type} onClose={() => setNotice(null)} />
+      )}
     </div>
   );
 }
