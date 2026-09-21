@@ -65,7 +65,7 @@ const COUNT_PASS_CARD_TIERS = [
   { border: "#ff007f", text: "#ff007f", tagBg: "rgba(82, 17, 59, 0.86)", bg: TIER_TEXTURE[1] },
 ];
 
-function CountPassUsageModal({ pass, onClose }: { pass: CountPass; onClose: () => void }) {
+export function CountPassUsageModal({ pass, onClose }: { pass: CountPass; onClose: () => void }) {
   const productIndex = COUNT_PACKAGES.findIndex((pkg) => pkg.id === pass.productId);
   const product = productIndex >= 0 ? COUNT_PACKAGES[productIndex] : null;
   const tier = COUNT_PASS_CARD_TIERS[productIndex >= 0 ? productIndex : 1];
@@ -136,7 +136,7 @@ const READING_LOADING_MESSAGES = [
   "당신을 위한 조언을 준비하고 있습니다...",
 ];
 
-function ReadingLoadingMessage() {
+export function ReadingLoadingMessage() {
   const [messageIndex, setMessageIndex] = useState(0);
   const [typedLength, setTypedLength] = useState(0);
   // 예전엔 "typing" 다음에 "holding" 단계를 따로 두고 타이핑이 끝나는 순간 이펙트 안에서
@@ -181,7 +181,7 @@ function ReadingLoadingMessage() {
   );
 }
 
-function CardImage({
+export function CardImage({
   card,
   extraRotate = 0,
   className = "w-full",
@@ -220,7 +220,7 @@ function renderInterpretation(text: string) {
 }
 
 /** Celtic Cross 카드 순서는 SPREAD_POSITIONS.celtic과 동일: 0현재 1도전 2근본원인 3과거 4목표 5가까운미래 6태도 7외부영향 8희망과두려움 9결과 */
-function CelticCrossLayout({ cards }: { cards: TarotCardInfo[] }) {
+export function CelticCrossLayout({ cards }: { cards: TarotCardInfo[] }) {
   return (
     <div className="flex w-full gap-3">
       <div
@@ -260,7 +260,7 @@ function CelticCrossLayout({ cards }: { cards: TarotCardInfo[] }) {
 }
 
 /** 양자택일 카드 순서는 SPREAD_POSITIONS.dual과 동일: 0A현재 1A결과 2B현재 3B결과 4조언 */
-function DualPathLayout({ cards }: { cards: TarotCardInfo[] }) {
+export function DualPathLayout({ cards }: { cards: TarotCardInfo[] }) {
   return (
     <div className="flex w-full items-center justify-center gap-4">
       <div className="flex flex-1 flex-col items-center gap-2">
@@ -276,7 +276,7 @@ function DualPathLayout({ cards }: { cards: TarotCardInfo[] }) {
   );
 }
 
-function WelcomePopup({ onClose }: { onClose: () => void }) {
+export function WelcomePopup({ onClose }: { onClose: () => void }) {
   return (
     <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-w-sm flex-col gap-3 rounded-2xl bg-surface p-6">
@@ -315,7 +315,7 @@ const SPREAD_DESCRIPTIONS: Record<SpreadKey, string> = {
   celtic: "세부적인 심층 분석에 추천",
 };
 
-function TimePassCard({ pass, actionLabel, onAction, busy }: {
+export function TimePassCard({ pass, actionLabel, onAction, busy }: {
   pass: TimePass;
   actionLabel?: string;
   onAction?: () => void;
@@ -353,7 +353,7 @@ function TimePassCard({ pass, actionLabel, onAction, busy }: {
 
 /** 피그마 "Screen / HeldTimepassListModal" — 보유한 시간제 이용권을 카드로 나열, 사용하기를
  * 누르면 확인 모달(HeldTimepassUseModal)로 넘어간다. */
-function HeldTimepassListModal({
+export function HeldTimepassListModal({
   timePasses,
   onSelect,
   onClose,
@@ -395,7 +395,7 @@ function HeldTimepassListModal({
 
 /** 피그마 "Screen / HeldTimepassUseModal" — 실제로 활성화되면 즉시 시간 차감이 시작된다는 걸
  * 한 번 더 확인시키는 모달. */
-function HeldTimepassUseModal({
+export function HeldTimepassUseModal({
   pass,
   busy,
   onConfirm,
@@ -442,7 +442,7 @@ function HeldTimepassUseModal({
 
 /** 피그마 "Screen / NoHeldTimepassModal" — 보유 시간제 이용권 배지를 눌렀는데 보유한 이용권이
  * 없을 때(HeldTimepassListModal 대신) 뜨는, 화면 중앙에 뜨는 안내 모달. */
-function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onGoCharge: () => void }) {
+export function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onGoCharge: () => void }) {
   return (
     <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
@@ -472,7 +472,7 @@ function NoHeldTimepassModal({ onClose, onGoCharge }: { onClose: () => void; onG
   );
 }
 
-function PurchaseTicketModal({
+export function PurchaseTicketModal({
   onClose,
   onInvite,
   onPurchase,
@@ -514,7 +514,7 @@ function PurchaseTicketModal({
 }
 
 /** 피그마 "Screen / ChatroomNameEdit" — 대화방 이름 변경. 기존엔 브라우저 기본 prompt()를 썼음. */
-function RenameRoomModal({
+export function RenameRoomModal({
   initialTitle,
   busy,
   onConfirm,
@@ -570,7 +570,7 @@ function RenameRoomModal({
 }
 
 /** 피그마 "Screen / SpreadSelect"의 List_Spread — 스프레드 4종을 설명+가격과 함께 고르는 바텀시트 */
-function SpreadSelectSheet({
+export function SpreadSelectSheet({
   spread,
   remainingBySpread,
   timePassActive,
@@ -669,7 +669,7 @@ function SpreadSelectSheet({
 /** 피그마 "Screen / SpreadSelect"(궁합 추가 시트)가 쓰던 on/off 스위치 — 기존 코드베이스엔
  * 세그먼트 버튼(ToggleGroup)만 있고 iOS류 스위치가 없어서 신설. 스프레드 선택 시트 하단의 궁합
  * 스위치가 그대로 재사용한다(2026-09-18, 사주/자미두수는 이용권 조합 고정으로 별도 시트 제거됨). */
-function Switch({
+export function Switch({
   checked,
   onChange,
   disabled,
@@ -759,7 +759,17 @@ function TarotChat() {
   const [suspension, setSuspension] = useState<SuspensionInfo | null>(null);
   const [roomActionBusy, setRoomActionBusy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const questionInputRef = useRef<HTMLInputElement>(null);
+  const questionInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // textarea는 스스로 늘어나지 않는다. 높이를 auto로 되돌려 scrollHeight를 다시 재고(줄어드는
+  // 경우까지 반영하려면 이 초기화가 필요하다) 그 값을 높이로 준다. 최소·최대 높이와 넘칠 때의
+  // 스크롤은 CSS(min-h-14 / max-h-40 / overflow-y-auto)가 맡는다.
+  useEffect(() => {
+    const el = questionInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [question]);
   const greetedRoomIdsRef = useRef<Set<string>>(new Set());
   // 이 방에서 진행 중인 리딩 요청이 있는지 — 이 인스턴스가 직접 시작했든(loading), 로딩 중
   // 페이지 이동 후 돌아와서 다른(재마운트 전) 인스턴스가 시작한 걸 뒤늦게 알게 됐든
@@ -1468,10 +1478,21 @@ function TarotChat() {
           onSubmit={handleSubmit}
           className="flex flex-col gap-2 rounded-[40px] border border-border bg-surface px-[12px] pt-3 pb-[12px]"
         >
-          <input
+          {/* 예전엔 <input>이라 긴 질문이 한 줄 안에서 옆으로 밀려 앞부분이 보이지 않았다.
+              textarea로 바꾸되, 채팅 입력이므로 Enter는 그대로 전송이고 줄바꿈은 Shift+Enter다
+              (textarea의 기본 동작과 반대라 명시적으로 처리해야 한다). 한글 입력 중의 Enter는
+              조합 확정이므로 전송하지 않는다(isComposing). */}
+          <textarea
             ref={questionInputRef}
             value={question}
+            rows={1}
             onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
             onFocus={() => {
               if (noUsableTicket) {
                 questionInputRef.current?.blur();
@@ -1479,7 +1500,7 @@ function TarotChat() {
               }
             }}
             placeholder="궁금한 것을 물어보세요"
-            className="h-14 min-w-0 flex-1 bg-transparent px-3.5 text-base font-semibold text-bold-text placeholder-placeholder outline-none"
+            className="max-h-40 min-h-14 w-full min-w-0 resize-none overflow-y-auto bg-transparent px-3.5 py-4 text-base font-semibold leading-6 text-bold-text placeholder-placeholder outline-none"
             disabled={showLoading}
           />
           <div className="flex items-center gap-2.5">
