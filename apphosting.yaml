@@ -53,6 +53,30 @@ env:
     availability:
       - RUNTIME
 
+  # 포트원(PortOne) V2 — 스토어 ID와 채널 키는 클라이언트 번들에 그대로 실리는 공개값이라
+  # 시크릿이 아니다. 다만 BUILD 단계에 없으면 Next.js가 NEXT_PUBLIC_ 값을 인라인하지 못해
+  # 브라우저에서 undefined가 되고 결제창이 아예 열리지 않으므로, BUILD/RUNTIME 둘 다 필요하다.
+  #
+  # !! 심사 기간 한정: 지금은 테스트 채널 "타연_이니시스_테스트"(MID INIpayTest)가 붙어 있다.
+  # KG이니시스가 심사 시 사이트에서 카드 결제창이 뜨는지 확인하기 때문에 결제창만 먼저 열어둔
+  # 것이며, 이 동안은 실제 카드 승인 없이도 fulfill.ts가 PAID로 보고 이용권을 지급한다.
+  # 심사 통과 후 아래 두 가지를 반드시 같이 바꿀 것:
+  #   1. NEXT_PUBLIC_PORTONE_CHANNEL_KEY -> channel-key-e80d28cc-c6b2-4385-bb63-275c9dbaa5f4
+  #      (실연동 채널 "타연_이니시스", MID MOI6983921)
+  #   2. PORTONE_WEBHOOK_SECRET -> 실연동 웹훅 시크릿으로 새 버전 등록
+  #      (`firebase apphosting:secrets:set PORTONE_WEBHOOK_SECRET`; 실연동 값은 이 시크릿의
+  #       버전 1에 그대로 남아 있다 — `apphosting:secrets:access PORTONE_WEBHOOK_SECRET@1`)
+  - variable: NEXT_PUBLIC_PORTONE_STORE_ID
+    value: "store-7dc1cefa-bad0-4cf6-b8b4-52d669e4ac8d"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_PORTONE_CHANNEL_KEY
+    value: "channel-key-9643e0f9-47d8-4116-9906-2ae04ba29ee5"
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Secret-backed values — created via `firebase apphosting:secrets:set`, values live in Secret Manager only
   - variable: KAKAO_CLIENT_SECRET
     secret: KAKAO_CLIENT_SECRET
@@ -62,6 +86,17 @@ env:
     secret: PG_REVIEW_TEST_ID
   - variable: PG_REVIEW_TEST_PASSWORD
     secret: PG_REVIEW_TEST_PASSWORD
+  # 포트원 V2 API Secret(결제 재조회·취소)과 웹훅 서명 검증 키. 서버 전용이라 시크릿으로 둔다.
+  # 이 둘이 없으면 결제창은 떠도 /api/payment/complete와 웹훅이 실패해 이용권이 지급되지 않는다.
+  # 배포 전에 `firebase apphosting:secrets:set`으로 먼저 등록해야 롤아웃이 실패하지 않는다.
+  - variable: PORTONE_API_SECRET
+    secret: PORTONE_API_SECRET
+    availability:
+      - RUNTIME
+  - variable: PORTONE_WEBHOOK_SECRET
+    secret: PORTONE_WEBHOOK_SECRET
+    availability:
+      - RUNTIME
   # 고객센터 문의 전달용. `firebase apphosting:secrets:set RESEND_API_KEY`로 먼저 등록한다.
   - variable: RESEND_API_KEY
     secret: RESEND_API_KEY
