@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SUPPORT_EMAIL } from "@/lib/company";
-import { DISPUTE_RECORD_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
+import { DISPUTE_RECORD_RETENTION_MONTHS } from "@/lib/legal/retention";
+import { retentionExpiresAt } from "@/lib/legal/retentionTimestamp";
 import { consumeRateLimit, clientIp } from "@/lib/rateLimit";
 
 // 이 엔드포인트는 일부러 비로그인도 받는다 — 로그인이 안 되는 상황이야말로 문의가 필요하기
