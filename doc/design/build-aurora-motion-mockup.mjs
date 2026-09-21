@@ -51,19 +51,22 @@ const THEMES = {
   },
   dark: {
     label: "다크",
-    page: "#120c10",
-    surface: "#1e161b",
-    surfaceAlt: "#2a1e24",
-    border: "#3a2a31",
-    text: "#f7eff1",
-    muted: "#c2a8ae",
-    chip: "#2f2229",
+    // 전체적으로 한 단계 더 내렸다(2026-09-22, 사용자 요청). 오로라가 배경에서 살아 있되
+    // 면이 앞으로 튀어나오지 않을 만큼만 남긴다 — 밝기를 내리면서 불투명도도 같이 낮춰야
+    // 색 덩어리가 회색으로 뜨지 않는다.
+    page: "#08070a",
+    surface: "#120e13",
+    surfaceAlt: "#1a141a",
+    border: "#271f27",
+    text: "#f4eef0",
+    muted: "#a89298",
+    chip: "#211a20",
     gradFrom: "#ff8a6b",
     gradTo: "#ff5993",
-    onGrad: "#140d11",
+    onGrad: "#08070a",
     link: "#ff9d86",
-    aurora: ["#7a1038", "#8a3416", "#3d1030", "#a8264a"],
-    auroraOpacity: 0.62,
+    aurora: ["#4d0a24", "#54200e", "#24091d", "#6b1830"],
+    auroraOpacity: 0.5,
   },
 };
 
