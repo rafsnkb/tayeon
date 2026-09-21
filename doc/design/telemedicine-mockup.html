@@ -61,9 +61,10 @@
   .who { margin:0 0 4px; font-size:11.5px; color:var(--muted); }
   .body { margin:0; font-size:14.5px; line-height:1.6; color:var(--text);
     background:var(--alt); border:1px solid var(--line); border-radius:20px; padding:12px 15px; }
-  /* 내 말풍선 = 데모의 주 버튼과 같은 칠. 그림자까지 같이 간다. */
+  /* 내 말풍선 = 데모의 주 버튼과 같은 칠. 단 그림자는 안 준다 — 데모는 컬러 그림자를
+     컨트롤에만 쓴다. 내용 면에까지 붙였더니 말풍선이 빛을 내며 떠 있는 꼴이 됐다. */
   .msg.me .body { background:linear-gradient(135deg, var(--brand) 0%, var(--brand-lite) 100%);
-    color:var(--on-brand); border:0; font-weight:600; box-shadow:0 4px 14px var(--glow); }
+    color:var(--on-brand); border:0; font-weight:600; }
   .card-name { margin:0 0 6px; font-size:20px; font-weight:700; }
   .grad-text { background:linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
     -webkit-background-clip:text; background-clip:text; color:transparent; }
@@ -134,7 +135,7 @@
   <div class="swatches"><div class="sw"><span style="background:#ffffff"></span><code>#ffffff</code><small>page</small>
      <span class="arr">→</span><span style="background:#ffffff"></span><b>#ffffff</b></div><div class="sw"><span style="background:#eef4ff"></span><code>#eef4ff</code><small>band</small>
      <span class="arr">→</span><span style="background:#fff0ef"></span><b>#fff0ef</b></div><div class="sw"><span style="background:#f8fafc"></span><code>#f8fafc</code><small>alt</small>
-     <span class="arr">→</span><span style="background:#f8fafc"></span><b>#f8fafc</b></div><div class="sw"><span style="background:#e2e8f0"></span><code>#e2e8f0</code><small>line</small>
+     <span class="arr">→</span><span style="background:#fcf9f9"></span><b>#fcf9f9</b></div><div class="sw"><span style="background:#e2e8f0"></span><code>#e2e8f0</code><small>line</small>
      <span class="arr">→</span><span style="background:#f0e4e4"></span><b>#f0e4e4</b></div><div class="sw"><span style="background:#1e293b"></span><code>#1e293b</code><small>text</small>
      <span class="arr">→</span><span style="background:#392121"></span><b>#392121</b></div><div class="sw"><span style="background:#64748b"></span><code>#64748b</code><small>muted</small>
      <span class="arr">→</span><span style="background:#896a69"></span><b>#896a69</b></div></div>
@@ -147,7 +148,7 @@
   <h2>무엇을 가져왔고 무엇을 바꿨나</h2>
   <table>
     <thead><tr><th>요소</th><th>데모 실측</th><th>적용</th><th>비고</th></tr></thead>
-    <tbody><tr><td><b>카드 모서리</b></td><td class="src">20px</td><td>20px</td><td class="why">그대로</td></tr><tr><td><b>카드 그림자</b></td><td class="src">없음 · 1px 선으로만 구분</td><td>동일</td><td class="why">그대로 — 지금 우리도 선을 쓴다</td></tr><tr><td><b>버튼 모서리</b></td><td class="src">14px</td><td>14px</td><td class="why"><b>바뀜</b> · 지금은 999px 알약</td></tr><tr><td><b>버튼 그라데이션</b></td><td class="src">135deg 브랜드 → 밝은 짝</td><td>135deg #c2005f → #d23c21</td><td class="why">각도만 30deg→135deg</td></tr><tr><td><b>버튼 그림자</b></td><td class="src">0 4px 14px rgba(브랜드,.3)</td><td>동일 (다크는 .38)</td><td class="why"><b>이 스타일의 서명</b></td></tr><tr><td><b>칩</b></td><td class="src">pill · 브랜드 10% 면 <small>(밝기차 0.035)</small></td><td>pill · 브랜드 14% 면</td><td class="why"><b>올림</b> · 10%는 0.057로 기준 미달</td></tr><tr><td><b>필터 칩</b></td><td class="src">흰 면 + 1px 선</td><td>면만</td><td class="why"><b>못 옮김</b> — 테두리 버튼 금지</td></tr><tr><td><b>중성색</b></td><td class="src">전부 브랜드 색조 H≈-100°</td><td>L·C 유지, H→20°</td><td class="why">회색이 하나도 없다</td></tr><tr><td><b>제목 강조</b></td><td class="src">135deg 2색 clip:text</td><td>동일</td><td class="why">그대로</td></tr><tr><td><b>본문 크기</b></td><td class="src">16px / 보조 20px</td><td>14.5px 유지</td><td class="why">“요소가 크다” 지적이 우선</td></tr><tr><td><b>폰트</b></td><td class="src">DM Sans</td><td>Pretendard 유지</td><td class="why">DM Sans에 한글이 없다</td></tr><tr><td><b>다크 모드</b></td><td class="src"><b>없음</b></td><td>유추</td><td class="why">실측 아님</td></tr></tbody>
+    <tbody><tr><td><b>카드 모서리</b></td><td class="src">20px</td><td>20px</td><td class="why">그대로</td></tr><tr><td><b>카드 그림자</b></td><td class="src">없음 · 1px 선으로만 구분</td><td>동일</td><td class="why">그대로 — 지금 우리도 선을 쓴다</td></tr><tr><td><b>버튼 모서리</b></td><td class="src">14px</td><td>14px</td><td class="why"><b>바뀜</b> · 지금은 999px 알약</td></tr><tr><td><b>버튼 그라데이션</b></td><td class="src">135deg 브랜드 → 밝은 짝</td><td>135deg #c2005f → #d23c21</td><td class="why">각도만 30deg→135deg</td></tr><tr><td><b>버튼 그림자</b></td><td class="src">0 4px 14px rgba(브랜드,.3)</td><td>동일 (다크는 .38)</td><td class="why"><b>이 스타일의 서명</b></td></tr><tr><td><b>칩</b></td><td class="src">pill · 브랜드 10% 면 <small>(밝기차 0.035)</small></td><td>pill · 브랜드 14% 면</td><td class="why"><b>올림</b> · 10%는 0.057로 기준 미달</td></tr><tr><td><b>필터 칩</b></td><td class="src">흰 면 + 1px 선</td><td>면만</td><td class="why"><b>못 옮김</b> — 테두리 버튼 금지</td></tr><tr><td><b>중성색</b></td><td class="src">전부 브랜드 색조 H≈-100°</td><td>L·C 유지, H→20°</td><td class="why">회색이 하나도 없다</td></tr><tr><td><b>제목 강조</b></td><td class="src">135deg 2색 clip:text</td><td>동일</td><td class="why">그대로</td></tr><tr><td><b>본문 크기</b></td><td class="src">16px / 보조 20px</td><td>14.5px 유지</td><td class="why">“요소가 크다” 지적이 우선</td></tr><tr><td><b>폰트</b></td><td class="src">DM Sans</td><td>Pretendard 유지</td><td class="why">DM Sans에 한글이 없다</td></tr><tr><td><b>컬러 그림자 범위</b></td><td class="src"><b>컨트롤에만</b></td><td>동일</td><td class="why"><b>고침</b> · 말풍선에도 줬었다</td></tr><tr><td><b>칩 면</b></td><td class="src">rgba(브랜드,.1)</td><td>합성한 단색</td><td class="why"><b>고침</b> · 반투명은 글래스 신호</td></tr><tr><td><b>다크 모드</b></td><td class="src"><b>없음</b></td><td>유추 · 라이트와 같은 20°</td><td class="why">실측 아님</td></tr></tbody>
   </table>
 
   <h2>시안</h2>
@@ -156,10 +157,10 @@
   <figure class="frame">
     <figcaption>라이트</figcaption>
     <div class="screen" style="
-      --page:#ffffff; --band:#fff0ef; --alt:#f8fafc; --line:#f0e4e4;
+      --page:#ffffff; --band:#fff0ef; --alt:#fcf9f9; --line:#f0e4e4;
       --text:#392121; --muted:#896a69; --brand:#c2005f; --brand-lite:#d23c21;
       --accent:#d23c21; --on-brand:#ffffff; --link:#ac0053;
-      --glow:rgba(194, 0, 95, .28); --tint:rgba(194, 0, 95, .14);">
+      --glow:rgba(194, 0, 95, .28); --tint:#f6dbe9;">
       <div class="col">
         <header class="topbar">
           <button class="bar-btn"><span class="ic">☰</span>메뉴</button>
@@ -211,8 +212,8 @@
     </div>
 
     <dl class="facts">
-      <div><dt>본문 대비<small>카드 면 위</small></dt><dd class="pass">14.20</dd></div>
-      <div><dt>보조 글자 대비</dt><dd class="pass">4.64</dd></div>
+      <div><dt>본문 대비<small>카드 면 위</small></dt><dd class="pass">14.19</dd></div>
+      <div><dt>보조 글자 대비</dt><dd class="pass">4.63</dd></div>
       <div><dt>버튼 글자 대비<small>그라데이션 양 끝 중 불리한 쪽</small></dt><dd class="pass">4.76</dd></div>
       <div><dt>버튼이 배경에서 떠 보이는 정도<small>비텍스트 3:1 — 컨트롤이라 판정 대상</small></dt><dd class="pass">6.07</dd></div>
       <div><dt>추천 질문 칩이 배경에서 떠 보이는 정도<small>OKLab 밝기차 · 0.06 기준</small></dt><dd class="pass">0.082</dd></div>
@@ -222,10 +223,10 @@
   <figure class="frame">
     <figcaption>다크 (유추)</figcaption>
     <div class="screen" style="
-      --page:#150e12; --band:#1d1419; --alt:#241a20; --line:#33242c;
-      --text:#e8d9dd; --muted:#b39ba2; --brand:#ff5993; --brand-lite:#ff8a6b;
+      --page:#160e0e; --band:#1e1414; --alt:#261a1a; --line:#352424;
+      --text:#e9d9d9; --muted:#b59b9b; --brand:#ff5993; --brand-lite:#ff8a6b;
       --accent:#ff8a6b; --on-brand:#2a0715; --link:#ff9b8a;
-      --glow:rgba(255, 89, 147, .38); --tint:rgba(255, 89, 147, .14);">
+      --glow:rgba(255, 89, 147, .38); --tint:#371921;">
       <div class="col">
         <header class="topbar">
           <button class="bar-btn"><span class="ic">☰</span>메뉴</button>
@@ -277,11 +278,11 @@
     </div>
 
     <dl class="facts">
-      <div><dt>본문 대비<small>카드 면 위</small></dt><dd class="pass">12.38</dd></div>
+      <div><dt>본문 대비<small>카드 면 위</small></dt><dd class="pass">12.36</dd></div>
       <div><dt>보조 글자 대비</dt><dd class="pass">6.53</dd></div>
       <div><dt>버튼 글자 대비<small>그라데이션 양 끝 중 불리한 쪽</small></dt><dd class="pass">6.23</dd></div>
       <div><dt>버튼이 배경에서 떠 보이는 정도<small>비텍스트 3:1 — 컨트롤이라 판정 대상</small></dt><dd class="pass">6.44</dd></div>
-      <div><dt>추천 질문 칩이 배경에서 떠 보이는 정도<small>OKLab 밝기차 · 0.06 기준</small></dt><dd class="pass">0.084</dd></div>
+      <div><dt>추천 질문 칩이 배경에서 떠 보이는 정도<small>OKLab 밝기차 · 0.06 기준</small></dt><dd class="pass">0.085</dd></div>
     </dl>
   </figure>
   </div>
@@ -296,7 +297,14 @@
     <br><br>
     칩의 브랜드 틴트는 데모가 10%인데, 그대로 쓰면 밝기차 0.057로 우리 기준 0.06에 미달한다.
     데모 자체는 0.035로 더 옅다 — 라이트에서 칩이 안 보이던 문제를 방금 고친 참이라 14%로 올렸다.
-    공교롭게 그 값이 0.082, 직전에 고른 값과 같다.
+    공교롭게 그 값이 0.082, 직전에 고른 값과 같다. 다만 <b>rgba로 깔지 않고 합성한 단색으로
+    굳혔다</b> — 색은 같지만 반투명 면은 뒤가 비치는 재질로 읽혀서 글래스 인상을 남긴다.
+    <br><br>
+    <b>첫 판에서 잘못했던 것 세 가지.</b> 색조 이동에 <code>C &lt; 0.004</code> 임계값을 뒀는데
+    <code>#f8fafc</code>(C 0.003)가 거기 걸려, 상단바·말풍선·컴포저·푸터에 다 쓰이는 가장 넓은 면만
+    푸른빛 H -112°로 남았다. 다크는 손으로 골랐더니 면 H -16° / 글자 H -1°로 라이트(20°)와
+    색온도가 갈렸다. 그리고 컬러 그림자를 내 말풍선에까지 줘서 내용 면이 빛을 내며 떠 있었다.
+    셋 다 대비 수치로는 안 잡힌다 — 전부 통과한 상태였다.
     <br><br>
     생성: <code>node doc/design/build-telemedicine-mockup.mjs</code>
   </footer>

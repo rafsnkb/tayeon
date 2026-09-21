@@ -48,7 +48,13 @@ const SRC = {
   accent: "#00c9a7",
 };
 
-// 포팅 규칙: L·C 유지, H만 이동. 채도가 0에 가까운 값은 돌려도 티가 안 나므로 그대로 둔다.
+// 포팅 규칙: L·C 유지, H만 이동.
+//
+// 처음엔 "채도가 0에 가까우면 돌려도 티가 안 난다"며 C < 0.004를 건너뛰었다. 그게 틀렸다 —
+// #f8fafc의 C가 0.003이라 임계값에 딱 걸렸고, 그 값은 상단바·말풍선·컴포저·푸터에 다 쓰이는
+// 화면에서 가장 넓은 면이다. 나머지가 전부 H 20°로 도는 동안 그 면만 H -112°(푸른빛)에
+// 남았다. 따뜻한 페이지 위에 차가운 카드가 얹힌 꼴이라, 다른 재질이 떠 있는 것처럼 보인다.
+// 순백·순흑만 건너뛴다.
 const HUE = 20;
 // 반투명 면의 대비는 rgba 값이 아니라 뒤에 깔린 색과 합성한 결과로 재야 한다.
 const over = (fg, alpha, bg) => {
@@ -58,7 +64,7 @@ const over = (fg, alpha, bg) => {
 };
 const rehue = (hex, h = HUE) => {
   const { L, C } = toOklch(hex);
-  return C < 0.004 ? hex : rgbToHex(oklch(L, C, h));
+  return C < 0.0005 ? hex : rgbToHex(oklch(L, C, h));
 };
 
 const L = {
@@ -78,37 +84,45 @@ const L = {
   glow: "rgba(194, 0, 95, .28)",
   // 데모는 브랜드 10%인데, 그 값이 우리 기준(OKLab 밝기차 0.06)을 못 넘는다 — 0.057.
   // 데모 자체가 0.035로 더 옅다. 라이트에서 칩이 안 보인다고 방금 고친 참이라 14%로 올렸다.
-  tint: "rgba(194, 0, 95, .14)",
   tintAlpha: 0.14,
 };
 
-// 다크는 실측이 아니라 유추다. 라이트의 L 관계를 뒤집되, 데모 푸터가 순검정이 아니라
-// 짙은 남색(#1a365d, L .333)이었다는 점을 따라 우리도 순검정 대신 짙은 자주로 간다.
+// 다크는 실측이 아니라 유추다. 데모에 다크 모드가 없다.
+//
+// 처음엔 손으로 골랐는데, 뽑아 보니 면이 H -16°, 글자가 H -1°였다. 라이트는 H 20°다.
+// 한 제품 안에서 두 테마의 색온도가 갈렸다는 뜻이다. 대비는 다 통과했으니 수치로는 안 잡힌다.
+// L·C 사다리는 그대로 두고 색조만 라이트와 같은 20°로 맞춘다.
+const DARK_LADDER = {
+  page: [0.175, 0.014],
+  band: [0.205, 0.017],
+  alt: [0.233, 0.019],
+  line: [0.281, 0.026],
+  text: [0.898, 0.017],
+  muted: [0.713, 0.03],
+};
+
 const D = {
   label: "다크 (유추)",
-  page: "#150e12",
-  band: "#1d1419",
-  alt: "#241a20",
-  line: "#33242c",
-  text: "#e8d9dd",
-  muted: "#b39ba2",
+  ...Object.fromEntries(
+    Object.entries(DARK_LADDER).map(([k, [l, c]]) => [k, rgbToHex(oklch(l, c, HUE))]),
+  ),
   brand: "#ff5993",
   brandLite: "#ff8a6b",
   accent: "#ff8a6b",
   onBrand: "#2a0715",
   link: "#ff9b8a",
   glow: "rgba(255, 89, 147, .38)", // 어두운 바탕에서 .28은 안 보인다. 올렸다.
-  tint: "rgba(255, 89, 147, .14)",
   tintAlpha: 0.14,
 };
 
-// 칩 면의 실제 색 — rgba를 페이지 면에 합성해서 구한다.
-for (const t of [L, D]) t.tintSolid = over(t.brand, t.tintAlpha, t.page);
+// 칩 면은 합성한 단색으로 굳혀서 쓴다. 데모는 rgba로 깔지만, 반투명 면은 그 자체가
+// 글래스의 신호다 — 뒤가 비치는 재질로 읽힌다. 결과 색은 같고 재질감만 사라진다.
+for (const t of [L, D]) t.tint = over(t.brand, t.tintAlpha, t.page);
 
 const T = { light: L, dark: D };
 
 const fmt = (n) => n.toFixed(2);
-const chipStep = (t) => Math.abs(toOklch(t.tintSolid).L - toOklch(t.page).L);
+const chipStep = (t) => Math.abs(toOklch(t.tint).L - toOklch(t.page).L);
 
 // 무엇을 그대로 가져왔고 무엇을 바꿨는지. 짐작과 실측을 섞지 않으려고 출처를 붙인다.
 const MAP = [
@@ -123,7 +137,9 @@ const MAP = [
   { what: "제목 강조", src: "135deg 2색 clip:text", ours: "동일", note: "그대로" },
   { what: "본문 크기", src: "16px / 보조 20px", ours: "14.5px 유지", note: "“요소가 크다” 지적이 우선" },
   { what: "폰트", src: "DM Sans", ours: "Pretendard 유지", note: "DM Sans에 한글이 없다" },
-  { what: "다크 모드", src: "<b>없음</b>", ours: "유추", note: "실측 아님" },
+  { what: "컬러 그림자 범위", src: "<b>컨트롤에만</b>", ours: "동일", note: "<b>고침</b> · 말풍선에도 줬었다" },
+  { what: "칩 면", src: "rgba(브랜드,.1)", ours: "합성한 단색", note: "<b>고침</b> · 반투명은 글래스 신호" },
+  { what: "다크 모드", src: "<b>없음</b>", ours: "유추 · 라이트와 같은 20°", note: "실측 아님" },
 ];
 
 function frame(key) {
@@ -282,9 +298,10 @@ const html = `<!doctype html>
   .who { margin:0 0 4px; font-size:11.5px; color:var(--muted); }
   .body { margin:0; font-size:14.5px; line-height:1.6; color:var(--text);
     background:var(--alt); border:1px solid var(--line); border-radius:20px; padding:12px 15px; }
-  /* 내 말풍선 = 데모의 주 버튼과 같은 칠. 그림자까지 같이 간다. */
+  /* 내 말풍선 = 데모의 주 버튼과 같은 칠. 단 그림자는 안 준다 — 데모는 컬러 그림자를
+     컨트롤에만 쓴다. 내용 면에까지 붙였더니 말풍선이 빛을 내며 떠 있는 꼴이 됐다. */
   .msg.me .body { background:linear-gradient(135deg, var(--brand) 0%, var(--brand-lite) 100%);
-    color:var(--on-brand); border:0; font-weight:600; box-shadow:0 4px 14px var(--glow); }
+    color:var(--on-brand); border:0; font-weight:600; }
   .card-name { margin:0 0 6px; font-size:20px; font-weight:700; }
   .grad-text { background:linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
     -webkit-background-clip:text; background-clip:text; color:transparent; }
@@ -378,7 +395,14 @@ const html = `<!doctype html>
     <br><br>
     칩의 브랜드 틴트는 데모가 10%인데, 그대로 쓰면 밝기차 0.057로 우리 기준 0.06에 미달한다.
     데모 자체는 0.035로 더 옅다 — 라이트에서 칩이 안 보이던 문제를 방금 고친 참이라 14%로 올렸다.
-    공교롭게 그 값이 0.082, 직전에 고른 값과 같다.
+    공교롭게 그 값이 0.082, 직전에 고른 값과 같다. 다만 <b>rgba로 깔지 않고 합성한 단색으로
+    굳혔다</b> — 색은 같지만 반투명 면은 뒤가 비치는 재질로 읽혀서 글래스 인상을 남긴다.
+    <br><br>
+    <b>첫 판에서 잘못했던 것 세 가지.</b> 색조 이동에 <code>C &lt; 0.004</code> 임계값을 뒀는데
+    <code>#f8fafc</code>(C 0.003)가 거기 걸려, 상단바·말풍선·컴포저·푸터에 다 쓰이는 가장 넓은 면만
+    푸른빛 H -112°로 남았다. 다크는 손으로 골랐더니 면 H -16° / 글자 H -1°로 라이트(20°)와
+    색온도가 갈렸다. 그리고 컬러 그림자를 내 말풍선에까지 줘서 내용 면이 빛을 내며 떠 있었다.
+    셋 다 대비 수치로는 안 잡힌다 — 전부 통과한 상태였다.
     <br><br>
     생성: <code>node doc/design/build-telemedicine-mockup.mjs</code>
   </footer>
