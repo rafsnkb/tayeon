@@ -86,11 +86,26 @@ export default function PurchaseHistoryPage() {
                       </button>
                     )}
                   </div>
-                  <p className="mt-1 text-base font-semibold text-bold-text">{e.productName}</p>
+                  {/* 목업 실측(sharp, 2026-09-21): 상품명 잉크 높이가 상단바 제목("결제 내역",
+                      SubPageTopBar의 text-xl)과 18px로 동일해 text-base가 아니라 text-xl이다. */}
+                  <p
+                    className={`mt-1 text-xl font-bold text-bold-text ${e.refunded ? "line-through" : ""}`}
+                  >
+                    {e.productName}
+                  </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-sm font-semibold text-icon-muted">{e.priceWon.toLocaleString("ko-KR")}원</span>
+                    {/* 초록 배지는 "아직 환불할 수 있다"는 신호다 — 라벨이 "미사용"이라도
+                        환불 기간(7일)이 지났으면 환불이 불가능하므로 회색으로 내린다.
+                        같은 조건으로 위의 "환불하기" 링크도 같이 사라진다. */}
                     {e.badge && (
-                      <span className="rounded-full bg-chip-fill px-2 py-0.5 text-xs font-semibold text-white">{e.badge}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          e.refundable ? "bg-success text-success-text" : "bg-chip-fill text-placeholder"
+                        }`}
+                      >
+                        {e.badge}
+                      </span>
                     )}
                   </div>
                 </div>
