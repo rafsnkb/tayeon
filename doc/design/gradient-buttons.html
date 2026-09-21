@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>타연 — 그라데이션 포인트 컬러 후보</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px 20px 64px; background:#15161a; color:#e8e6ee;
+    font:500 14px/1.6 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .lede { margin:0 0 26px; color:#a7a3b8; max-width:74ch; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size:12px; }
+
+  .grid { display:grid; gap:18px; grid-template-columns:repeat(auto-fit, minmax(340px,1fr)); }
+  .cand { background:#1d1e24; border:1px solid #2c2d35; border-radius:16px; padding:16px; }
+  .cand h3 { font-size:14px; margin:0 0 4px; }
+  .note { margin:0 0 12px; font-size:12px; color:#a7a3b8; }
+
+  .stage { background:var(--bg); border-radius:12px; padding:18px; display:flex;
+    align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .grad { font:inherit; font-weight:700; border:0; border-radius:999px; padding:12px 20px; cursor:pointer; }
+  .grad.sm { font-size:12px; padding:5px 12px; }
+
+  /* 21개 표본을 그대로 늘어놓는다 — 부드럽게 보이는 띠가 실제로 어디서 어두워지는지 눈으로 확인. */
+  .strip { display:flex; height:16px; border-radius:6px; overflow:hidden; margin-bottom:12px; }
+  .strip span { flex:1; }
+
+  .facts { margin:0; display:grid; gap:6px; }
+  .facts > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    border-top:1px solid #2c2d35; padding-top:6px; }
+  .facts dt { font-size:12px; color:#a7a3b8; }
+  .facts dt b { color:#e8e6ee; }
+  .facts dt small { display:block; opacity:.75; font-size:11px; }
+  .facts dd { margin:0; }
+  .ratio { font-variant-numeric:tabular-nums; font-weight:700; font-size:12px;
+    border-radius:999px; padding:2px 8px; white-space:nowrap; }
+  .ratio i { font-style:normal; margin-left:4px; }
+  .ratio.pass { background:#1e4023; color:#b9f0c0; }
+  .ratio.fail { background:#4a1f1c; color:#ffc9c4; }
+  .ratio.note { background:rgba(127,127,127,.2); color:#e8e6ee; }
+
+  footer { margin-top:28px; color:#a7a3b8; font-size:12px; max-width:74ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>그라데이션 포인트 컬러 후보</h1>
+  <p class="lede">
+    전부 <code>linear-gradient(30deg in oklab, …)</code>. 기본 sRGB 보간은 보라→핑크처럼 색상이
+    크게 도는 구간에서 중간이 탁해지므로 OKLab으로 보간한다. 판정에 쓰는 대비는
+    <b>양 끝이 아니라 21개 지점 중 최솟값</b>이다 — 라벨이 어느 구간 위에 놓일지 알 수 없고,
+    보간 중간이 양 끝보다 불리해질 수 있다.
+  </p>
+  <div class="grid">
+  <article class="cand light">
+    <h3>보라 → 핑크 (라이트)</h3>
+    <p class="note">요청하신 그림 그대로. 보라 끝이 충분히 어두워야 흰 글씨가 산다.</p>
+    <div class="stage" style="--bg:#efe7f7">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #7b2ff7, #d30068); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #7b2ff7, #d30068); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#7b2ff7" title="#7b2ff7"></span><span style="background:#7f32f0" title="#7f32f0"></span><span style="background:#8335e9" title="#8335e9"></span><span style="background:#8837e2" title="#8837e2"></span><span style="background:#8c39db" title="#8c39db"></span><span style="background:#903ad4" title="#903ad4"></span><span style="background:#953bcd" title="#953bcd"></span><span style="background:#993bc6" title="#993bc6"></span><span style="background:#9e3bbf" title="#9e3bbf"></span><span style="background:#a23ab8" title="#a23ab8"></span><span style="background:#a739b1" title="#a739b1"></span><span style="background:#ab38aa" title="#ab38aa"></span><span style="background:#af36a3" title="#af36a3"></span><span style="background:#b4349c" title="#b4349c"></span><span style="background:#b83195" title="#b83195"></span><span style="background:#bd2e8e" title="#bd2e8e"></span><span style="background:#c12987" title="#c12987"></span><span style="background:#c6247f" title="#c6247f"></span><span style="background:#ca1d78" title="#ca1d78"></span><span style="background:#cf1370" title="#cf1370"></span><span style="background:#d30068" title="#d30068"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#cf1370</code> (95% 지점)</small></dt><dd><span class="ratio pass">5.28<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">5.85 / 5.29</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">4.39<i>✓</i></span></dd></div>
+    </dl>
+  </article>
+  <article class="cand light">
+    <h3>연한 보라 → 핑크 (라이트)</h3>
+    <p class="note">브랜드 핑크 원본을 끝에 그대로 둔 안. 밝은 쪽이 흰 글씨에 불리하다.</p>
+    <div class="stage" style="--bg:#efe7f7">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #a35cff, #ff007f); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #a35cff, #ff007f); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#a35cff" title="#a35cff"></span><span style="background:#a85cf9" title="#a85cf9"></span><span style="background:#ad5bf3" title="#ad5bf3"></span><span style="background:#b25aec" title="#b25aec"></span><span style="background:#b659e6" title="#b659e6"></span><span style="background:#bb58e0" title="#bb58e0"></span><span style="background:#c057da" title="#c057da"></span><span style="background:#c455d4" title="#c455d4"></span><span style="background:#c953cd" title="#c953cd"></span><span style="background:#ce51c7" title="#ce51c7"></span><span style="background:#d24ec1" title="#d24ec1"></span><span style="background:#d74bba" title="#d74bba"></span><span style="background:#db48b4" title="#db48b4"></span><span style="background:#e044ae" title="#e044ae"></span><span style="background:#e440a7" title="#e440a7"></span><span style="background:#e93ba1" title="#e93ba1"></span><span style="background:#ed359a" title="#ed359a"></span><span style="background:#f22e94" title="#f22e94"></span><span style="background:#f6258d" title="#f6258d"></span><span style="background:#fb1986" title="#fb1986"></span><span style="background:#ff007f" title="#ff007f"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#ce51c7</code> (45% 지점)</small></dt><dd><span class="ratio fail">3.73<i>✗</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">3.80 / 3.78</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">3.14<i>✓</i></span></dd></div>
+    </dl>
+  </article>
+  <article class="cand light">
+    <h3>핑크 톤 그라데이션 (라이트)</h3>
+    <p class="note">색상을 돌리지 않고 같은 분홍 안에서만 밝기를 움직인 안. 가장 보수적.</p>
+    <div class="stage" style="--bg:#efe7f7">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #ac0053, #d30068); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #ac0053, #d30068); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#ac0053" title="#ac0053"></span><span style="background:#ae0054" title="#ae0054"></span><span style="background:#b00055" title="#b00055"></span><span style="background:#b20056" title="#b20056"></span><span style="background:#b40057" title="#b40057"></span><span style="background:#b60058" title="#b60058"></span><span style="background:#b80059" title="#b80059"></span><span style="background:#b9005a" title="#b9005a"></span><span style="background:#bb005b" title="#bb005b"></span><span style="background:#bd005c" title="#bd005c"></span><span style="background:#bf005d" title="#bf005d"></span><span style="background:#c1005e" title="#c1005e"></span><span style="background:#c30060" title="#c30060"></span><span style="background:#c50061" title="#c50061"></span><span style="background:#c70062" title="#c70062"></span><span style="background:#c90063" title="#c90063"></span><span style="background:#cb0064" title="#cb0064"></span><span style="background:#cd0065" title="#cd0065"></span><span style="background:#cf0066" title="#cf0066"></span><span style="background:#d10067" title="#d10067"></span><span style="background:#d30068" title="#d30068"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#d30068</code> (100% 지점)</small></dt><dd><span class="ratio pass">5.29<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.29 / 5.29</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">4.39<i>✓</i></span></dd></div>
+    </dl>
+  </article>
+  <article class="cand dark">
+    <h3>보라 → 핑크 (다크)</h3>
+    <p class="note">다크는 밝은 면에 어두운 글씨. 단색안과 같은 원칙.</p>
+    <div class="stage" style="--bg:#141517">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #b18cff, #ff5993); color:#141517">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #b18cff, #ff5993); color:#141517">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#b18cff" title="#b18cff"></span><span style="background:#b68bfa" title="#b68bfa"></span><span style="background:#ba89f4" title="#ba89f4"></span><span style="background:#be87ef" title="#be87ef"></span><span style="background:#c386ea" title="#c386ea"></span><span style="background:#c784e5" title="#c784e5"></span><span style="background:#cb82df" title="#cb82df"></span><span style="background:#cf80da" title="#cf80da"></span><span style="background:#d37ed5" title="#d37ed5"></span><span style="background:#d77ccf" title="#d77ccf"></span><span style="background:#db79ca" title="#db79ca"></span><span style="background:#df77c5" title="#df77c5"></span><span style="background:#e274bf" title="#e274bf"></span><span style="background:#e672ba" title="#e672ba"></span><span style="background:#ea6fb4" title="#ea6fb4"></span><span style="background:#ed6caf" title="#ed6caf"></span><span style="background:#f168a9" title="#f168a9"></span><span style="background:#f565a4" title="#f565a4"></span><span style="background:#f8619e" title="#f8619e"></span><span style="background:#fc5d99" title="#fc5d99"></span><span style="background:#ff5993" title="#ff5993"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#ff5993</code> (100% 지점)</small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.02 / 6.18</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+    </dl>
+  </article>
+  <article class="cand dark">
+    <h3>보라 → 핑크, 흰 글씨 (다크)</h3>
+    <p class="note">다크에서 흰 글씨를 유지하려면 칠이 어두워지는데, 배경과 덜 분리된다.</p>
+    <div class="stage" style="--bg:#141517">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #6d28d9, #b3005c); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #6d28d9, #b3005c); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#6d28d9" title="#6d28d9"></span><span style="background:#702bd3" title="#702bd3"></span><span style="background:#742dcd" title="#742dcd"></span><span style="background:#772ec7" title="#772ec7"></span><span style="background:#7b2fc0" title="#7b2fc0"></span><span style="background:#7e30ba" title="#7e30ba"></span><span style="background:#8231b4" title="#8231b4"></span><span style="background:#8531ae" title="#8531ae"></span><span style="background:#8931a8" title="#8931a8"></span><span style="background:#8c30a2" title="#8c30a2"></span><span style="background:#902f9c" title="#902f9c"></span><span style="background:#932e96" title="#932e96"></span><span style="background:#972d8f" title="#972d8f"></span><span style="background:#9a2b89" title="#9a2b89"></span><span style="background:#9e2883" title="#9e2883"></span><span style="background:#a1257d" title="#a1257d"></span><span style="background:#a52176" title="#a52176"></span><span style="background:#a81d70" title="#a81d70"></span><span style="background:#ac1769" title="#ac1769"></span><span style="background:#af0e63" title="#af0e63"></span><span style="background:#b3005c" title="#b3005c"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#972d8f</code> (60% 지점)</small></dt><dd><span class="ratio pass">6.80<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.10 / 6.84</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio fail">2.57<i>✗</i></span></dd></div>
+    </dl>
+  </article></div>
+  <footer>
+    띠 아래 “양 끝만 봤을 때” 값과 최솟값을 나란히 둔 이유는, 끝점 두 개만 재고 통과라고
+    적어두는 실수가 흔해서다. 차이가 크지 않은 후보도 있지만 차이가 판정을 뒤집는 후보도 있다.
+    <br><br>
+    생성: <code>node doc/design/build-gradient-buttons.mjs</code>
+  </footer>
+</div>
+</body>
+</html>
