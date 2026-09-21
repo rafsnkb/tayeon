@@ -34,7 +34,7 @@ function toneDescription(key: ToneKey): string {
   return TONE_DESCRIPTIONS[key];
 }
 
-function SectionPanel({ title, children }: { title: string; children: React.ReactNode }) {
+export function SectionPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="px-1 text-base font-semibold text-icon-muted">{title}</p>

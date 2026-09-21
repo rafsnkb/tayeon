@@ -77,7 +77,7 @@ type RoomsContextValue = {
   markReadingDone: (roomId: string) => void;
 };
 
-const RoomsContext = createContext<RoomsContextValue | null>(null);
+export const RoomsContext = createContext<RoomsContextValue | null>(null);
 
 export function RoomsProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   // hori.chat 실제 확인(2026-09-14): /terms, /support 같은 하위 페이지는 사이드바가 아예 없는

@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "./types",
+    "skipLibCheck": true,
+    "rootDir": ".."
+  },
+  "include": ["entry.tsx", "preview-provider.tsx", "preview-env.ts"]
+}

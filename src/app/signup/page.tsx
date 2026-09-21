@@ -13,7 +13,7 @@ const POLICY_SECTIONS: Record<"terms" | "privacy", { title: string; sections: ty
   privacy: { title: "개인정보처리방침", sections: PRIVACY_POLICY_SECTIONS },
 };
 
-function PolicyModal({
+export function PolicyModal({
   policy,
   onClose,
 }: {
@@ -75,7 +75,7 @@ function ToggleGroup<T extends string>({
   );
 }
 
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+export function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <span className="text-sm font-semibold text-icon-muted">
       {children}

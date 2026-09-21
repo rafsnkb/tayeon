@@ -1,0 +1,157 @@
+{
+  "projectId": "c38bf6d2-13f9-417b-a9d0-14392298abe4",
+  "shape": "package",
+  "pkg": "tayeon",
+  "globalName": "Tayeon",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/compiled/tayeon.css",
+  "componentSrcMap": {
+    "BrandBi": "src/components/BrandBi.tsx",
+    "CompanyFooter": "src/components/CompanyFooter.tsx",
+    "CompanyInfoBar": "src/components/CompanyInfoBar.tsx",
+    "ConfirmModal": "src/components/ConfirmModal.tsx",
+    "InfoModal": "src/components/InfoModal.tsx",
+    "ModalViewportChrome": "src/components/ModalViewportChrome.tsx",
+    "NoBirthTimePopup": "src/components/NoBirthTimePopup.tsx",
+    "NoticeList": "src/components/NoticeList.tsx",
+    "RoomLimitModal": "src/components/RoomLimitModal.tsx",
+    "SubPageTopBar": "src/components/SubPageTopBar.tsx",
+    "SupportCenter": "src/components/SupportCenter.tsx",
+    "SuspensionModal": "src/components/SuspensionModal.tsx",
+    "BackIcon": "src/app/(app)/tarot/icons.tsx",
+    "MenuIcon": "src/app/(app)/tarot/icons.tsx",
+    "SendIcon": "src/app/(app)/tarot/icons.tsx",
+    "RoomInfoIcon": "src/app/(app)/tarot/icons.tsx",
+    "NewChatIcon": "src/app/(app)/tarot/icons.tsx",
+    "SajuIcon": "src/app/(app)/tarot/icons.tsx",
+    "ZiweiIcon": "src/app/(app)/tarot/icons.tsx",
+    "CompatibilityIcon": "src/app/(app)/tarot/icons.tsx",
+    "TimepassIcon": "src/app/(app)/tarot/icons.tsx",
+    "CloseIcon": "src/app/(app)/tarot/icons.tsx",
+    "CheckIcon": "src/app/(app)/tarot/icons.tsx",
+    "PlusIcon": "src/app/(app)/tarot/icons.tsx",
+    "SpreadOneIcon": "src/app/(app)/tarot/icons.tsx",
+    "SpreadThreeIcon": "src/app/(app)/tarot/icons.tsx",
+    "SpreadDualIcon": "src/app/(app)/tarot/icons.tsx",
+    "SpreadCelticIcon": "src/app/(app)/tarot/icons.tsx",
+    "ChevronRightIcon": "src/app/(app)/tarot/icons.tsx",
+    "SearchIcon": "src/app/(app)/tarot/icons.tsx",
+    "InvitePersonIcon": "src/app/(app)/tarot/icons.tsx",
+    "CartIcon": "src/app/(app)/tarot/icons.tsx",
+    "CardIcon": "src/app/(app)/tarot/icons.tsx",
+    "ListIcon": "src/app/(app)/tarot/icons.tsx",
+    "IdCardIcon": "src/app/(app)/tarot/icons.tsx",
+    "PersonIcon": "src/app/(app)/tarot/icons.tsx",
+    "CompassIcon": "src/app/(app)/tarot/icons.tsx",
+    "GearIcon": "src/app/(app)/tarot/icons.tsx",
+    "LogoutDoorIcon": "src/app/(app)/tarot/icons.tsx",
+    "PencilIcon": "src/app/(app)/tarot/icons.tsx",
+    "TrashIcon": "src/app/(app)/tarot/icons.tsx",
+    "InfoCircleIcon": "src/app/(app)/tarot/icons.tsx",
+    "BellIcon": "src/app/(app)/tarot/icons.tsx",
+    "TicketIcon": "src/app/(app)/tarot/icons.tsx",
+    "CountPassUsageModal": "src/app/(app)/tarot/page.tsx",
+    "ReadingLoadingMessage": "src/app/(app)/tarot/page.tsx",
+    "CardImage": "src/app/(app)/tarot/page.tsx",
+    "CelticCrossLayout": "src/app/(app)/tarot/page.tsx",
+    "DualPathLayout": "src/app/(app)/tarot/page.tsx",
+    "WelcomePopup": "src/app/(app)/tarot/page.tsx",
+    "TimePassCard": "src/app/(app)/tarot/page.tsx",
+    "HeldTimepassListModal": "src/app/(app)/tarot/page.tsx",
+    "HeldTimepassUseModal": "src/app/(app)/tarot/page.tsx",
+    "NoHeldTimepassModal": "src/app/(app)/tarot/page.tsx",
+    "PurchaseTicketModal": "src/app/(app)/tarot/page.tsx",
+    "RenameRoomModal": "src/app/(app)/tarot/page.tsx",
+    "SpreadSelectSheet": "src/app/(app)/tarot/page.tsx",
+    "Switch": "src/app/(app)/tarot/page.tsx",
+    "ListRow": "src/app/(app)/me/page.tsx",
+    "Section": "src/app/(app)/me/page.tsx",
+    "ComingSoon": null,
+    "SectionPanel": "src/app/(app)/settings/page.tsx",
+    "PolicyModal": "src/app/signup/page.tsx",
+    "FieldLabel": "src/app/signup/page.tsx",
+    "AppShell": "src/app/(app)/layout.tsx",
+    "DsPreviewProvider": null
+  },
+  "provider": {
+    "component": "DsPreviewProvider"
+  },
+  "overrides": {
+    "ConfirmModal": {
+      "cardMode": "single",
+      "viewport": "420x420"
+    },
+    "SpreadSelectSheet": {
+      "cardMode": "single",
+      "viewport": "420x620"
+    },
+    "InfoModal": {
+      "cardMode": "single",
+      "viewport": "420x360"
+    },
+    "NoBirthTimePopup": {
+      "cardMode": "single",
+      "viewport": "420x380"
+    },
+    "RoomLimitModal": {
+      "cardMode": "single",
+      "viewport": "420x400"
+    },
+    "SuspensionModal": {
+      "cardMode": "single",
+      "viewport": "420x420"
+    },
+    "PolicyModal": {
+      "cardMode": "single",
+      "viewport": "420x680"
+    },
+    "CountPassUsageModal": {
+      "cardMode": "single",
+      "viewport": "420x520"
+    },
+    "WelcomePopup": {
+      "cardMode": "single",
+      "viewport": "420x560"
+    },
+    "NoHeldTimepassModal": {
+      "cardMode": "single",
+      "viewport": "420x380"
+    },
+    "HeldTimepassListModal": {
+      "cardMode": "single",
+      "viewport": "420x560"
+    },
+    "HeldTimepassUseModal": {
+      "cardMode": "single",
+      "viewport": "420x420"
+    },
+    "PurchaseTicketModal": {
+      "cardMode": "single",
+      "viewport": "420x460"
+    },
+    "RenameRoomModal": {
+      "cardMode": "single",
+      "viewport": "420x360"
+    },
+    "SupportCenter": {
+      "cardMode": "single",
+      "primaryStory": "Default",
+      "viewport": "420x720"
+    },
+    "ListRow": {
+      "cardMode": "column"
+    },
+    "SubPageTopBar": {
+      "cardMode": "single",
+      "primaryStory": "Default",
+      "viewport": "420x240"
+    }
+  },
+  "extraFonts": [
+    "asset/font/Pretendard-SemiBold.otf",
+    "asset/font/Pretendard-Bold.otf"
+  ],
+  "readmeHeader": ".design-sync/conventions.md",
+  "buildCmd": "node .design-sync/make-css.mjs && npx tsc -p .design-sync/tsconfig.types.json"
+}

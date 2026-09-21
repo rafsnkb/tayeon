@@ -24,7 +24,7 @@ import {
   CloseIcon,
 } from "../tarot/icons";
 
-function ListRow({
+export function ListRow({
   icon,
   label,
   danger,
@@ -58,7 +58,7 @@ function ListRow({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="px-1 text-base font-semibold text-icon-muted">{title}</p>
@@ -69,7 +69,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function ComingSoon() {
+export function ComingSoon() {
   alert("아직 준비 중인 기능이에요.");
 }
 
