@@ -72,3 +72,6 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 .design-sync/types/
+
+# Playwright MCP가 브라우저 확인 중 남기는 스크린샷/스냅샷
+.playwright-mcp/
