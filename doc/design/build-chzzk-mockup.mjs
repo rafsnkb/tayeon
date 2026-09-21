@@ -51,13 +51,15 @@ const CHZZK = {
     brandText: "#00ffa3", // content-brand-strong
   },
   light: {
-    page: "#ffffff",
+    // 라이트에서 올린 면에 background-neutral-weak(#f9f9f9)을 썼더니 페이지와 밝기차가
+    // 0.018밖에 안 났다. 그건 배경 토큰이지 면 토큰이 아니다 — surface 쪽으로 바꾼다.
+    page: "#ffffff", // background-neutral-base
     base: "#ffffff",
-    raise: "#f9f9f9",
-    control: "#f0f1f2",
-    controlHi: "#e8e9eb",
-    line: "#e1e1e5",
-    lineHi: "#d0d1d3",
+    raise: "#f0f1f2", // surface-neutral-weakest
+    control: "#e8e9eb", // surface-neutral-subtle
+    controlHi: "#e1e1e5", // surface-neutral-base
+    line: "#d0d1d3", // surface가 한 단계 올라갔으니 선도 같이 올린다
+    lineHi: "#c0c1c2",
     text: "#0e0f10",
     textSub: "#202224",
     muted: "#4d4d4d",
@@ -67,35 +69,101 @@ const CHZZK = {
   },
 };
 
-// 브랜드만 바꾼다. 면·선·글자는 치지직 값을 그대로 쓴다 — 무채색이라 색조를 돌릴 게 없다.
+// ── 핑크를 치지직 컬러셋에 맞춰 톤 조절 ─────────────────────────────────
+//
+// 치지직 브랜드 사다리를 재 보니 모든 단계가 그 명도에서 낼 수 있는 최대 채도의 99%다.
+// 색조 선택이 아니라 그냥 sRGB 경계선을 따라간다.
+//
+//   #003321 98%   #006641 99%   #009962 99%   #00cc82 99%   #00e693 99%   #00ffa3 99%
+//
+// 그런데 #ff007f도 C 0.260 / max 0.262 = 99%다. 같은 규칙으로 만들어진 색이다.
+// 다른 건 L축 위 위치뿐이고, 그건 sRGB가 강제한다 — 핑크의 경계선은 L 0.645 근처에서
+// 가장 불룩하고 초록은 L 0.88에서 그렇다.
+//
+// 여기서 두 번째가 걸린다. WCAG 대비는 OKLab 명도가 아니라 상대휘도의 비다. 그리고
+// 상대휘도는 초록에 0.7152, 빨강에 0.2126, 파랑에 0.0722을 준다. 같은 L에서도 —
+//
+//   #00ffa3 Y 0.742  vs  #ffc6d4 Y 0.664   1.12배
+//   #00cc82 Y 0.448  vs  #ff7aa3 Y 0.378   1.18배
+//   #009962 Y 0.237  vs  #e80473 Y 0.185   1.28배
+//
+// 초록이 같은 밝기에서 휘도를 더 많이 낸다. 그래서 L을 맞춰 옮기면 핑크는 대비가 한 단계씩
+// 모자란다. 대비 역할을 맞추려면 핑크는 치지직보다 밝은 쪽에 놓여야 한다.
+//
+// 그래서 L이 아니라 대비를 맞춰 사다리를 푼다. 결과가 흥미롭다 —
+//
+//   다크   content-brand-weaker (#009962, 4.99)  →  #ff1b81 (4.98)
+//   라이트 content-brand-weak   (#1a9662, 3.76)  →  #ff057f (3.76)
+//
+// 둘 다 #ff007f다. 타연 핑크는 치지직 체계에서 형광 악센트 자리가 아니라 채움 면 자리에
+// 해당한다. 밝은 악센트 글자 자리는 그보다 옅은 핑크가 맡아야 한다.
+
 const PINK = "#ff007f";
 const PINK_H = toOklch(PINK).H;
-// 브랜드 계열의 옅은 면은 치지직 값의 L·C를 유지하고 색조만 핑크로 돌린다.
-const rehue = (hex) => {
-  const { L, C } = toOklch(hex);
-  return rgbToHex(oklch(L, C, PINK_H));
+
+// 주어진 명도에서 sRGB 안에 들어가는 최대 채도
+const maxC = (L, H) => {
+  let lo = 0;
+  let hi = 0.45;
+  for (let i = 0; i < 40; i++) {
+    const m = (lo + hi) / 2;
+    Math.abs(toOklch(rgbToHex(oklch(L, m, H))).C - m) < 0.0015 ? (lo = m) : (hi = m);
+  }
+  return lo;
 };
+// 치지직처럼 경계선을 따라간다
+const edge = (L) => rgbToHex(oklch(L, maxC(L, PINK_H), PINK_H));
+// 배경 위에서 목표 대비를 내는 경계선 핑크를 찾는다
+const solveByContrast = (bg, target, rising) => {
+  let lo = 0.15;
+  let hi = 0.99;
+  for (let i = 0; i < 50; i++) {
+    const m = (lo + hi) / 2;
+    const c = contrast(bg, edge(m));
+    (rising ? c < target : c > target) ? (lo = m) : (hi = m);
+  }
+  return edge((lo + hi) / 2);
+};
+// 옅은 브랜드 면은 채도 비율을 유지해 옮긴다 — 면이라 대비 목표가 없다
+const rehueByRatio = (hex) => {
+  const { L, C, H } = toOklch(hex);
+  return rgbToHex(oklch(L, maxC(L, PINK_H) * (C / maxC(L, H)), PINK_H));
+};
+
+// 치지직 brand 사다리 → 같은 대비를 내는 핑크
+const BRAND_LADDER = {
+  dark: { bg: "#141517", rising: true, src: {
+    weaker: "#009962", weak: "#00cc82", base: "#00e693", strong: "#00ffa3" } },
+  light: { bg: "#ffffff", rising: false, src: {
+    weaker: "#32bb81", weak: "#1a9662", base: "#168f5c", strong: "#23815a" } },
+};
+for (const cfg of Object.values(BRAND_LADDER)) {
+  cfg.out = Object.fromEntries(
+    Object.entries(cfg.src).map(([k, g]) => [k, solveByContrast(cfg.bg, contrast(cfg.bg, g), cfg.rising)]),
+  );
+}
 
 const T = {
   dark: {
     ...CHZZK.dark,
     label: "다크",
     src: CHZZK.dark,
-    brand: PINK, // 앵커. 그대로 쓴다.
-    onBrand: "#141517", // 핑크 면 위 글자 — 흰 글자는 3.78로 떨어진다
-    brandText: PINK, // 다크 배경 위 4.84
-    brandSurface: rehue("#003321"), // surface-brand-weakest
-    brandSurfaceHi: rehue("#11382c"),
+    brand: PINK,        // 채움. weaker 자리에 그대로 앉는다(4.98 ↔ 4.84).
+    onBrand: "#141517", // 흰 글자는 3.78로 미달
+    // 악센트 글자는 weak 자리. strong(#ffd5df, 13.78)까지 가면 흰색에 가까워진다.
+    brandText: BRAND_LADDER.dark.out.weak,
+    brandSurface: rehueByRatio("#003321"),
+    brandSurfaceHi: rehueByRatio("#11382c"),
   },
   light: {
     ...CHZZK.light,
     label: "라이트",
     src: CHZZK.light,
-    brand: PINK,
+    brand: PINK,        // 라이트에서는 weak 자리(3.76) — 글자로 쓰기엔 모자라고 면으로는 된다
     onBrand: "#141517",
-    brandText: "#ac0053", // 흰 배경 위 7.29 (#ff007f는 3.78로 미달)
-    brandSurface: rehue("#e8f7f1"),
-    brandSurfaceHi: rehue("#ddf4ea"),
+    brandText: BRAND_LADDER.light.out.strong,
+    brandSurface: rehueByRatio("#e8f7f1"),
+    brandSurfaceHi: rehueByRatio("#ddf4ea"),
   },
 };
 
@@ -112,8 +180,9 @@ const MAP = [
   { what: "면", src: "무채색 사다리 7단", ours: "그대로", note: "면에 색을 넣지 않는다" },
   { what: "테두리", src: "알파 #ffffff0d~4d", ours: "그대로", note: "선 색을 따로 안 만든다" },
   { what: "글자", src: "흰색 + cool 회색 사다리", ours: "그대로", note: "면은 무채, 글자만 차갑다" },
-  { what: "브랜드 글자", src: "#00ffa3 <small>(대비 13.78)</small>", ours: "#ff007f <small>(4.84)</small>", note: "핑크는 그 밝기를 못 낸다" },
-  { what: "브랜드 채움", src: "#009962 <small>형광 아님</small>", ours: "#ff007f", note: "앵커라 그대로 쓴다" },
+  { what: "브랜드 사다리", src: "전 단계 최대 채도의 <b>99%</b>", ours: "동일", note: "#ff007f도 99% — 같은 규칙" },
+  { what: "브랜드 글자", src: "#00ffa3 <small>(13.78)</small>", ours: `${T.dark.brandText} <small>(${fmt(contrast(T.dark.page, T.dark.brandText))})</small>`, note: "대비를 맞춰 푼 자리" },
+  { what: "브랜드 채움", src: "#009962 <small>형광 아님</small>", ours: "#ff007f", note: "<b>여기가 #ff007f 자리</b>" },
   { what: "채움 위 글자", src: "—", ours: "#141517", note: "흰 글자는 3.78로 미달" },
   { what: "아이콘 버튼", src: "아이콘만", ours: "아이콘 + 글자", note: "<b>안 따름</b> · 50대 테스터" },
   { what: "가장 옅은 글자", src: "#697183 <small>(cool-weak)</small>", ours: "#9da5b6 한 단계 위", note: "<b>안 따름</b> · 다크에서 3.92" },
@@ -237,6 +306,22 @@ const mapRows = MAP.map(
   (m) => `<tr><td><b>${m.what}</b></td><td class="src">${m.src}</td><td>${m.ours}</td><td class="why">${m.note}</td></tr>`,
 ).join("");
 
+// 치지직 초록 사다리와 같은 대비를 내는 핑크를 나란히
+const brandLadder = (key) => {
+  const cfg = BRAND_LADDER[key];
+  return Object.entries(cfg.src)
+    .map(([k, g]) => {
+      const p = cfg.out[k];
+      return `<tr><td><b>content-brand-${k}</b></td>
+        <td><span class="dot-sw" style="background:${g}"></span><code>${g}</code></td>
+        <td class="num">${fmt(contrast(cfg.bg, g))}</td>
+        <td><span class="dot-sw" style="background:${p}"></span><code>${p}</code></td>
+        <td class="num">${fmt(contrast(cfg.bg, p))}</td>
+        <td class="why">${k === (key === "dark" ? "weaker" : "weak") ? "<b>여기가 #ff007f다</b>" : ""}</td></tr>`;
+    })
+    .join("");
+};
+
 const ladder = (key) => {
   const s = CHZZK[key];
   const keys = ["page", "base", "raise", "control", "controlHi", "text", "textSub", "muted", "faint"];
@@ -272,6 +357,9 @@ const html = `<!doctype html>
     border-radius:6px; padding:5px 9px; font-size:11px; }
   .sw span { width:16px; height:16px; border-radius:4px; border:1px solid #ffffff1a; }
   .sw small { color:#697183; }
+  .dot-sw { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px;
+    margin-right:6px; border:1px solid #ffffff1a; }
+  td.num { font-variant-numeric:tabular-nums; color:#dfe2ea; }
 
   .frames { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
   .frame { margin:0; }
@@ -394,6 +482,37 @@ const html = `<!doctype html>
   <h2>라이트</h2>
   <div class="swatches">${ladder("light")}</div>
 
+  <h2>핑크 톤 조절 — 치지직 사다리와 같은 대비를 내는 자리 찾기</h2>
+  <p class="lede">
+    치지직 브랜드 사다리는 모든 단계가 그 명도에서 낼 수 있는 <b>최대 채도의 99%</b>다.
+    색조를 고른 게 아니라 sRGB 경계선을 그대로 따라간다. 그런데 <code>#ff007f</code>도
+    C 0.260 / max 0.262 = <b>99%</b>다 — 같은 규칙으로 만들어진 색이다. 다른 건 L축 위
+    위치뿐이고 그건 sRGB가 강제한다.
+    <br><br>
+    여기에 하나 더 걸린다. WCAG 대비는 OKLab 명도가 아니라 <b>상대휘도</b>의 비이고,
+    상대휘도는 초록에 0.7152를 주고 빨강·파랑에 0.2126·0.0722을 준다. 같은 L에서도
+    <code>#00cc82</code>(Y 0.448)가 <code>#ff7aa3</code>(Y 0.378)보다 1.18배 밝다.
+    그래서 명도를 맞춰 옮기면 핑크는 대비가 한 단계씩 모자란다 —
+    <b>대비 역할을 맞추려면 핑크는 치지직보다 밝은 쪽에 놓여야 한다.</b>
+    아래는 L이 아니라 대비를 맞춰 푼 결과다.
+  </p>
+  <table>
+    <thead><tr><th>단계</th><th>치지직 초록</th><th>대비</th><th>같은 대비의 핑크</th><th>대비</th><th></th></tr></thead>
+    <tbody>${brandLadder("dark")}</tbody>
+  </table>
+  <p class="lede" style="margin-top:-2px">다크 기준 <code>#141517</code> 위. 라이트는 <code>#ffffff</code> 위:</p>
+  <table>
+    <thead><tr><th>단계</th><th>치지직 초록</th><th>대비</th><th>같은 대비의 핑크</th><th>대비</th><th></th></tr></thead>
+    <tbody>${brandLadder("light")}</tbody>
+  </table>
+  <p class="lede">
+    <b>타연 핑크는 치지직 체계에서 형광 악센트 자리가 아니라 채움 면 자리다.</b>
+    다크의 <code>content-brand-weaker</code>(4.99)와 라이트의 <code>content-brand-weak</code>(3.76)를
+    풀면 둘 다 <code>#ff007f</code>가 나온다. 밝은 악센트 글자 자리는 그보다 옅은 핑크가 맡는다 —
+    치지직이 <code>#00ffa3</code>을 쓰는 자리에 <code>#ffd5df</code>를 넣으면 흰색에 가까워지므로
+    한 단계 아래 <code>${T.dark.brandText}</code>를 악센트로 쓴다.
+  </p>
+
   <h2>무엇을 가져왔고 무엇을 바꿨나</h2>
   <table>
     <thead><tr><th>요소</th><th>치지직 실측</th><th>적용</th><th>비고</th></tr></thead>
@@ -411,12 +530,11 @@ const html = `<!doctype html>
   <div class="factrow">${facts("dark")}${facts("light")}</div>
 
   <footer>
-    <b>핑크가 치지직 초록 자리를 그대로 못 간다.</b> 초록은 L 0.88에서도 선명해서 형광
-    <code>#00ffa3</code>을 본문급 글자로 쓴다(다크 배경 대비 13.78). <code>#ff007f</code>는
-    L 0.645의 중명도 색이라 선명함과 고대비를 같이 가질 수 없다 — 다크 배경 위 4.84다.
-    기준(4.5)은 넘지만 치지직 초록만큼 튀지는 않는다. 라이트에서는 <code>#ff007f</code>가
-    3.78로 미달이라 글자로는 <code>#ac0053</code>(7.29)을 쓰고, 채움 면에만
-    <code>#ff007f</code>를 그대로 둔다.
+    <b>남는 맞바꿈 하나.</b> 대비 역할을 맞추면 악센트 핑크가 옅어지고, 채도를 지키면 대비가
+    내려간다. 둘을 동시에 가질 수 없는 건 sRGB의 제약이다 — 핑크의 채도 경계선이 L 0.645에서
+    가장 불룩하기 때문이다. 지금은 대비 쪽을 택해 악센트에 <code>${T.dark.brandText}</code>(다크
+    ${fmt(contrast(T.dark.page, T.dark.brandText))})를 쓴다. 더 쨍하게 가려면
+    <code>#ff007f</code>를 글자에도 쓰면 되고, 그때 다크 대비는 4.84로 내려간다.
     <br><br>
     채움 버튼 위 글자는 <b>흰색이 아니라 <code>#141517</code></b>이다. 흰 글자는 3.78로 떨어진다.
     <br><br>
