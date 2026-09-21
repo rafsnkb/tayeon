@@ -8,6 +8,7 @@ import {
   COMPANY_ADDRESS,
   COMPANY_PHONE,
   SUPPORT_EMAIL,
+  FTC_BUSINESS_INFO_URL,
 } from "@/lib/company";
 
 /** 피그마 "Screen / MyPage"·메뉴 드로어 하단에 반복되는 사업자 정보 블록 — 두 군데서 같은
@@ -41,7 +42,7 @@ export function CompanyFooter() {
         </Link>
       </p>
       <a
-        href="https://www.ftc.go.kr/bizCommPop.do?wrkr_no=2771902371"
+        href={FTC_BUSINESS_INFO_URL}
         target="_blank"
         rel="noopener noreferrer"
         className="underline"

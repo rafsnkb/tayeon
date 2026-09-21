@@ -1,5 +1,6 @@
 import TestAccountLogin from "./TestAccountLogin";
 import { BrandBi } from "@/components/BrandBi";
+import { CompanyInfoLink } from "@/components/CompanyInfoBar";
 
 // 친구 초대 링크(/login?ref=CODE)로 들어온 경우, OAuth 왕복 동안 유일하게 그대로 되돌아오는
 // state 파라미터에 초대 코드를 실어서 콜백(src/app/api/auth/kakao/callback/route.ts)까지
@@ -31,7 +32,7 @@ export default async function LoginPage({
 }) {
   const { error, ref } = await searchParams;
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#0e0f10] p-6">
+    <main className="relative flex min-h-dvh items-center justify-center bg-[#0e0f10] p-6">
       <div className="flex w-full max-w-sm flex-col gap-5 rounded-[32px] border border-[#e4d8ef] bg-[#fcfbff] p-6 shadow-[0_16px_42px_rgba(0,0,0,0.2)]">
         <span className="self-center"><BrandBi variant="light" /></span>
         <p className="text-center text-base font-semibold text-[#74628a]">
@@ -73,6 +74,10 @@ export default async function LoginPage({
 
         <TestAccountLogin />
       </div>
+
+      {/* 초기 화면이 요구하는 사업자 정보 접근 경로. 이 화면은 --bg가 아니라 자체 어두운 면
+          위에 있어서, 토큰 대신 그 면에 맞는 색을 넘긴다. */}
+      <CompanyInfoLink className="absolute bottom-6 text-xs text-[#8b8d92]" />
     </main>
   );
 }
