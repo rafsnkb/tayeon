@@ -11,6 +11,7 @@ type PurchaseEntry = {
   productName: string;
   priceWon: number;
   paidAt: string;
+  refunded: boolean;
   badge: string;
   refundable: boolean;
 };
@@ -76,7 +77,9 @@ export default function PurchaseHistoryPage() {
                 <p className="px-1 text-sm text-icon-muted">{formatDateTime(e.paidAt)}</p>
                 <div className="rounded-[28px] border border-border bg-topbar p-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-icon-muted">[결제 완료]</p>
+                    <p className={`text-sm font-semibold ${e.refunded ? "text-urgent" : "text-icon-muted"}`}>
+                      {e.refunded ? "[결제 취소]" : "[결제 완료]"}
+                    </p>
                     {e.refundable && (
                       <button onClick={() => setSelected(e)} className="text-sm font-semibold text-point underline">
                         환불하기

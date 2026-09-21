@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as PortOne from "@portone/server-sdk";
 import { fulfillPayment } from "@/lib/payment/fulfill";
+import { revokeCancelledPayment } from "@/lib/payment/revoke";
+
+// 결제가 취소됐다는 통지. 앱을 거치지 않고 포트원 콘솔이나 PG 측에서 취소된 경우가 여기로 온다.
+// Transaction.CancelPending은 아직 취소가 확정되지 않은 단계라 회수하지 않는다(확정되면
+// Transaction.Cancelled가 다시 온다).
+const CANCEL_TYPES = new Set(["Transaction.Cancelled", "Transaction.PartialCancelled"]);
 
 // 포트원 콘솔(결제 연동 > 연동 관리 > 결제알림(Webhook) 관리)에 등록하는 웹훅 엔드포인트.
 // 결제창 콜백(/api/payment/complete)이 브라우저 종료 등으로 아예 호출되지 못한 경우에도
@@ -30,11 +36,30 @@ export async function POST(req: NextRequest) {
   }
 
   if ("data" in webhook && webhook.data && "paymentId" in webhook.data) {
-    const outcome = await fulfillPayment(webhook.data.paymentId, undefined, "webhook");
-    if (outcome.kind === "rejected") {
-      // 웹훅은 포트원이 재시도하므로, 거부 사유를 로그로 남기고 200을 반환해 불필요한 재시도를
-      // 막는다(위조/파싱 실패 등은 재시도해도 결과가 달라지지 않는다).
-      console.error("[payment webhook] fulfillPayment 거부", webhook.data.paymentId, outcome.reason);
+    const paymentId = webhook.data.paymentId;
+    // 예전엔 종류를 보지 않고 paymentId가 있는 모든 이벤트를 fulfillPayment로 보냈다. 취소
+    // 이벤트도 지급 시도로 들어가 멱등성 체크에 걸려 조용히 스킵됐고, 그 결과 콘솔에서 취소해도
+    // 사용자는 이용권을 그대로 들고 있었다(2026-09-21 수정).
+    if (CANCEL_TYPES.has(webhook.type)) {
+      const outcome = await revokeCancelledPayment(paymentId);
+      if (outcome.kind === "rejected") {
+        console.error("[payment webhook] 이용권 회수 실패", paymentId, outcome.reason);
+      } else if (outcome.kind === "revoked" && outcome.passStatusBefore !== "unused") {
+        // 어드민 환불은 미사용 건만 허용하므로, 사용된 이용권이 취소됐다는 건 콘솔 직접 취소
+        // 같은 비정상 경로를 뜻한다. 회수는 하되 추적할 수 있도록 남긴다.
+        console.error(
+          "[payment webhook] 이미 사용된 이용권이 취소돼 회수됨 — 경위 확인 필요",
+          paymentId,
+          outcome.passStatusBefore
+        );
+      }
+    } else {
+      const outcome = await fulfillPayment(paymentId, undefined, "webhook");
+      if (outcome.kind === "rejected") {
+        // 웹훅은 포트원이 재시도하므로, 거부 사유를 로그로 남기고 200을 반환해 불필요한 재시도를
+        // 막는다(위조/파싱 실패 등은 재시도해도 결과가 달라지지 않는다).
+        console.error("[payment webhook] fulfillPayment 거부", paymentId, outcome.reason);
+      }
     }
   }
 

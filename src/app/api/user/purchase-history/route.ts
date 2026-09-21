@@ -46,6 +46,19 @@ export async function GET(req: NextRequest) {
       const data = doc.data();
       let badge = "";
       let refundable = false;
+      // 환불/취소된 결제는 이용권 배지(미사용 등)를 보여줄 이유가 없고 다시 환불할 수도 없다.
+      // 어드민 환불과 포트원 취소 웹훅(src/lib/payment/revoke.ts) 양쪽 다 status를 refunded로 쓴다.
+      if (data.status === "refunded") {
+        return {
+          paymentId: doc.id,
+          productName: productName(data.productId, data.productType),
+          priceWon: data.priceWon,
+          paidAt: data.paidAt ?? data.fulfilledAt,
+          refunded: true,
+          badge: "",
+          refundable: false,
+        };
+      }
       if (data.productType === "countPass" && data.countPassId) {
         const passSnap = await userRef.collection(COUNT_PASSES).doc(data.countPassId).get();
         const status = passSnap.data()?.status as string | undefined;
@@ -66,6 +79,7 @@ export async function GET(req: NextRequest) {
         productName: productName(data.productId, data.productType),
         priceWon: data.priceWon,
         paidAt: data.paidAt ?? data.fulfilledAt,
+        refunded: false,
         badge,
         refundable,
       };
