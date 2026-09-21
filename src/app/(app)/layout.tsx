@@ -6,6 +6,8 @@ import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
 import { BrandBi } from "@/components/BrandBi";
 import RoomLimitModal from "@/components/RoomLimitModal";
+import { CompanyFooter } from "@/components/CompanyFooter";
+import { kakaoAuthorizeUrl } from "@/components/LoginPanel";
 import { NewChatIcon, ChevronRightIcon, BellIcon } from "./tarot/icons";
 
 const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
@@ -50,9 +52,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
+  // 비로그인이어도 대화 화면은 그대로 보여준다 — 로그인 유도는 입력을 시도했을 때 뜨는
+  // LoginModal과, 아래 드로어의 로그인 CTA가 맡는다(피그마 "Screen / LoginModal",
+  // "MenuOpen - NotLogin"). /me·/charge 같은 나머지 화면은 볼 내용 자체가 계정에 딸려 있어서
+  // 예전처럼 /login으로 보낸다.
   useEffect(() => {
-    if (authChecked && !user) router.replace("/login");
-  }, [authChecked, user, router]);
+    if (authChecked && !user && !isMainRoute) router.replace("/login");
+  }, [authChecked, user, isMainRoute, router]);
 
   useEffect(() => onOpenMenu(() => setMenuOpen(true)), []);
   const [roomLimitOpen, setRoomLimitOpen] = useState(false);
@@ -86,7 +92,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/tarot?room=${roomId}`);
   }
 
-  if (!authChecked || !user) return null;
+  if (!authChecked) return null;
+  if (!user && !isMainRoute) return null;
 
   // 서브페이지(/me, /settings, /charge 등)는 사이드바 없이 단순 중앙정렬 — hori.chat의 /terms,
   // /support와 동일한 원칙(위 isMainRoute 주석 참고). 사이드바+플렉스로 관련 복잡한 폭 계산이
@@ -141,6 +148,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* 피그마 "Screen / MenuOpen - NotLogin" — 비로그인 드로어는 대화 목록 대신 가운데
+            로그인 유도, 아래에 사업자 정보를 둔다. 여긴 모달을 띄우지 않고 카카오로 바로 보낸다:
+            드로어를 열어 버튼까지 누른 사람에게 같은 내용을 한 번 더 카드로 보여줄 이유가 없다. */}
+        {!user ? (
+          <div className={`flex flex-1 flex-col justify-center px-4 ${sidebarCollapsed ? "xl:hidden" : ""}`}>
+            <p className="text-center text-sm font-semibold leading-6 text-text">
+              카카오 로그인으로
+              <br />
+              타연에서 여러분의 고민을
+              <br />
+              얘기해보세요
+            </p>
+            <a
+              href={kakaoAuthorizeUrl()}
+              className="mt-4 flex h-12 items-center justify-center rounded-2xl bg-[#fae100] text-base font-bold text-black"
+            >
+              로그인ㆍ회원가입
+            </a>
+          </div>
+        ) : (
         <div className="flex-1 overflow-y-auto px-2 py-2">
           <div className={sidebarCollapsed ? "xl:hidden" : ""}>
             <p className="px-2 py-2 text-sm font-semibold text-icon-muted">최근 대화</p>
@@ -163,7 +190,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
+        )}
 
+        {!user ? (
+          <div className={`shrink-0 p-4 ${sidebarCollapsed ? "xl:hidden" : ""}`}>
+            <CompanyFooter />
+          </div>
+        ) : (
         <div
           className={`flex shrink-0 flex-col gap-2 p-4 ${sidebarCollapsed ? "xl:items-center xl:px-2" : ""}`}
         >
@@ -232,6 +265,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className={sidebarCollapsed ? "xl:hidden" : ""}>새 대화</span>
           </button>
         </div>
+        )}
       </div>
 
       {/* 사이드바 옆 남는 공간은 여기서 전부 채운다(풀블리드) — hori.chat처럼 탑바/컴포저 배경은

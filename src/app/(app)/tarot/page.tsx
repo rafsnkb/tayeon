@@ -16,6 +16,7 @@ import RoomLimitModal from "@/components/RoomLimitModal";
 import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
 import { BrandBi } from "@/components/BrandBi";
 import { CompanyInfoBar } from "@/components/CompanyInfoBar";
+import LoginModal from "@/components/LoginModal";
 import {
   MenuIcon,
   SendIcon,
@@ -758,6 +759,7 @@ function TarotChat() {
   const [roomLimitBusy, setRoomLimitBusy] = useState(false);
   const [suspension, setSuspension] = useState<SuspensionInfo | null>(null);
   const [roomActionBusy, setRoomActionBusy] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -987,7 +989,14 @@ function TarotChat() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = question.trim();
-    if (!trimmed || showLoading || !user || !activeRoomId) return;
+    if (!trimmed || showLoading) return;
+    // 비로그인 상태로도 이 화면을 볼 수 있으므로(AppShell 참고), 조용히 무시하지 말고
+    // 로그인 모달로 연결한다 — 피그마 "Screen / LoginModal".
+    if (!user) {
+      setLoginModalOpen(true);
+      return;
+    }
+    if (!activeRoomId) return;
 
     if (includeCompatibility && !hasPartner) {
       setMessages((prev) => [
@@ -1341,7 +1350,10 @@ function TarotChat() {
             isBlankRoom ? "pt-[76px]" : "pt-[120px]"
           }`}
         >
-        {!historyLoaded && (
+        {/* 비로그인은 불러올 대화 자체가 없다 — historyLoaded는 false로 남으므로 여기서
+            같이 본다. 이펙트에서 setState로 뒤집으면 렌더가 한 번 더 도는 데다 eslint의
+            동기 setState 규칙에도 걸린다(2026-09-22). */}
+        {user && !historyLoaded && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
         )}
         {messages.map((msg, i) => {
@@ -1494,6 +1506,11 @@ function TarotChat() {
               }
             }}
             onFocus={() => {
+              if (!user) {
+                questionInputRef.current?.blur();
+                setLoginModalOpen(true);
+                return;
+              }
               if (noUsableTicket) {
                 questionInputRef.current?.blur();
                 setPurchaseTicketOpen(true);
@@ -1523,6 +1540,9 @@ function TarotChat() {
           </div>
         </form>
 
+        {/* 생년월일시·궁합 상대·보유 이용권은 전부 계정에 딸린 안내라 비로그인에는 띄우지
+            않는다 — 링크를 눌러봤자 /login으로 튕긴다. */}
+        {user && (
         <div className="flex flex-col items-start gap-1 px-1 pt-1.5 text-xs">
           <div className="flex flex-col gap-0.5">
             {!hasBirthInfo && (
@@ -1555,8 +1575,10 @@ function TarotChat() {
             </span>
           )}
         </div>
+        )}
       </div>
       <CompanyInfoBar />
+      {loginModalOpen && <LoginModal onClose={() => setLoginModalOpen(false)} />}
     </div>
   );
 }

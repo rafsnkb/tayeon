@@ -5,6 +5,7 @@ import {
   CEO_NAME,
   BUSINESS_REGISTRATION_NUMBER,
   MAIL_ORDER_BUSINESS_NUMBER,
+  MAIL_ORDER_NUMBER_PENDING,
   COMPANY_ADDRESS,
   COMPANY_PHONE,
   SUPPORT_EMAIL,
@@ -21,8 +22,13 @@ export function CompanyFooter() {
         <br />
         사업자등록번호: {BUSINESS_REGISTRATION_NUMBER}
         <br />
-        통신판매업신고번호: {MAIL_ORDER_BUSINESS_NUMBER}
-        <br />
+        {/* 신고 전 자리표시자가 들어 있는 동안에는 줄을 감춘다 — CompanyInfoModal과 같은 규칙. */}
+        {MAIL_ORDER_BUSINESS_NUMBER !== MAIL_ORDER_NUMBER_PENDING && (
+          <>
+            통신판매업신고번호: {MAIL_ORDER_BUSINESS_NUMBER}
+            <br />
+          </>
+        )}
         {COMPANY_ADDRESS}
         <br />
         {COMPANY_PHONE} | {SUPPORT_EMAIL}
