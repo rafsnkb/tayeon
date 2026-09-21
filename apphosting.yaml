@@ -75,10 +75,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  # !! QA 백엔드를 만든 뒤 실제 URL로 교체할 것
-  #    (예: https://tayeon-qa--tayeon-d5149.asia-east1.hosted.app).
+  # 카카오 콘솔의 등록된 Redirect URI와 문자 그대로 일치해야 한다(끝 슬래시·http/https 포함).
   - variable: NEXT_PUBLIC_KAKAO_REDIRECT_URI
-    value: "<QA_BACKEND_URL>/api/auth/kakao/callback"
+    value: "https://tayeon-qa--tayeon-d5149.asia-east1.hosted.app/api/auth/kakao/callback"
     availability:
       - BUILD
       - RUNTIME
