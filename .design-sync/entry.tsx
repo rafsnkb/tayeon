@@ -41,5 +41,8 @@ export { SectionPanel } from "../src/app/(app)/settings/page";
 export { PolicyModal, FieldLabel } from "../src/app/signup/page";
 export { AppShell } from "../src/app/(app)/layout";
 
+// -- preview-only cards (no app source; see componentSrcMap null entries) ---
+export { TokenSpecimen } from "./token-specimen";
+
 // -- preview-only provider (not a DS component; used via cfg.provider) ------
 export { DsPreviewProvider } from "./preview-provider";

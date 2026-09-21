@@ -41,14 +41,28 @@ tokens are what make light and dark mode work. Use these families:
 | Family | Tokens |
 |---|---|
 | Surfaces | `bg-bg` (app background), `bg-surface` (card), `bg-topbar` (bar / modal body), `bg-chip-fill` |
-| Text | `text-bold-text` (primary), `text-text` (secondary), `text-icon-muted` (labels/icons), `text-placeholder` |
-| Brand | `text-point` / `bg-point` (핑크 #ff007f), `bg-point-bg` (tinted wash), `point-strong`, `point-muted`, `accent`, `gold` |
+| Text | `text-bold-text` (primary), `text-text` (secondary), `text-icon-muted` (labels/icons), `text-placeholder` (weak text on a LIGHT surface), `text-chip-muted-text` (weak text on `bg-chip-fill`) |
+| Brand | `bg-point` (핑크 #ff007f, fills only), `text-point-text` (pink AS TEXT), `bg-point-bg` (tinted wash), `point-strong`, `point-muted`, `accent`, `gold` |
 | Action | `bg-cta-fill` / `text-cta-text` (primary CTA) |
 | Status | `urgent` (destructive/error), `success`, `warning` — each with a `-text` pair, e.g. `bg-urgent text-urgent-text` |
 | Lines | `border-border` |
 
 Each works with every Tailwind prefix: `bg-`, `text-`, `border-`, `fill-`,
 `divide-`, plus variants (`hover:`, `disabled:`, `lg:`).
+
+Two of those need care, because a token that reads well on one surface is
+invisible on another:
+
+- `bg-chip-fill` is a DARK face in both themes — light mode's is deep purple,
+  not a pale grey. Text on it is `text-white` (or `text-chip-muted-text` when
+  it should read as disabled). `text-placeholder` on a chip is unreadable.
+- `point` at #ff007f only clears contrast as a fill. As body-size text on the
+  light background it lands at 3.47, so use `text-point-text`, which resolves
+  to a deeper pink in light mode and a brighter one in dark.
+
+The `TokenSpecimen` card shows every token in both themes side by side, with
+the measured ratio for each combination the app ships. Check it before
+inventing a colour pairing.
 
 **Dark mode** is a `.dark` class on an ancestor (not `prefers-color-scheme`).
 Every token above already has a dark value, so correct token use needs no

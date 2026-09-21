@@ -72,6 +72,7 @@
     "PolicyModal": "src/app/signup/page.tsx",
     "FieldLabel": "src/app/signup/page.tsx",
     "AppShell": "src/app/(app)/layout.tsx",
+    "TokenSpecimen": ".design-sync/token-specimen.tsx",
     "DsPreviewProvider": null
   },
   "provider": {
@@ -146,6 +147,10 @@
       "cardMode": "single",
       "primaryStory": "Default",
       "viewport": "420x240"
+    },
+    "TokenSpecimen": {
+      "cardMode": "single",
+      "viewport": "1180x2000"
     }
   },
   "extraFonts": [
