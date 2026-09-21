@@ -58,6 +58,11 @@ const hueGap = (a, b) => {
 };
 const horiDistance = (hex) => hueGap(oklchOf(hex).H, HORI_HUE);
 
+// 타연 자신의 색상각. 후보가 브랜드에서 얼마나 멀어지는지도 같이 재야 한다 — 호리에서 멀다는
+// 것만으로는 부족하고, 너무 멀면 그건 타연이 아니라 다른 브랜드다.
+const TAYEON_HUE = oklchOf("#ff007f").H;
+const tayeonDistance = (hex) => hueGap(oklchOf(hex).H, TAYEON_HUE);
+
 const relLum = (hex) => {
   const [r, g, b] = hexToRgb(hex).map(srgbToLinear);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -81,12 +86,15 @@ function analyse(fromHex, toHex, labelHex) {
   const pts = sample(fromHex, toHex);
   const ratios = pts.map((p) => contrast(p, labelHex));
   const min = Math.min(...ratios);
+  // 양 끝이 둘 다 호리에서 멀어도 경로가 그 사이를 지날 수 있다 — 파랑→핑크는 보라를 통과한다.
+  const horiPath = Math.min(...pts.map(horiDistance));
   return {
     min,
     max: Math.max(...ratios),
     worstAt: pts[ratios.indexOf(min)],
     worstT: ratios.indexOf(min) / (pts.length - 1),
     ends: [contrast(fromHex, labelHex), contrast(toHex, labelHex)],
+    horiPath,
   };
 }
 
@@ -130,6 +138,42 @@ const CANDIDATES = [
     note: "다크는 밝은 면 + 어두운 글씨. 따뜻한 쪽에서 브랜드 핑크로.",
   },
   {
+    id: "navy-blue-light",
+    theme: "light",
+    name: "네이비 → 블루 (라이트)",
+    from: "#16307a",
+    to: "#1d63d1",
+    label: "#ffffff",
+    note: "파란 계열 단독. 신뢰감 쪽으로 가지만 타연 핑크와는 다른 브랜드가 된다.",
+  },
+  {
+    id: "indigo-cyan-light",
+    theme: "light",
+    name: "인디고 → 청록 (라이트)",
+    from: "#2b2f9e",
+    to: "#0a7a8c",
+    label: "#ffffff",
+    note: "차갑고 서늘한 쪽. 타로·사주의 신비감보다 도구 느낌에 가깝다.",
+  },
+  {
+    id: "blue-pink-light",
+    theme: "light",
+    name: "블루 → 핑크 (라이트)",
+    from: "#1d4ed8",
+    to: "#d30068",
+    label: "#ffffff",
+    note: "브랜드 핑크를 한쪽에 남긴 절충안. 다만 경로가 보라를 지난다 — 아래 호리 거리 확인.",
+  },
+  {
+    id: "blue-cyan-dark",
+    theme: "dark",
+    name: "블루 → 청록 (다크)",
+    from: "#7aa8ff",
+    to: "#6fd6e0",
+    label: "#141517",
+    note: "다크용 파란 계열. 밝은 면 + 어두운 글씨.",
+  },
+  {
     id: "violet-pink-light",
     theme: "light",
     name: "보라 → 핑크 (참고: 호리 영역)",
@@ -145,7 +189,8 @@ const BG = { light: "#efe7f7", dark: "#141517" };
 const rows = CANDIDATES.map((c) => {
   const a = analyse(c.from, c.to, c.label);
   const fillSeparation = Math.min(contrast(c.from, BG[c.theme]), contrast(c.to, BG[c.theme]));
-  return { ...c, ...a, fillSeparation, horiFrom: horiDistance(c.from), horiTo: horiDistance(c.to) };
+  return { ...c, ...a, fillSeparation, horiFrom: horiDistance(c.from), horiTo: horiDistance(c.to),
+    tayeonFrom: tayeonDistance(c.from), tayeonTo: tayeonDistance(c.to) };
 });
 
 const fmt = (n) => n.toFixed(2);
@@ -175,7 +220,8 @@ const cards = rows
       <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>${r.worstAt}</code> (${Math.round(r.worstT * 100)}% 지점)</small></dt><dd>${chipHtml(r.min, 4.5)}</dd></div>
       <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">${fmt(r.ends[0])} / ${fmt(r.ends[1])}</span></dd></div>
       <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd>${chipHtml(r.fillSeparation, 3)}</dd></div>
-      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio ${r.horiFrom >= 40 ? "pass" : "fail"}">${Math.round(r.horiFrom)}° → ${Math.round(r.horiTo)}°</span></dd></div>
+      <div><dt>호리와 가장 가까워지는 지점<small>양 끝 ${Math.round(r.horiFrom)}° / ${Math.round(r.horiTo)}° · <b>경로 전체 최솟값</b></small></dt><dd><span class="ratio ${r.horiPath >= 40 ? "pass" : "fail"}">${Math.round(r.horiPath)}°</span></dd></div>
+      <div><dt>타연 핑크에서 멀어진 정도<small>0°면 그대로 · 클수록 다른 브랜드</small></dt><dd><span class="ratio note">${Math.round(r.tayeonFrom)}° / ${Math.round(r.tayeonTo)}°</span></dd></div>
     </dl>
   </article>`,
   )
@@ -254,11 +300,11 @@ const html = `<!doctype html>
 
 writeFileSync("doc/design/gradient-buttons.html", html);
 console.log("wrote doc/design/gradient-buttons.html\n");
-console.log("후보                              최솟값   양끝            배경분리  호리거리");
+console.log("후보                              최솟값  배경분리  호리(경로최소)  타연거리");
 for (const r of rows) {
   console.log(
-    `${r.name.padEnd(30)} ${fmt(r.min).padStart(6)}  ` +
-      `${fmt(r.ends[0])}/${fmt(r.ends[1])}`.padEnd(14) +
-      ` ${fmt(r.fillSeparation)}     ${Math.round(r.horiFrom)}°→${Math.round(r.horiTo)}°`,
+    `${r.name.padEnd(30)} ${fmt(r.min).padStart(6)}  ${fmt(r.fillSeparation).padStart(6)}   ` +
+      `${String(Math.round(r.horiPath)).padStart(9)}°   ` +
+      `${Math.round(r.tayeonFrom)}°/${Math.round(r.tayeonTo)}°`,
   );
 }
