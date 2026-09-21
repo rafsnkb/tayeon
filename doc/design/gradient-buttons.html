@@ -52,11 +52,99 @@
     크게 도는 구간에서 중간이 탁해지므로 OKLab으로 보간한다. 판정에 쓰는 대비는
     <b>양 끝이 아니라 21개 지점 중 최솟값</b>이다 — 라벨이 어느 구간 위에 놓일지 알 수 없고,
     보간 중간이 양 끝보다 불리해질 수 있다.
+    <br><br>
+    색상각도 같이 잰다. 호리(hori.chat)의 핵심 색상은 <b>312°</b>이고 타연 핑크는 <b>3°</b>로
+    50° 떨어져 있다. 그라데이션 끝을 보라로 보내면 그 거리를 스스로 좁히게 된다 — 대비는
+    통과해도 브랜드는 잃는다.
   </p>
   <div class="grid">
   <article class="cand light">
-    <h3>보라 → 핑크 (라이트)</h3>
-    <p class="note">요청하신 그림 그대로. 보라 끝이 충분히 어두워야 흰 글씨가 산다.</p>
+    <h3>자홍 → 코랄 (라이트)</h3>
+    <p class="note">핑크에서 따뜻한 쪽으로 넘어간다. 호리의 보라와 정반대 방향.</p>
+    <div class="stage" style="--bg:#efe7f7">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #c2005f, #e04a2f); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #c2005f, #e04a2f); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#c2005f" title="#c2005f"></span><span style="background:#c3095d" title="#c3095d"></span><span style="background:#c5115c" title="#c5115c"></span><span style="background:#c6175a" title="#c6175a"></span><span style="background:#c81c58" title="#c81c58"></span><span style="background:#c92057" title="#c92057"></span><span style="background:#cb2455" title="#cb2455"></span><span style="background:#cc2853" title="#cc2853"></span><span style="background:#ce2b51" title="#ce2b51"></span><span style="background:#cf2e4f" title="#cf2e4f"></span><span style="background:#d1314d" title="#d1314d"></span><span style="background:#d2344a" title="#d2344a"></span><span style="background:#d43748" title="#d43748"></span><span style="background:#d53945" title="#d53945"></span><span style="background:#d73c43" title="#d73c43"></span><span style="background:#d83e40" title="#d83e40"></span><span style="background:#da413d" title="#da413d"></span><span style="background:#db433a" title="#db433a"></span><span style="background:#dd4537" title="#dd4537"></span><span style="background:#de4833" title="#de4833"></span><span style="background:#e04a2f" title="#e04a2f"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#e04a2f</code> (100% 지점)</small></dt><dd><span class="ratio fail">4.05<i>✗</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">6.07 / 4.05</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">3.36<i>✓</i></span></dd></div>
+      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio pass">51° → 80°</span></dd></div>
+    </dl>
+  </article>
+  <article class="cand light">
+    <h3>와인 → 핫핑크 (라이트)</h3>
+    <p class="note">같은 마젠타 안에서 깊이만 준다. 브랜드에서 가장 덜 벗어나는 안.</p>
+    <div class="stage" style="--bg:#efe7f7">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #8c0036, #d30068); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #8c0036, #d30068); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#8c0036" title="#8c0036"></span><span style="background:#8f0038" title="#8f0038"></span><span style="background:#93003b" title="#93003b"></span><span style="background:#96003d" title="#96003d"></span><span style="background:#9a0040" title="#9a0040"></span><span style="background:#9d0042" title="#9d0042"></span><span style="background:#a10045" title="#a10045"></span><span style="background:#a40047" title="#a40047"></span><span style="background:#a8004a" title="#a8004a"></span><span style="background:#ab004c" title="#ab004c"></span><span style="background:#af004f" title="#af004f"></span><span style="background:#b20051" title="#b20051"></span><span style="background:#b60054" title="#b60054"></span><span style="background:#ba0056" title="#ba0056"></span><span style="background:#bd0059" title="#bd0059"></span><span style="background:#c1005b" title="#c1005b"></span><span style="background:#c4005e" title="#c4005e"></span><span style="background:#c80060" title="#c80060"></span><span style="background:#cc0063" title="#cc0063"></span><span style="background:#cf0065" title="#cf0065"></span><span style="background:#d30068" title="#d30068"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#d30068</code> (100% 지점)</small></dt><dd><span class="ratio pass">5.29<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">9.68 / 5.29</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">4.39<i>✓</i></span></dd></div>
+      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio pass">58° → 51°</span></dd></div>
+    </dl>
+  </article>
+  <article class="cand light">
+    <h3>크림슨 → 마젠타 (라이트)</h3>
+    <p class="note">붉은 쪽에서 출발해 브랜드 핑크로 도착. 따뜻하지만 튀지 않는다.</p>
+    <div class="stage" style="--bg:#efe7f7">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #b31235, #cf0072); color:#ffffff">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #b31235, #cf0072); color:#ffffff">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#b31235" title="#b31235"></span><span style="background:#b41238" title="#b41238"></span><span style="background:#b6123c" title="#b6123c"></span><span style="background:#b7113f" title="#b7113f"></span><span style="background:#b81142" title="#b81142"></span><span style="background:#ba1145" title="#ba1145"></span><span style="background:#bb1049" title="#bb1049"></span><span style="background:#bd104c" title="#bd104c"></span><span style="background:#be0f4f" title="#be0f4f"></span><span style="background:#bf0f52" title="#bf0f52"></span><span style="background:#c10e55" title="#c10e55"></span><span style="background:#c20d58" title="#c20d58"></span><span style="background:#c40c5b" title="#c40c5b"></span><span style="background:#c50b5e" title="#c50b5e"></span><span style="background:#c60a61" title="#c60a61"></span><span style="background:#c80864" title="#c80864"></span><span style="background:#c90766" title="#c90766"></span><span style="background:#cb0569" title="#cb0569"></span><span style="background:#cc046c" title="#cc046c"></span><span style="background:#ce026f" title="#ce026f"></span><span style="background:#cf0072" title="#cf0072"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#cf0072</code> (100% 지점)</small></dt><dd><span class="ratio pass">5.39<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">6.87 / 5.39</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">4.48<i>✓</i></span></dd></div>
+      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio pass">66° → 46°</span></dd></div>
+    </dl>
+  </article>
+  <article class="cand dark">
+    <h3>코랄 → 핑크 (다크)</h3>
+    <p class="note">다크는 밝은 면 + 어두운 글씨. 따뜻한 쪽에서 브랜드 핑크로.</p>
+    <div class="stage" style="--bg:#141517">
+      <button class="grad" style="background:linear-gradient(30deg in oklab, #ff8a6b, #ff5993); color:#141517">
+        이용권 구입하기
+      </button>
+      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #ff8a6b, #ff5993); color:#141517">
+        환불 가능
+      </button>
+    </div>
+    <div class="strip">
+      <span style="background:#ff8a6b" title="#ff8a6b"></span><span style="background:#ff886d" title="#ff886d"></span><span style="background:#ff8670" title="#ff8670"></span><span style="background:#ff8472" title="#ff8472"></span><span style="background:#ff8174" title="#ff8174"></span><span style="background:#ff7f77" title="#ff7f77"></span><span style="background:#ff7d79" title="#ff7d79"></span><span style="background:#ff7b7b" title="#ff7b7b"></span><span style="background:#ff787d" title="#ff787d"></span><span style="background:#ff767f" title="#ff767f"></span><span style="background:#ff7481" title="#ff7481"></span><span style="background:#ff7183" title="#ff7183"></span><span style="background:#ff6f85" title="#ff6f85"></span><span style="background:#ff6c87" title="#ff6c87"></span><span style="background:#ff6a89" title="#ff6a89"></span><span style="background:#ff678a" title="#ff678a"></span><span style="background:#ff648c" title="#ff648c"></span><span style="background:#ff628e" title="#ff628e"></span><span style="background:#ff5f90" title="#ff5f90"></span><span style="background:#ff5c91" title="#ff5c91"></span><span style="background:#ff5993" title="#ff5993"></span>
+    </div>
+    <dl class="facts">
+      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#ff5993</code> (100% 지점)</small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.92 / 6.18</span></dd></div>
+      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
+      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio pass">84° → 51°</span></dd></div>
+    </dl>
+  </article>
+  <article class="cand light">
+    <h3>보라 → 핑크 (참고: 호리 영역)</h3>
+    <p class="note">대비는 통과하지만 시작점이 호리 색상각 21° 안이다. 비교용으로 남겨둔다.</p>
     <div class="stage" style="--bg:#efe7f7">
       <button class="grad" style="background:linear-gradient(30deg in oklab, #7b2ff7, #d30068); color:#ffffff">
         이용권 구입하기
@@ -72,86 +160,7 @@
       <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#cf1370</code> (95% 지점)</small></dt><dd><span class="ratio pass">5.28<i>✓</i></span></dd></div>
       <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">5.85 / 5.29</span></dd></div>
       <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">4.39<i>✓</i></span></dd></div>
-    </dl>
-  </article>
-  <article class="cand light">
-    <h3>연한 보라 → 핑크 (라이트)</h3>
-    <p class="note">브랜드 핑크 원본을 끝에 그대로 둔 안. 밝은 쪽이 흰 글씨에 불리하다.</p>
-    <div class="stage" style="--bg:#efe7f7">
-      <button class="grad" style="background:linear-gradient(30deg in oklab, #a35cff, #ff007f); color:#ffffff">
-        이용권 구입하기
-      </button>
-      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #a35cff, #ff007f); color:#ffffff">
-        환불 가능
-      </button>
-    </div>
-    <div class="strip">
-      <span style="background:#a35cff" title="#a35cff"></span><span style="background:#a85cf9" title="#a85cf9"></span><span style="background:#ad5bf3" title="#ad5bf3"></span><span style="background:#b25aec" title="#b25aec"></span><span style="background:#b659e6" title="#b659e6"></span><span style="background:#bb58e0" title="#bb58e0"></span><span style="background:#c057da" title="#c057da"></span><span style="background:#c455d4" title="#c455d4"></span><span style="background:#c953cd" title="#c953cd"></span><span style="background:#ce51c7" title="#ce51c7"></span><span style="background:#d24ec1" title="#d24ec1"></span><span style="background:#d74bba" title="#d74bba"></span><span style="background:#db48b4" title="#db48b4"></span><span style="background:#e044ae" title="#e044ae"></span><span style="background:#e440a7" title="#e440a7"></span><span style="background:#e93ba1" title="#e93ba1"></span><span style="background:#ed359a" title="#ed359a"></span><span style="background:#f22e94" title="#f22e94"></span><span style="background:#f6258d" title="#f6258d"></span><span style="background:#fb1986" title="#fb1986"></span><span style="background:#ff007f" title="#ff007f"></span>
-    </div>
-    <dl class="facts">
-      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#ce51c7</code> (45% 지점)</small></dt><dd><span class="ratio fail">3.73<i>✗</i></span></dd></div>
-      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">3.80 / 3.78</span></dd></div>
-      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">3.14<i>✓</i></span></dd></div>
-    </dl>
-  </article>
-  <article class="cand light">
-    <h3>핑크 톤 그라데이션 (라이트)</h3>
-    <p class="note">색상을 돌리지 않고 같은 분홍 안에서만 밝기를 움직인 안. 가장 보수적.</p>
-    <div class="stage" style="--bg:#efe7f7">
-      <button class="grad" style="background:linear-gradient(30deg in oklab, #ac0053, #d30068); color:#ffffff">
-        이용권 구입하기
-      </button>
-      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #ac0053, #d30068); color:#ffffff">
-        환불 가능
-      </button>
-    </div>
-    <div class="strip">
-      <span style="background:#ac0053" title="#ac0053"></span><span style="background:#ae0054" title="#ae0054"></span><span style="background:#b00055" title="#b00055"></span><span style="background:#b20056" title="#b20056"></span><span style="background:#b40057" title="#b40057"></span><span style="background:#b60058" title="#b60058"></span><span style="background:#b80059" title="#b80059"></span><span style="background:#b9005a" title="#b9005a"></span><span style="background:#bb005b" title="#bb005b"></span><span style="background:#bd005c" title="#bd005c"></span><span style="background:#bf005d" title="#bf005d"></span><span style="background:#c1005e" title="#c1005e"></span><span style="background:#c30060" title="#c30060"></span><span style="background:#c50061" title="#c50061"></span><span style="background:#c70062" title="#c70062"></span><span style="background:#c90063" title="#c90063"></span><span style="background:#cb0064" title="#cb0064"></span><span style="background:#cd0065" title="#cd0065"></span><span style="background:#cf0066" title="#cf0066"></span><span style="background:#d10067" title="#d10067"></span><span style="background:#d30068" title="#d30068"></span>
-    </div>
-    <dl class="facts">
-      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#d30068</code> (100% 지점)</small></dt><dd><span class="ratio pass">5.29<i>✓</i></span></dd></div>
-      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.29 / 5.29</span></dd></div>
-      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">4.39<i>✓</i></span></dd></div>
-    </dl>
-  </article>
-  <article class="cand dark">
-    <h3>보라 → 핑크 (다크)</h3>
-    <p class="note">다크는 밝은 면에 어두운 글씨. 단색안과 같은 원칙.</p>
-    <div class="stage" style="--bg:#141517">
-      <button class="grad" style="background:linear-gradient(30deg in oklab, #b18cff, #ff5993); color:#141517">
-        이용권 구입하기
-      </button>
-      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #b18cff, #ff5993); color:#141517">
-        환불 가능
-      </button>
-    </div>
-    <div class="strip">
-      <span style="background:#b18cff" title="#b18cff"></span><span style="background:#b68bfa" title="#b68bfa"></span><span style="background:#ba89f4" title="#ba89f4"></span><span style="background:#be87ef" title="#be87ef"></span><span style="background:#c386ea" title="#c386ea"></span><span style="background:#c784e5" title="#c784e5"></span><span style="background:#cb82df" title="#cb82df"></span><span style="background:#cf80da" title="#cf80da"></span><span style="background:#d37ed5" title="#d37ed5"></span><span style="background:#d77ccf" title="#d77ccf"></span><span style="background:#db79ca" title="#db79ca"></span><span style="background:#df77c5" title="#df77c5"></span><span style="background:#e274bf" title="#e274bf"></span><span style="background:#e672ba" title="#e672ba"></span><span style="background:#ea6fb4" title="#ea6fb4"></span><span style="background:#ed6caf" title="#ed6caf"></span><span style="background:#f168a9" title="#f168a9"></span><span style="background:#f565a4" title="#f565a4"></span><span style="background:#f8619e" title="#f8619e"></span><span style="background:#fc5d99" title="#fc5d99"></span><span style="background:#ff5993" title="#ff5993"></span>
-    </div>
-    <dl class="facts">
-      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#ff5993</code> (100% 지점)</small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
-      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.02 / 6.18</span></dd></div>
-      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio pass">6.18<i>✓</i></span></dd></div>
-    </dl>
-  </article>
-  <article class="cand dark">
-    <h3>보라 → 핑크, 흰 글씨 (다크)</h3>
-    <p class="note">다크에서 흰 글씨를 유지하려면 칠이 어두워지는데, 배경과 덜 분리된다.</p>
-    <div class="stage" style="--bg:#141517">
-      <button class="grad" style="background:linear-gradient(30deg in oklab, #6d28d9, #b3005c); color:#ffffff">
-        이용권 구입하기
-      </button>
-      <button class="grad sm" style="background:linear-gradient(30deg in oklab, #6d28d9, #b3005c); color:#ffffff">
-        환불 가능
-      </button>
-    </div>
-    <div class="strip">
-      <span style="background:#6d28d9" title="#6d28d9"></span><span style="background:#702bd3" title="#702bd3"></span><span style="background:#742dcd" title="#742dcd"></span><span style="background:#772ec7" title="#772ec7"></span><span style="background:#7b2fc0" title="#7b2fc0"></span><span style="background:#7e30ba" title="#7e30ba"></span><span style="background:#8231b4" title="#8231b4"></span><span style="background:#8531ae" title="#8531ae"></span><span style="background:#8931a8" title="#8931a8"></span><span style="background:#8c30a2" title="#8c30a2"></span><span style="background:#902f9c" title="#902f9c"></span><span style="background:#932e96" title="#932e96"></span><span style="background:#972d8f" title="#972d8f"></span><span style="background:#9a2b89" title="#9a2b89"></span><span style="background:#9e2883" title="#9e2883"></span><span style="background:#a1257d" title="#a1257d"></span><span style="background:#a52176" title="#a52176"></span><span style="background:#a81d70" title="#a81d70"></span><span style="background:#ac1769" title="#ac1769"></span><span style="background:#af0e63" title="#af0e63"></span><span style="background:#b3005c" title="#b3005c"></span>
-    </div>
-    <dl class="facts">
-      <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>#972d8f</code> (60% 지점)</small></dt><dd><span class="ratio pass">6.80<i>✓</i></span></dd></div>
-      <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">7.10 / 6.84</span></dd></div>
-      <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd><span class="ratio fail">2.57<i>✗</i></span></dd></div>
+      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio fail">20° → 51°</span></dd></div>
     </dl>
   </article></div>
   <footer>

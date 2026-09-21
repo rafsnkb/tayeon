@@ -40,6 +40,24 @@ function oklabToRgb([L, a, b]) {
   ];
 }
 
+// 호리(hori.chat)의 핵심 색상각. 2026-09-22에 실제 사이트에서 뽑았다:
+// 구체 #af7ac5(316°), 딥퍼플 워시 #633974(315°), 라일락 틴트 #f1e7fd(306°).
+// 타연 핑크는 3°로 거기서 50° 떨어져 있다 — 그라데이션 끝을 보라로 보내면 그 거리를
+// 스스로 좁히게 되고, 그게 "짝퉁 같다"는 인상의 정체다.
+const HORI_HUE = 312;
+
+function oklchOf(hex) {
+  const [L, A, B] = rgbToOklab(hexToRgb(hex));
+  let H = (Math.atan2(B, A) * 180) / Math.PI;
+  if (H < 0) H += 360;
+  return { L, C: Math.hypot(A, B), H };
+}
+const hueGap = (a, b) => {
+  const x = Math.abs(a - b) % 360;
+  return x > 180 ? 360 - x : x;
+};
+const horiDistance = (hex) => hueGap(oklchOf(hex).H, HORI_HUE);
+
 const relLum = (hex) => {
   const [r, g, b] = hexToRgb(hex).map(srgbToLinear);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -72,52 +90,53 @@ function analyse(fromHex, toHex, labelHex) {
   };
 }
 
-// 후보. 전부 30도 각도, 보라 쪽에서 출발해 핑크로 온다.
+// 후보. 전부 30도 각도. 보라 쪽으로 가지 않고, 핑크를 기준으로 **따뜻한 쪽**이나 같은 색상
+// 안에서만 움직인다. 각 후보의 "호리와의 거리"를 같이 재서, 브랜드가 가까워지는지 본다.
 const CANDIDATES = [
+  {
+    id: "magenta-coral-light",
+    theme: "light",
+    name: "자홍 → 코랄 (라이트)",
+    from: "#c2005f",
+    to: "#e04a2f",
+    label: "#ffffff",
+    note: "핑크에서 따뜻한 쪽으로 넘어간다. 호리의 보라와 정반대 방향.",
+  },
+  {
+    id: "wine-pink-light",
+    theme: "light",
+    name: "와인 → 핫핑크 (라이트)",
+    from: "#8c0036",
+    to: "#d30068",
+    label: "#ffffff",
+    note: "같은 마젠타 안에서 깊이만 준다. 브랜드에서 가장 덜 벗어나는 안.",
+  },
+  {
+    id: "crimson-magenta-light",
+    theme: "light",
+    name: "크림슨 → 마젠타 (라이트)",
+    from: "#b31235",
+    to: "#cf0072",
+    label: "#ffffff",
+    note: "붉은 쪽에서 출발해 브랜드 핑크로 도착. 따뜻하지만 튀지 않는다.",
+  },
+  {
+    id: "wine-pink-dark",
+    theme: "dark",
+    name: "코랄 → 핑크 (다크)",
+    from: "#ff8a6b",
+    to: "#ff5993",
+    label: "#141517",
+    note: "다크는 밝은 면 + 어두운 글씨. 따뜻한 쪽에서 브랜드 핑크로.",
+  },
   {
     id: "violet-pink-light",
     theme: "light",
-    name: "보라 → 핑크 (라이트)",
+    name: "보라 → 핑크 (참고: 호리 영역)",
     from: "#7b2ff7",
     to: "#d30068",
     label: "#ffffff",
-    note: "요청하신 그림 그대로. 보라 끝이 충분히 어두워야 흰 글씨가 산다.",
-  },
-  {
-    id: "violet-pink-light-soft",
-    theme: "light",
-    name: "연한 보라 → 핑크 (라이트)",
-    from: "#a35cff",
-    to: "#ff007f",
-    label: "#ffffff",
-    note: "브랜드 핑크 원본을 끝에 그대로 둔 안. 밝은 쪽이 흰 글씨에 불리하다.",
-  },
-  {
-    id: "pink-tonal-light",
-    theme: "light",
-    name: "핑크 톤 그라데이션 (라이트)",
-    from: "#ac0053",
-    to: "#d30068",
-    label: "#ffffff",
-    note: "색상을 돌리지 않고 같은 분홍 안에서만 밝기를 움직인 안. 가장 보수적.",
-  },
-  {
-    id: "violet-pink-dark",
-    theme: "dark",
-    name: "보라 → 핑크 (다크)",
-    from: "#b18cff",
-    to: "#ff5993",
-    label: "#141517",
-    note: "다크는 밝은 면에 어두운 글씨. 단색안과 같은 원칙.",
-  },
-  {
-    id: "violet-pink-dark-white",
-    theme: "dark",
-    name: "보라 → 핑크, 흰 글씨 (다크)",
-    from: "#6d28d9",
-    to: "#b3005c",
-    label: "#ffffff",
-    note: "다크에서 흰 글씨를 유지하려면 칠이 어두워지는데, 배경과 덜 분리된다.",
+    note: "대비는 통과하지만 시작점이 호리 색상각 21° 안이다. 비교용으로 남겨둔다.",
   },
 ];
 
@@ -126,7 +145,7 @@ const BG = { light: "#efe7f7", dark: "#141517" };
 const rows = CANDIDATES.map((c) => {
   const a = analyse(c.from, c.to, c.label);
   const fillSeparation = Math.min(contrast(c.from, BG[c.theme]), contrast(c.to, BG[c.theme]));
-  return { ...c, ...a, fillSeparation };
+  return { ...c, ...a, fillSeparation, horiFrom: horiDistance(c.from), horiTo: horiDistance(c.to) };
 });
 
 const fmt = (n) => n.toFixed(2);
@@ -156,6 +175,7 @@ const cards = rows
       <div><dt>라벨 대비 <b>최솟값</b><small>21개 지점 중 가장 불리한 곳 <code>${r.worstAt}</code> (${Math.round(r.worstT * 100)}% 지점)</small></dt><dd>${chipHtml(r.min, 4.5)}</dd></div>
       <div><dt>양 끝만 봤을 때<small>끝만 재면 놓치는 값</small></dt><dd><span class="ratio note">${fmt(r.ends[0])} / ${fmt(r.ends[1])}</span></dd></div>
       <div><dt>칠이 배경에서 떠 보이는 정도<small>비텍스트 3:1, 불리한 끝 기준</small></dt><dd>${chipHtml(r.fillSeparation, 3)}</dd></div>
+      <div><dt>호리 색상각과의 거리<small>타연 핑크는 50° · 가까울수록 남의 브랜드</small></dt><dd><span class="ratio ${r.horiFrom >= 40 ? "pass" : "fail"}">${Math.round(r.horiFrom)}° → ${Math.round(r.horiTo)}°</span></dd></div>
     </dl>
   </article>`,
   )
@@ -215,6 +235,10 @@ const html = `<!doctype html>
     크게 도는 구간에서 중간이 탁해지므로 OKLab으로 보간한다. 판정에 쓰는 대비는
     <b>양 끝이 아니라 21개 지점 중 최솟값</b>이다 — 라벨이 어느 구간 위에 놓일지 알 수 없고,
     보간 중간이 양 끝보다 불리해질 수 있다.
+    <br><br>
+    색상각도 같이 잰다. 호리(hori.chat)의 핵심 색상은 <b>312°</b>이고 타연 핑크는 <b>3°</b>로
+    50° 떨어져 있다. 그라데이션 끝을 보라로 보내면 그 거리를 스스로 좁히게 된다 — 대비는
+    통과해도 브랜드는 잃는다.
   </p>
   <div class="grid">${cards}</div>
   <footer>
@@ -230,11 +254,11 @@ const html = `<!doctype html>
 
 writeFileSync("doc/design/gradient-buttons.html", html);
 console.log("wrote doc/design/gradient-buttons.html\n");
-console.log("후보                              최솟값   양끝            배경분리");
+console.log("후보                              최솟값   양끝            배경분리  호리거리");
 for (const r of rows) {
   console.log(
     `${r.name.padEnd(30)} ${fmt(r.min).padStart(6)}  ` +
       `${fmt(r.ends[0])}/${fmt(r.ends[1])}`.padEnd(14) +
-      ` ${fmt(r.fillSeparation)}`,
+      ` ${fmt(r.fillSeparation)}     ${Math.round(r.horiFrom)}°→${Math.round(r.horiTo)}°`,
   );
 }
