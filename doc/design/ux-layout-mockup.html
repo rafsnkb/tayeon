@@ -23,7 +23,7 @@
   .frame { margin:0; }
   figcaption { font-size:12px; color:#ab999e; margin-bottom:8px; }
 
-  .screen { position:relative; width:390px; height:860px; overflow:hidden;
+  .screen { position:relative; width:390px; height:720px; overflow:hidden;
     background:var(--page); display:flex; border-radius:26px; box-shadow:0 16px 46px rgba(0,0,0,.5); }
   .col { position:relative; display:flex; flex-direction:column; flex:1; min-width:0; }
   .aurora { position:absolute; inset:-30%; opacity:var(--aurora-op);
@@ -39,71 +39,69 @@
   @keyframes d1 { from{background-position:0% 0%} to{background-position:100% 60%} }
   @keyframes d2 { from{background-position:100% 100%} to{background-position:0% 30%} }
 
-  /* 상단바 — 아이콘 단독 없음. 최소 높이 48. */
-  .topbar { position:relative; display:flex; align-items:center; gap:8px; padding:10px 12px;
+  /* 상단바 — 아이콘 단독 없음. 웹 하한 24px의 1.6배인 40px로 잡는다. */
+  .topbar { position:relative; display:flex; align-items:center; gap:2px; padding:6px 8px;
     background:var(--surface); border-bottom:1px solid var(--line); }
   .bar-btn { display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:1px; min-width:56px; height:48px; border:0; border-radius:14px; cursor:pointer;
-    background:transparent; color:var(--text); font:inherit; font-size:11.5px; font-weight:600;
+    gap:1px; min-width:44px; height:40px; border:0; border-radius:11px; cursor:pointer;
+    background:transparent; color:var(--text); font:inherit; font-size:10px; font-weight:600;
     transition:background 300ms ease; }
   .bar-btn:hover { background:var(--chip); }
-  .bar-btn .ic { font-size:17px; line-height:1; }
-  .title { flex:1; text-align:center; font-size:16px; font-weight:700; color:var(--text);
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-btn .ic { font-size:14px; line-height:1; }
+  .title { flex:1; text-align:center; font-size:15px; font-weight:700; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 2px; }
 
-  /* 상태 줄 — 떠 있던 배지를 없애고 문장으로. */
+  /* 상태 줄 — 한 줄로 압축. 문장은 유지하되 높이를 40으로. */
   .status { position:relative; display:flex; align-items:center; justify-content:space-between;
-    gap:12px; padding:12px 16px; background:var(--surface-alt); border-bottom:1px solid var(--line); }
-  .status-text { margin:0; font-size:14px; line-height:1.4; color:var(--muted); }
-  .status-text b { color:var(--text); font-size:17px; }
+    gap:10px; min-height:40px; padding:0 12px; background:var(--surface-alt);
+    border-bottom:1px solid var(--line); }
+  .status-text { margin:0; font-size:13px; color:var(--muted); }
+  .status-text b { color:var(--text); font-size:14px; }
 
-  .stream { position:relative; flex:1; overflow:hidden; padding:16px 16px 8px;
-    display:flex; flex-direction:column; gap:14px; }
+  .stream { position:relative; flex:1; overflow:hidden; padding:12px 12px 6px;
+    display:flex; flex-direction:column; gap:10px; }
   .msg { max-width:88%; }
   .msg.me { align-self:flex-end; max-width:82%; }
-  .who { margin:0 0 4px; font-size:13px; color:var(--muted); }
-  .body { margin:0; font-size:16px; line-height:1.65; color:var(--text);
-    background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:12px 14px; }
+  .who { margin:0 0 3px; font-size:11.5px; color:var(--muted); }
+  .body { margin:0; font-size:14.5px; line-height:1.6; color:var(--text);
+    background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:10px 13px; }
   .msg.me .body { background:var(--grad); color:var(--on-grad); border:0; font-weight:600; }
-  .card-name { margin:0 0 6px; font-size:20px; font-weight:700; color:var(--text); }
-  .msg .card-name + .body { margin-top:0; }
+  .card-name { margin:0 0 5px; font-size:18px; font-weight:700; color:var(--text); }
 
-  .suggest { display:flex; flex-direction:column; gap:8px; }
-  .suggest-label { margin:0 0 0 2px; font-size:13px; color:var(--muted); }
-  .suggest button { display:flex; align-items:center; gap:8px; text-align:left; font:inherit;
-    font-size:15px; font-weight:600; cursor:pointer; border:0; background:var(--tint);
-    color:var(--link); border-radius:999px; padding:12px 16px; min-height:48px;
+  .suggest { display:flex; flex-direction:column; gap:6px; }
+  .suggest-label { margin:0 0 0 2px; font-size:11.5px; color:var(--muted); }
+  .suggest button { display:flex; align-items:center; gap:7px; text-align:left; font:inherit;
+    font-size:13px; font-weight:600; cursor:pointer; border:0; background:var(--tint);
+    color:var(--link); border-radius:999px; padding:0 14px; min-height:36px;
     transition:transform 300ms ease, filter 300ms ease; }
   .suggest button:hover { transform:translateX(3px); filter:brightness(1.05); }
-  .suggest .ico { font-size:14px; }
+  .suggest .ico { font-size:12px; }
 
-  /* 컴포저 — 보이는 라벨, 48h 컨트롤, 글자 붙은 버튼 */
-  .composer { position:relative; padding:12px 16px 4px; background:var(--surface);
+  /* 컴포저 — 기존 형태: 둥근 카드 하나 안에 입력칸 + 모드/보내기 줄 */
+  .composer { position:relative; padding:8px 12px 2px; background:var(--surface);
     border-top:1px solid var(--line); }
-  .field-label { display:block; margin-bottom:6px; font-size:14px; font-weight:600; color:var(--muted); }
-  .field { min-height:56px; border-radius:16px; background:var(--page); border:1px solid var(--line);
-    padding:15px 14px; font-size:16px; color:var(--text); }
-  .actions { display:flex; align-items:stretch; gap:10px; margin-top:10px; }
-  .spread { flex:1; display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
-    gap:1px; min-height:56px; border:1px solid var(--line); border-radius:16px; cursor:pointer;
-    background:var(--page); padding:8px 14px; font:inherit; transition:background 300ms ease; }
-  .spread:hover { background:var(--chip); }
-  .spread-label { font-size:12px; color:var(--muted); }
-  .spread-value { font-size:15px; font-weight:700; color:var(--text); }
-  .caret { font-size:11px; color:var(--muted); }
-  .btn-grad { border:0; border-radius:16px; cursor:pointer; background:var(--grad);
+  .composer-card { border:1px solid var(--line); border-radius:22px; background:var(--page);
+    padding:10px 10px 10px 14px; }
+  .field { min-height:34px; font-size:14.5px; color:var(--text); padding:4px 0 8px; }
+  .actions { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .spread { display:flex; align-items:center; min-height:36px; border:0; border-radius:999px;
+    cursor:pointer; background:var(--chip); color:var(--text); padding:0 14px;
+    font:inherit; font-size:13px; font-weight:600; transition:filter 300ms ease; }
+  .spread:hover { filter:brightness(.97); }
+  .caret { font-size:10px; color:var(--muted); }
+  .btn-grad { border:0; border-radius:999px; cursor:pointer; background:var(--grad);
     color:var(--on-grad); font:inherit; font-weight:700;
     transition:transform 300ms ease, filter 300ms ease; }
-  .btn-grad:hover { transform:translateY(-2px); filter:brightness(1.04); }
-  .btn-grad.send { min-width:112px; min-height:56px; font-size:16px; display:flex;
-    align-items:center; justify-content:center; gap:6px; }
-  .btn-grad.sm { min-height:48px; padding:0 18px; font-size:14px; white-space:nowrap; }
-  .helper { display:flex; align-items:center; min-height:44px; font-size:15px; color:var(--muted); }
+  .btn-grad:hover { transform:translateY(-1px); filter:brightness(1.04); }
+  .btn-grad.send { min-height:36px; padding:0 16px; font-size:13.5px; display:flex;
+    align-items:center; gap:5px; }
+  .btn-grad.sm { min-height:30px; padding:0 14px; font-size:12.5px; white-space:nowrap; }
+  .helper { display:flex; align-items:center; min-height:34px; font-size:13px; color:var(--muted); }
   .helper u { color:var(--link); }
 
   .footnote { position:relative; margin:0; display:flex; align-items:center; justify-content:center;
-    min-height:44px; background:var(--surface); }
-  .footnote a { font-size:13px; color:var(--muted); text-decoration:underline; }
+    min-height:32px; background:var(--surface); }
+  .footnote a { font-size:12px; color:var(--muted); text-decoration:underline; }
 
   @media (prefers-reduced-motion: reduce) { .aurora, .in { animation:none !important; } * { transition-duration:1ms !important; } }
   .in { animation:rise 420ms cubic-bezier(.22,.9,.3,1) both; animation-delay:var(--d,0ms); }
@@ -134,7 +132,7 @@
 
   <table>
     <thead><tr><th>요소</th><th>실측 (현재)</th><th>개선</th><th>이유</th></tr></thead>
-    <tbody><tr><td><b>메뉴 버튼</b></td><td class="was">64×64 · 아이콘만</td><td>아이콘 + “메뉴” 글자</td><td class="why">아이콘만으로는 무엇인지 배워야 한다</td></tr><tr><td><b>이용권 추가</b></td><td class="was">40×40 · 아이콘만</td><td>상태 줄의 “이용권 구입” 버튼 48h</td><td class="why">44px 미만 + 라벨 없음</td></tr><tr><td><b>대화방 정보</b></td><td class="was">40×40 · 아이콘만</td><td>“더보기” 48h, 글자 포함</td><td class="why">〃</td></tr><tr><td><b>대화 제목</b></td><td class="was">222×24 버튼</td><td>제목은 글자, 이름 변경은 더보기 안으로</td><td class="why">누를 수 있는지 알 수 없고 24px</td></tr><tr><td><b>보유 이용권</b></td><td class="was">48×48 아이콘 · 허공에 떠 있음</td><td>상단 상태 줄에 문장으로</td><td class="why">위치가 떠 있어 정렬이 깨지고 의미가 없다</td></tr><tr><td><b>“보유 이용권 없음”</b></td><td class="was">12px 글자</td><td>16px 문장 + 다음 행동 버튼</td><td class="why">빈 상태에 다음 행동이 없었다</td></tr><tr><td><b>스프레드 선택</b></td><td class="was">칩 → 바텀시트 2단계</td><td>현재 선택을 글자로 보여주는 48h 버튼</td><td class="why">무엇이 선택돼 있는지 한눈에 안 보였다</td></tr><tr><td><b>질문 입력</b></td><td class="was">placeholder만</td><td>그 위에 보이는 라벨</td><td class="why">입력하면 라벨이 사라진다</td></tr><tr><td><b>보내기</b></td><td class="was">48×48 아이콘만</td><td>“보내기” 글자 + 화살표</td><td class="why">아이콘만</td></tr><tr><td><b>궁합 상대 정보</b></td><td class="was">68×14 · 12px</td><td>48h 줄 안의 링크, 15px</td><td class="why">높이 14px는 정밀 탭을 요구한다</td></tr><tr><td><b>회사 정보</b></td><td class="was">37×15 · 10px</td><td>44h 영역, 13px</td><td class="why">10px는 읽히지 않는다</td></tr></tbody>
+    <tbody><tr><td><b>메뉴 버튼</b></td><td class="was">64×64 · 아이콘만</td><td>아이콘 + “메뉴” 글자</td><td class="why">아이콘만으로는 무엇인지 배워야 한다</td></tr><tr><td><b>이용권 추가</b></td><td class="was">40×40 · 아이콘만</td><td>상태 줄의 “구입” 버튼 30h</td><td class="why">44px 미만 + 라벨 없음</td></tr><tr><td><b>대화방 정보</b></td><td class="was">40×40 · 아이콘만</td><td>“더보기” 40h, 글자 포함</td><td class="why">〃</td></tr><tr><td><b>대화 제목</b></td><td class="was">222×24 버튼</td><td>제목은 글자, 이름 변경은 더보기 안으로</td><td class="why">누를 수 있는지 알 수 없고 24px</td></tr><tr><td><b>보유 이용권</b></td><td class="was">48×48 아이콘 · 허공에 떠 있음</td><td>상단바에 “시간제” 버튼으로 복귀 + 상태 줄에 문장</td><td class="why">위치가 떠 있어 정렬이 깨지고 의미가 없다</td></tr><tr><td><b>“보유 이용권 없음”</b></td><td class="was">12px 글자</td><td>13px 문장 + 구입 버튼</td><td class="why">빈 상태에 다음 행동이 없었다</td></tr><tr><td><b>스프레드 선택</b></td><td class="was">칩 → 바텀시트 2단계</td><td>현재 선택을 글자로 보여주는 36h 칩(기존 위치)</td><td class="why">무엇이 선택돼 있는지 한눈에 안 보였다</td></tr><tr><td><b>질문 입력</b></td><td class="was">placeholder만</td><td><b>기존 형태 유지</b> · 크기만 축소</td><td class="why">형태 유지가 요청사항. placeholder 한계는 남는다</td></tr><tr><td><b>보내기</b></td><td class="was">48×48 아이콘만</td><td>“보내기” 글자 + 화살표, 36h</td><td class="why">아이콘만</td></tr><tr><td><b>궁합 상대 정보</b></td><td class="was">68×14 · 12px</td><td>34h 줄 안의 링크, 13px</td><td class="why">높이 14px는 정밀 탭을 요구한다</td></tr><tr><td><b>회사 정보</b></td><td class="was">37×15 · 10px</td><td>32h 영역, 12px</td><td class="why">10px는 읽히지 않는다</td></tr></tbody>
   </table>
 
   <div class="frames">
@@ -150,17 +148,20 @@
       <div class="aurora l2"></div>
 
       <div class="col">
-        <!-- 상단바: 아이콘 단독을 없앴다. 전부 글자가 붙는다. -->
+        <!-- 상단바: 아이콘 단독을 없앴다. 전부 글자가 붙는다.
+             우상단 시간제 이용권 버튼은 원래 자리로 되돌렸다(2026-09-22) — 없애지 말고
+             허공에 떠 있던 것만 줄 안으로 넣는다. -->
         <header class="topbar">
           <button class="bar-btn"><span class="ic">☰</span>메뉴</button>
           <b class="title">이직 고민 상담</b>
+          <button class="bar-btn"><span class="ic">◷</span>시간제</button>
           <button class="bar-btn"><span class="ic">⋯</span>더보기</button>
         </header>
 
-        <!-- 상태 줄: 떠 있던 이용권 배지를 여기로. 배지가 아니라 문장이다. -->
+        <!-- 상태 줄: 떠 있던 이용권 배지를 여기로. 배지가 아니라 문장이다. 한 줄로 압축. -->
         <div class="status">
-          <p class="status-text">스탠다드 이용권<br><b>14회</b> 남았어요</p>
-          <button class="btn-grad sm">이용권 구입</button>
+          <p class="status-text">스탠다드 이용권 · <b>14회</b> 남았어요</p>
+          <button class="btn-grad sm">구입</button>
         </div>
 
         <div class="stream">
@@ -184,16 +185,17 @@
           </div>
         </div>
 
+        <!-- 입력창은 기존 형태를 유지한다(2026-09-22, 사용자 요청) — 둥근 카드 하나 안에
+             입력칸이 있고 그 아래 줄에 모드 버튼과 보내기가 들어간다. 크기만 줄였다.
+             기존 형태라 placeholder가 라벨을 겸하는데, 입력을 시작하면 사라진다는 한계는
+             그대로 남는다(input-labels). 형태를 유지해달라는 요청이 우선이다. -->
         <div class="composer">
-          <!-- 보이는 라벨. placeholder는 입력을 시작하면 사라진다. -->
-          <label class="field-label" for="q-light">무엇이 궁금하세요?</label>
-          <div class="field" id="q-light">이직 시기를 알고 싶어요</div>
-          <div class="actions">
-            <button class="spread">
-              <span class="spread-label">카드 방식</span>
-              <span class="spread-value">원 카드&nbsp;<span class="caret">▼</span></span>
-            </button>
-            <button class="btn-grad send">보내기 <span class="ic">→</span></button>
+          <div class="composer-card">
+            <div class="field">이직 시기를 알고 싶어요</div>
+            <div class="actions">
+              <button class="spread">원 카드&nbsp;<span class="caret">▼</span></button>
+              <button class="btn-grad send">보내기 <span class="ic">→</span></button>
+            </div>
           </div>
           <a class="helper">궁합도 보려면&nbsp;<u>상대 정보 입력</u></a>
         </div>
@@ -202,9 +204,9 @@
     </div>
 
     <dl class="facts">
-      <div><dt>본문 글자 크기<small>이전 13~14px</small></dt><dd class="note">16px</dd></div>
-      <div><dt>가장 작은 글자<small>이전 10px(회사 정보)</small></dt><dd class="note">13px</dd></div>
-      <div><dt>가장 작은 터치 영역<small>이전 68×14</small></dt><dd class="pass">48px</dd></div>
+      <div><dt>본문 글자 크기<small>이전 13~14px</small></dt><dd class="note">14.5px</dd></div>
+      <div><dt>가장 작은 글자<small>이전 10px(회사 정보)</small></dt><dd class="note">10px(아이콘 라벨) · 본문 외 12px</dd></div>
+      <div><dt>가장 작은 터치 영역<small>이전 68×14 · 웹 하한 24px</small></dt><dd class="pass">30px</dd></div>
       <div><dt>본문 대비</dt><dd class="pass">17.32</dd></div>
       <div><dt>보조 글자 대비</dt><dd class="pass">7.01</dd></div>
     </dl>
@@ -221,17 +223,20 @@
       <div class="aurora l2"></div>
 
       <div class="col">
-        <!-- 상단바: 아이콘 단독을 없앴다. 전부 글자가 붙는다. -->
+        <!-- 상단바: 아이콘 단독을 없앴다. 전부 글자가 붙는다.
+             우상단 시간제 이용권 버튼은 원래 자리로 되돌렸다(2026-09-22) — 없애지 말고
+             허공에 떠 있던 것만 줄 안으로 넣는다. -->
         <header class="topbar">
           <button class="bar-btn"><span class="ic">☰</span>메뉴</button>
           <b class="title">이직 고민 상담</b>
+          <button class="bar-btn"><span class="ic">◷</span>시간제</button>
           <button class="bar-btn"><span class="ic">⋯</span>더보기</button>
         </header>
 
-        <!-- 상태 줄: 떠 있던 이용권 배지를 여기로. 배지가 아니라 문장이다. -->
+        <!-- 상태 줄: 떠 있던 이용권 배지를 여기로. 배지가 아니라 문장이다. 한 줄로 압축. -->
         <div class="status">
-          <p class="status-text">스탠다드 이용권<br><b>14회</b> 남았어요</p>
-          <button class="btn-grad sm">이용권 구입</button>
+          <p class="status-text">스탠다드 이용권 · <b>14회</b> 남았어요</p>
+          <button class="btn-grad sm">구입</button>
         </div>
 
         <div class="stream">
@@ -255,16 +260,17 @@
           </div>
         </div>
 
+        <!-- 입력창은 기존 형태를 유지한다(2026-09-22, 사용자 요청) — 둥근 카드 하나 안에
+             입력칸이 있고 그 아래 줄에 모드 버튼과 보내기가 들어간다. 크기만 줄였다.
+             기존 형태라 placeholder가 라벨을 겸하는데, 입력을 시작하면 사라진다는 한계는
+             그대로 남는다(input-labels). 형태를 유지해달라는 요청이 우선이다. -->
         <div class="composer">
-          <!-- 보이는 라벨. placeholder는 입력을 시작하면 사라진다. -->
-          <label class="field-label" for="q-dark">무엇이 궁금하세요?</label>
-          <div class="field" id="q-dark">이직 시기를 알고 싶어요</div>
-          <div class="actions">
-            <button class="spread">
-              <span class="spread-label">카드 방식</span>
-              <span class="spread-value">원 카드&nbsp;<span class="caret">▼</span></span>
-            </button>
-            <button class="btn-grad send">보내기 <span class="ic">→</span></button>
+          <div class="composer-card">
+            <div class="field">이직 시기를 알고 싶어요</div>
+            <div class="actions">
+              <button class="spread">원 카드&nbsp;<span class="caret">▼</span></button>
+              <button class="btn-grad send">보내기 <span class="ic">→</span></button>
+            </div>
           </div>
           <a class="helper">궁합도 보려면&nbsp;<u>상대 정보 입력</u></a>
         </div>
@@ -273,9 +279,9 @@
     </div>
 
     <dl class="facts">
-      <div><dt>본문 글자 크기<small>이전 13~14px</small></dt><dd class="note">16px</dd></div>
-      <div><dt>가장 작은 글자<small>이전 10px(회사 정보)</small></dt><dd class="note">13px</dd></div>
-      <div><dt>가장 작은 터치 영역<small>이전 68×14</small></dt><dd class="pass">48px</dd></div>
+      <div><dt>본문 글자 크기<small>이전 13~14px</small></dt><dd class="note">14.5px</dd></div>
+      <div><dt>가장 작은 글자<small>이전 10px(회사 정보)</small></dt><dd class="note">10px(아이콘 라벨) · 본문 외 12px</dd></div>
+      <div><dt>가장 작은 터치 영역<small>이전 68×14 · 웹 하한 24px</small></dt><dd class="pass">30px</dd></div>
       <div><dt>본문 대비</dt><dd class="pass">11.13</dd></div>
       <div><dt>보조 글자 대비</dt><dd class="pass">6.58</dd></div>
     </dl>
