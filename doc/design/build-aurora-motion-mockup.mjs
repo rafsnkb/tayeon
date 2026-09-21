@@ -58,13 +58,16 @@ const THEMES = {
     surface: "#120e13",
     surfaceAlt: "#1a141a",
     border: "#271f27",
-    text: "#f4eef0",
+    // 거의 검정 위의 흰 글씨는 획이 번져 보인다(헐레이션). 대비 16.70은 AA 기준의 네 배에
+    // 가까운 과잉이라 읽기 편해지는 게 아니라 눈이 부신다. 11.13으로 낮춘다 — AAA(7)도
+    // 여유 있게 넘는다. 순백 대신 따뜻한 회색이라 코랄과도 같이 논다.
+    text: "#d0c2c7",
     muted: "#a89298",
     chip: "#211a20",
     gradFrom: "#ff8a6b",
     gradTo: "#ff5993",
     onGrad: "#08070a",
-    link: "#ff9d86",
+    link: "#f08d78",
     aurora: ["#4d0a24", "#54200e", "#24091d", "#6b1830"],
     auroraOpacity: 0.5,
   },
