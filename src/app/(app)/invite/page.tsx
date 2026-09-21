@@ -50,7 +50,7 @@ export default function InvitePage() {
               친구를 초대하면 {REFERRAL_SIGNUP_FREE_PASSES}회 무료 이용권을 드려요!<br />
               나와 친구 모두 받을 수 있어요!
             </p>
-            <p className="mt-1 text-sm font-semibold text-point">(최대 {REFERRAL_SIGNUP_FRIEND_CAP}명)</p>
+            <p className="mt-1 text-sm font-semibold text-point-text">(최대 {REFERRAL_SIGNUP_FRIEND_CAP}명)</p>
             <p className="mt-4 text-base font-bold text-bold-text">내 링크로 가입한 친구: {invitedFriends}/{REFERRAL_SIGNUP_FRIEND_CAP}명</p>
           <button
             type="button"

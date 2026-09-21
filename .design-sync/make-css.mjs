@@ -29,7 +29,8 @@ const TOKENS = [
   "bg", "surface", "border", "bold-text", "text", "point", "point-strong",
   "point-muted", "point-bg", "cta-fill", "cta-text", "urgent", "urgent-text",
   "success", "success-text", "warning", "warning-text", "accent", "topbar",
-  "chip-fill", "icon-muted", "placeholder", "gold",
+  "chip-fill", "icon-muted", "chip-muted-text", "placeholder", "point-text",
+  "gold",
 ];
 const PREFIXES = ["bg", "text", "border", "fill", "divide"];
 const VARIANTS = ["", "hover:", "disabled:", "focus:", "lg:"];

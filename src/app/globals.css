@@ -1,7 +1,20 @@
 @import "tailwindcss";
 
+/* .design-sync/는 claude.ai/design 업로드 전용이다. 자동 소스 탐색은 이 파일 위치에서 저장소
+   루트까지 올라가며 훑기 때문에, 거기 있는 safelist.txt(전 토큰 × 전 변종을 강제 생성시키는
+   목록)와 프리뷰 파일들이 실서비스 CSS까지 밀려 들어온다. 싱크 빌드는 자기 entry.css에서
+   따로 @source로 집어넣으므로 여기서 빼도 영향이 없다. */
+@source not "../../.design-sync";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* 글자색 토큰은 "어느 면 위에 얹히는가"로 나뉜다. 라이트 모드의 --chip-fill은 어두운 보라라서,
+   페이지 배경(--bg, --surface) 위에서 읽히는 색과 칩 위에서 읽히는 색이 정반대 방향으로 가야 한다.
+   예전엔 --placeholder 하나가 두 역할을 겸하다 양쪽 모두 대비 2.3~2.6에 머물렀다.
+     --placeholder      : 밝은 면 위의 약한 글씨(입력창 placeholder, 보조 문구) — 4.5 이상
+     --chip-muted-text  : --chip-fill 위의 약한 글씨(비활성 버튼 라벨) — 3.1 이상
+     --point-text       : 분홍을 글자로 쓸 때. --point(#ff007f)는 라이트 배경 위 3.47이라
+                          본문 크기 링크엔 미달이므로, 면(bg-point)에만 쓰고 글자엔 이 토큰을 쓴다. */
 :root {
   --bg: #f7f4fb;
   --surface: #ffffff;
@@ -16,7 +29,7 @@
   --cta-text: #ffffff;
   --urgent: #ec5d59;
   --urgent-text: #ffffff;
-  --success: #43a047;
+  --success: #2e7d32;
   --success-text: #ffffff;
   --warning: #fff3cd;
   --warning-text: #856404;
@@ -24,7 +37,9 @@
   --topbar: #ffffff;
   --chip-fill: #6b5c84;
   --icon-muted: #6b5c84;
-  --placeholder: #a89bbd;
+  --chip-muted-text: #cabfd9;
+  --placeholder: #776a93;
+  --point-text: #cc0066;
   --gold: #b8860b;
 }
 
@@ -50,7 +65,9 @@
   --topbar: #19191d;
   --chip-fill: #27292d;
   --icon-muted: #868b9a;
-  --placeholder: #585858;
+  --chip-muted-text: #7b8089;
+  --placeholder: #7b8089;
+  --point-text: #ff2a93;
   --gold: #f9de92;
   color-scheme: dark;
 }
@@ -77,7 +94,9 @@
   --color-topbar: var(--topbar);
   --color-chip-fill: var(--chip-fill);
   --color-icon-muted: var(--icon-muted);
+  --color-chip-muted-text: var(--chip-muted-text);
   --color-placeholder: var(--placeholder);
+  --color-point-text: var(--point-text);
   --color-gold: var(--gold);
   --font-sans: var(--font-pretendard);
   --font-mono: var(--font-geist-mono);

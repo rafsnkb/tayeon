@@ -294,7 +294,7 @@ export default function SignupPage() {
             />
             <span>
               [필수]{" "}
-              <button type="button" onClick={() => setOpenPolicy("terms")} className="text-point underline">
+              <button type="button" onClick={() => setOpenPolicy("terms")} className="text-point-text underline">
                 이용약관
               </button>
               에 동의합니다.
@@ -308,7 +308,7 @@ export default function SignupPage() {
             />
             <span>
               [필수]{" "}
-              <button type="button" onClick={() => setOpenPolicy("privacy")} className="text-point underline">
+              <button type="button" onClick={() => setOpenPolicy("privacy")} className="text-point-text underline">
                 개인정보처리방침
               </button>
               에 동의합니다.
@@ -322,7 +322,7 @@ export default function SignupPage() {
           type="submit"
           disabled={!canSubmit}
           className={`h-12 w-full shrink-0 rounded-2xl text-lg font-semibold ${
-            canSubmit ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            canSubmit ? "bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           }`}
         >
           타연 가입하기

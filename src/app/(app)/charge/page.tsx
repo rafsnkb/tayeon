@@ -330,7 +330,7 @@ export default function ChargePage() {
             )}
             <li>
               자세한 내용은{" "}
-              <Link href="/terms" className="font-bold text-point underline">
+              <Link href="/terms" className="font-bold text-point-text underline">
                 이용약관
               </Link>
               을 확인해주세요.
@@ -368,7 +368,7 @@ export default function ChargePage() {
             type="button"
             onClick={() => selectedCombo && handlePurchase(selected.id, selectedCombo)}
             disabled={purchasingId !== null || hasCountPass || !selectedCombo}
-            className="mx-auto block h-12 w-full max-w-2xl rounded-2xl bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-icon-muted disabled:opacity-60"
+            className="mx-auto block h-12 w-full max-w-2xl rounded-2xl bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-chip-muted-text disabled:opacity-60"
           >
             {formatWon(selected.priceWon)} 결제하기
           </button>

@@ -346,7 +346,7 @@ export default function MyPage() {
               {REWARD_TIER_ROWS.map((row) => (
                 <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
                   <span className="font-semibold text-[#2a1a43] dark:text-white">{row.label}</span>
-                  <span className="text-right font-bold text-point">
+                  <span className="text-right font-bold text-point-text">
                     {Number((row.rate * 100).toFixed(2))}%
                   </span>
                 </div>

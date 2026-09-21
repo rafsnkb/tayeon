@@ -82,7 +82,7 @@ export default function PurchaseHistoryPage() {
                       {e.refunded ? "[결제 취소]" : "[결제 완료]"}
                     </p>
                     {e.refundable && (
-                      <button onClick={() => setSelected(e)} className="text-sm font-semibold text-point underline">
+                      <button onClick={() => setSelected(e)} className="text-sm font-semibold text-point-text underline">
                         환불하기
                       </button>
                     )}
@@ -102,7 +102,7 @@ export default function PurchaseHistoryPage() {
                     {e.badge && (
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          e.refundable ? "bg-success text-success-text" : "bg-chip-fill text-placeholder"
+                          e.refundable ? "bg-success text-success-text" : "bg-chip-fill text-white"
                         }`}
                       >
                         {e.badge}

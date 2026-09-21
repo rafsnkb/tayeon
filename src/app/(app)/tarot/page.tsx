@@ -287,11 +287,11 @@ export function WelcomePopup({ onClose }: { onClose: () => void }) {
           <li>횟수제ㆍ시간제 이용권은 구입일부터 1년 동안 사용할 수 있어요.</li>
           <li>
             자세한 내용은{" "}
-            <a href="/terms" target="_blank" className="text-point underline">
+            <a href="/terms" target="_blank" className="text-point-text underline">
               이용약관
             </a>{" "}
             및{" "}
-            <a href="/privacy" target="_blank" className="text-point underline">
+            <a href="/privacy" target="_blank" className="text-point-text underline">
               개인정보처리방침
             </a>
             을 확인해주세요.
@@ -1328,7 +1328,7 @@ function TarotChat() {
               aria-label="보유 시간제 이용권"
               className={`pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full ${
                 timePasses.length > 0
-                  ? "bg-point text-white dark:h-9 dark:w-9 dark:border dark:border-point dark:bg-point-bg dark:text-point"
+                  ? "bg-point text-white dark:h-9 dark:w-9 dark:border dark:border-point dark:bg-point-bg dark:text-point-text"
                   : "bg-[#79678f] text-white dark:h-9 dark:w-9 dark:border dark:border-icon-muted dark:bg-transparent dark:text-icon-muted"
               }`}
             >
@@ -1430,7 +1430,7 @@ function TarotChat() {
                 </p>
               )}
               {msg.charged && msg.timePassApplied && (
-                <p className="mt-1 w-full px-1 text-xs text-point">시간제 이용권으로 이용한 리딩이에요.</p>
+                <p className="mt-1 w-full px-1 text-xs text-point-text">시간제 이용권으로 이용한 리딩이에요.</p>
               )}
               {msg.charged && i === messages.length - 1 && (msg.suggestions?.length ?? 0) > 0 && (
                 <div className="mt-2 flex w-full flex-col gap-1.5">
@@ -1442,7 +1442,7 @@ function TarotChat() {
                         setQuestion(s);
                         questionInputRef.current?.focus();
                       }}
-                      className="rounded-full border border-point px-3 py-1.5 text-left text-sm text-point"
+                      className="rounded-full border border-point px-3 py-1.5 text-left text-sm text-point-text"
                     >
                       {j + 1}. {s}
                     </button>
@@ -1527,7 +1527,7 @@ function TarotChat() {
           <div className="flex flex-col gap-0.5">
             {!hasBirthInfo && (
               <p className="text-placeholder">
-                <Link href="/me" className="text-point underline">
+                <Link href="/me" className="text-point-text underline">
                   내 정보
                 </Link>
                 에서 생년월일시를 입력하면 사주/자미두수도 함께 볼 수 있어요.
@@ -1535,7 +1535,7 @@ function TarotChat() {
             )}
             {!hasPartner && (
               <p className="text-placeholder">
-                <Link href="/compatibility" className="text-point underline">
+                <Link href="/compatibility" className="text-point-text underline">
                   궁합 상대 정보
                 </Link>
                 를 저장하면 궁합도 함께 볼 수 있어요.

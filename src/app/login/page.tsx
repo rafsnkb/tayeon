@@ -65,7 +65,7 @@ export default async function LoginPage({
 
         <p className="text-center text-xs text-[#74628a]">
           로그인 시{" "}
-          <a href="/terms" target="_blank" className="text-point underline">
+          <a href="/terms" target="_blank" className="text-point-text underline">
             이용약관
           </a>
           에 동의하는 것으로 간주합니다.

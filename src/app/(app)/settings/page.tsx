@@ -261,7 +261,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => router.push("/settings/open-source")}
-            className="self-center text-sm font-semibold text-point underline underline-offset-2"
+            className="self-center text-sm font-semibold text-point-text underline underline-offset-2"
           >
             오픈소스 라이선스
           </button>
@@ -282,7 +282,7 @@ export default function SettingsPage() {
           onClick={handleSave}
           disabled={saving || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-fill text-placeholder"
+            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           } disabled:opacity-60`}
         >
           저장하기

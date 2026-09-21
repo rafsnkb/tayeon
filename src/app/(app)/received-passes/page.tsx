@@ -230,7 +230,7 @@ export default function ReceivedPassesPage() {
                             type="button"
                             onClick={() => claim(entry)}
                             disabled={!selectedCombo || claiming}
-                            className="mt-4 h-12 w-full rounded-2xl bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-icon-muted disabled:opacity-60"
+                            className="mt-4 h-12 w-full rounded-2xl bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-chip-muted-text disabled:opacity-60"
                           >
                             {claiming ? "받는 중..." : `${entry.label} 이용권 받기`}
                           </button>

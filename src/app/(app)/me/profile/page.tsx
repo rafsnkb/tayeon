@@ -271,7 +271,7 @@ export default function MyProfilePage() {
           type="submit"
           disabled={!canSave || saving}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            canSave ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            canSave ? "bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           } disabled:opacity-60`}
         >
           저장하기

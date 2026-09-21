@@ -262,7 +262,7 @@ export default function CompatibilityPage() {
           type="submit"
           disabled={!nickname.trim() || submitting || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            nickname.trim() && isDirty ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            nickname.trim() && isDirty ? "bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           } disabled:opacity-60`}
         >
           저장하기
