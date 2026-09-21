@@ -40,6 +40,7 @@ const THEMES = {
     text: "#2a1320",
     muted: "#7a5c60",
     chip: "#f6e4de",
+    tint: "#ffe9e3",
     // 확정된 자홍 → 코랄
     gradFrom: "#c2005f",
     gradTo: "#d23c21",
@@ -64,6 +65,7 @@ const THEMES = {
     text: "#d0c2c7",
     muted: "#a89298",
     chip: "#211a20",
+    tint: "#2b1119",
     gradFrom: "#ff8a6b",
     gradTo: "#ff5993",
     onGrad: "#08070a",
@@ -85,6 +87,7 @@ function frame(key, variant) {
   const style = `
       --page:${t.page}; --surface:${t.surface}; --surface-alt:${t.surfaceAlt};
       --line:${t.border}; --text:${t.text}; --muted:${t.muted}; --chip:${t.chip};
+      --tint:${t.tint};
       --grad:linear-gradient(30deg in oklab, ${t.gradFrom}, ${t.gradTo});
       --on-grad:${t.onGrad}; --link:${t.link}; --aurora-op:${t.auroraOpacity};
       --a1:${t.aurora[0]}; --a2:${t.aurora[1]}; --a3:${t.aurora[2]}; --a4:${t.aurora[3]};`;
@@ -128,9 +131,13 @@ function frame(key, variant) {
             지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
             버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.
           </div>
+          <!-- 칩이 말풍선과 모양·채도가 비슷해 누를 수 있는지 헷갈린다는 지적(2026-09-22).
+               색만으로는 안 갈린다(틴트를 깔아도 말풍선과 대비 1.17). 그래서 묶음 라벨로
+               "여기부터는 컨트롤"이라고 선언하고, 화살표로 방향을 준다. -->
           <div class="suggest in" style="--d:360ms">
-            <button>1. 지금 준비해야 할 건 뭘까?</button>
-            <button>2. 올해 안에 결정해도 될까?</button>
+            <p class="suggest-label">이어서 물어보기</p>
+            <button><span class="ico">→</span>지금 준비해야 할 건 뭘까?</button>
+            <button><span class="ico">→</span>올해 안에 결정해도 될까?</button>
           </div>
           <div class="bubble me in" style="--d:450ms">준비할 걸 더 알려줘</div>
           <!-- 리딩 대기: Motion-Driven의 "상태를 움직임으로 알린다" -->
@@ -258,10 +265,14 @@ const html = `<!doctype html>
   @keyframes bounce { 0%,60%,100% { transform:translateY(0); opacity:.5 } 30% { transform:translateY(-5px); opacity:1 } }
 
   .suggest { display:flex; flex-direction:column; gap:6px; }
-  .suggest button { text-align:left; font:inherit; font-size:12px; cursor:pointer;
-    background:var(--surface-alt); color:var(--link); border:1px solid var(--line);
-    border-radius:999px; padding:7px 13px; transition:transform 300ms ease, background 300ms ease; }
-  .suggest button:hover { transform:translateX(3px); background:var(--chip); }
+  .suggest-label { margin:2px 0 2px 2px; font-size:11px; color:var(--muted); }
+  .suggest button { display:flex; align-items:center; gap:7px; text-align:left; font:inherit;
+    font-size:12px; font-weight:600; cursor:pointer; border:0;
+    background:var(--tint); color:var(--link);
+    border-radius:999px; padding:8px 14px;
+    transition:transform 300ms ease, filter 300ms ease; }
+  .suggest button:hover { transform:translateX(3px); filter:brightness(1.05); }
+  .suggest .ico { font-size:11px; opacity:.9; }
 
   .composer { position:absolute; left:12px; right:12px; bottom:34px; border-radius:24px;
     padding:10px; background:var(--surface); border:1px solid var(--line);
@@ -329,6 +340,7 @@ const html = `<!doctype html>
     <li><b>오로라 3겹이 서로 다른 주기로</b> 흐른다(패럴랙스). 같은 속도면 그림 한 장이 흔들리는 것처럼 보인다.</li>
     <li><b>리딩 대기를 점 세 개로</b> 바꿨다. 지금은 "이전 대화를 불러오는 중..." 같은 문장인데, 상태는 움직임으로 알리는 편이 빠르다.</li>
     <li><b>진입 애니메이션</b>은 90ms씩 밀린다. 한꺼번에 나타나면 순서가 안 읽힌다.</li>
+    <li><b>추천 질문에 묶음 라벨과 화살표</b>를 달았다. 틴트만으로는 말풍선과 대비 1.17이라 눈으로 안 갈린다 — 색이 아니라 언어와 모양으로 “누를 수 있음”을 말한다.</li>
     <li><b><code>prefers-reduced-motion</code></b>을 존중한다. OS에서 모션 줄이기를 켜면 전부 최종 상태로 고정된다 — 스펙의 필수 항목이다.</li>
   </ul>
 
