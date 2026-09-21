@@ -52,12 +52,11 @@ export const dailyBirthdayCouponPayout = onSchedule(
     const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
     const year = pick("year"), month = pick("month"), day = pick("day");
     const birthdayKey = `${year}-${month}${day}`;
-    const users = await db.collection("users").get();
+    // 예전에는 users 컬렉션을 통째로 읽어 문서마다 생일을 계산해 비교했다. 사용자가 늘수록
+    // 읽기 비용과 실행 시간이 선형으로 늘어나 결국 타임아웃에 걸리는 구조라, 쓰기 시점에
+    // 정규화해 둔 birthdayMMDD(src/lib/user/birthday.ts)로 동등 쿼리만 한다.
+    const users = await db.collection("users").where("birthdayMMDD", "==", `${month}${day}`).get();
     for (const user of users.docs) {
-      const data = user.data();
-      const birthDate = data.birthInfo?.birthDate;
-      const birthday = typeof data.kakaoBirthday === "string" ? data.kakaoBirthday : typeof birthDate === "string" ? birthDate.slice(5, 10).replace("-", "") : null;
-      if (birthday !== `${month}${day}`) continue;
       const ledger = user.ref.collection("birthdayCouponGrants").doc(birthdayKey);
       const reward = user.ref.collection("pendingRewards").doc();
       await db.runTransaction(async (tx) => {

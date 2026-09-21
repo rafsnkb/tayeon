@@ -139,20 +139,21 @@ const READING_LOADING_MESSAGES = [
 function ReadingLoadingMessage() {
   const [messageIndex, setMessageIndex] = useState(0);
   const [typedLength, setTypedLength] = useState(0);
-  const [phase, setPhase] = useState<"typing" | "holding" | "fading">("typing");
+  // 예전엔 "typing" 다음에 "holding" 단계를 따로 두고 타이핑이 끝나는 순간 이펙트 안에서
+  // 동기적으로 setPhase("holding")을 호출했는데, 이러면 렌더가 한 번 더 도는 연쇄가 생긴다.
+  // holding은 화면상 "커서만 사라진 typing"이라, 커서 표시 여부를 typedLength에서 직접
+  // 끌어내면 단계 자체가 필요 없어진다.
+  const [phase, setPhase] = useState<"typing" | "fading">("typing");
   const message = READING_LOADING_MESSAGES[messageIndex];
+  const typingDone = typedLength >= message.length;
 
   useEffect(() => {
     if (phase === "typing") {
-      if (typedLength < message.length) {
+      if (!typingDone) {
         const timeout = setTimeout(() => setTypedLength((length) => length + 1), 42);
         return () => clearTimeout(timeout);
       }
-      setPhase("holding");
-      return;
-    }
-
-    if (phase === "holding") {
+      // 다 친 뒤 1초 머무른 다음 페이드아웃으로 넘어간다.
       const timeout = setTimeout(() => setPhase("fading"), 1000);
       return () => clearTimeout(timeout);
     }
@@ -163,7 +164,7 @@ function ReadingLoadingMessage() {
       setPhase("typing");
     }, 1000);
     return () => clearTimeout(timeout);
-  }, [message.length, phase, typedLength]);
+  }, [phase, typingDone]);
 
   return (
     <div
@@ -173,7 +174,9 @@ function ReadingLoadingMessage() {
       }`}
     >
       {message.slice(0, typedLength)}
-      {phase === "typing" && <span aria-hidden="true" className="ml-0.5 inline-block animate-pulse">|</span>}
+      {phase === "typing" && !typingDone && (
+        <span aria-hidden="true" className="ml-0.5 inline-block animate-pulse">|</span>
+      )}
     </div>
   );
 }

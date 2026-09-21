@@ -10,6 +10,7 @@ const navigation = [
   { href: "/refund-requests", label: "환불" },
   { href: "/analytics", label: "분석" },
   { href: "/notices", label: "공지" },
+  { href: "/retained-data", label: "보관" },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

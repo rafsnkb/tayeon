@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import type { BirthInfo, JasiRule } from "@/lib/tarot/birthInfo";
+import { normalizeBirthdayMMDD } from "@/lib/user/birthday";
 
 const JASI_RULES: JasiRule[] = ["midnight", "jasi", "splitJasi"];
 
@@ -48,11 +49,14 @@ export async function POST(req: NextRequest) {
   };
 
   const userRef = adminDb.collection("users").doc(uid);
+  // 정규화된 생일은 카카오 생일이 우선이라, 이미 저장된 카카오 값을 확인한 뒤 결정한다.
+  const kakaoBirthday = (await userRef.get()).data()?.kakaoBirthday;
   await userRef.set(
     {
       nickname: trimmed,
       termsAgreedAt: new Date().toISOString(),
       ...birthInfoUpdate,
+      birthdayMMDD: normalizeBirthdayMMDD(kakaoBirthday, birthInfoUpdate.birthInfo.birthDate),
     },
     { merge: true }
   );

@@ -3,6 +3,15 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SUPPORT_EMAIL } from "@/lib/company";
 import { DISPUTE_RECORD_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
+import { consumeRateLimit, clientIp } from "@/lib/rateLimit";
+
+// 이 엔드포인트는 일부러 비로그인도 받는다 — 로그인이 안 되는 상황이야말로 문의가 필요하기
+// 때문이다. 대신 한 번 호출될 때마다 Firestore 쓰기와 Resend 메일(첨부 포함)이 발생하므로,
+// 제한이 없으면 운영자 메일함과 과금이 그대로 공격 표면이 된다. 로그인 사용자는 UID 기준으로,
+// 비로그인은 IP 기준으로 더 빡빡하게 건다(IP는 위조될 수 있어 인증이 아니라 완화 수단).
+const INQUIRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const INQUIRY_LIMIT_PER_USER = 5;
+const INQUIRY_LIMIT_PER_IP = 2;
 import {
   MAX_SUPPORT_ATTACHMENTS,
   MAX_SUPPORT_ATTACHMENT_BYTES,
@@ -78,6 +87,28 @@ export async function POST(req: NextRequest) {
   }
 
   const uid = await getUidFromRequest(req);
+
+  const limited = uid
+    ? await consumeRateLimit(`support:uid:${uid}`, INQUIRY_LIMIT_PER_USER, INQUIRY_WINDOW_MS)
+    : await (async () => {
+        const ip = clientIp(req);
+        // IP를 못 구하면(헤더 누락) 비로그인 요청은 받지 않는다 — 제한을 걸 수 없는 익명 요청을
+        // 무제한으로 통과시키는 것보다 낫다. 로그인 후 문의하거나 이메일로 문의할 수 있다.
+        if (!ip) return { ok: false as const, retryAfterSeconds: 60 };
+        return consumeRateLimit(`support:ip:${ip}`, INQUIRY_LIMIT_PER_IP, INQUIRY_WINDOW_MS);
+      })();
+  if (!limited.ok) {
+    return NextResponse.json(
+      {
+        error: uid
+          ? `문의는 하루 ${INQUIRY_LIMIT_PER_USER}건까지 접수할 수 있어요. 기존 문의에 대한 답변을 기다려주세요.`
+          : `문의가 너무 많이 접수됐어요. 로그인 후 문의하시거나 ${SUPPORT_EMAIL}로 보내주세요.`,
+        code: "RATE_LIMITED",
+      },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSeconds) } }
+    );
+  }
+
   const inquiryRef = adminDb.collection("supportInquiries").doc();
   const createdAt = new Date().toISOString();
   await inquiryRef.create({

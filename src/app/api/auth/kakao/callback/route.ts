@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { findUidByReferralCode, grantSignupFreePass, grantSignupReferralReward } from "@/lib/referral/code";
 import { USERS } from "@/lib/firestore/collections";
+import { normalizeBirthdayMMDD } from "@/lib/user/birthday";
 
 const KAKAO_REST_API_KEY = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!;
 const KAKAO_REDIRECT_URI = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI!;
@@ -85,6 +86,9 @@ export async function GET(req: NextRequest) {
       ...(profileImage !== null ? { profileImage } : {}),
       ...(email !== null ? { email } : {}),
       ...(birthday !== null ? { kakaoBirthday: birthday, kakaoBirthyear: birthyear, kakaoBirthdayType: profile.kakao_account?.birthday_type ?? null, kakaoIsLeapMonth: profile.kakao_account?.is_leap_month ?? null } : {}),
+      // 생일 쿠폰 배치가 동등 쿼리로 찾을 수 있게 정규화한 값을 같이 심는다. 카카오 생일은
+      // birthInfo보다 우선하므로, 값이 있으면 기존 birthInfo 기반 값을 덮어써도 된다.
+      ...(birthday !== null ? { birthdayMMDD: normalizeBirthdayMMDD(birthday, null) } : {}),
       ...(referredBy ? { referredBy } : {}),
       updatedAt: new Date().toISOString(),
     },
