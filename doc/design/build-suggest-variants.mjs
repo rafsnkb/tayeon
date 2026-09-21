@@ -9,7 +9,12 @@
 // 뺐다. 대비 수치도 같이 낸다.
 
 import { writeFileSync } from "node:fs";
-import { contrast } from "./build-point-ramp.mjs";
+import { contrast, toOklch } from "./build-point-ramp.mjs";
+
+// 칩 면이 배경에서 "떠 보이는" 정도는 명암비로 재면 안 된다. 명암비는 밝은 쪽에서 눌린다 —
+// 라이트의 1.10과 다크의 1.15는 같은 값처럼 보이지만 실제 밝기 차이는 0.031 대 0.088로 다크가
+// 세 배 가까이 크다. 라이트에서만 칩이 안 보였던 이유가 이것이다. OKLab L 차이로 잰다.
+const step = (a, b) => Math.abs(toOklch(a).L - toOklch(b).L);
 
 const T = {
   light: {
@@ -25,7 +30,7 @@ const T = {
     gradFrom: "#c2005f",
     onGrad: "#ffffff",
     link: "#ac0053",
-    tint: "#ffe9e3",
+    tint: "#ffd2c7",
   },
   dark: {
     label: "다크",
@@ -94,7 +99,7 @@ function block(key) {
     const fg = v.fg(t);
     const bg = v.bgGrad ? t.gradFrom : v.bg(t);
     const ratio = contrast(bg, fg);
-    const sep = contrast(bg, t.surface);
+    const sep = step(bg, t.page);
     return `
       <div class="variant">
         <h4>${v.name}</h4>
@@ -113,7 +118,7 @@ function block(key) {
         </div>
         <dl class="facts">
           <div><dt>칩 위 글자</dt><dd class="${ratio >= 4.5 ? "pass" : "fail"}">${fmt(ratio)}</dd></div>
-          <div><dt>칩이 말풍선과 갈리는 정도<small>같으면 1.00</small></dt><dd class="note">${fmt(sep)}</dd></div>
+          <div><dt>칩이 배경에서 떠 보이는 정도<small>OKLab 밝기차 · 같으면 0</small></dt><dd class="${sep >= 0.06 ? "pass" : "fail"}">${sep.toFixed(3)}</dd></div>
         </dl>
       </div>`;
   }).join("");
@@ -185,8 +190,10 @@ const html = `<!doctype html>
   ${block("light")}
   ${block("dark")}
   <footer>
-    “칩이 말풍선과 갈리는 정도”는 칩 면과 말풍선 면의 대비다. 접근성 기준이 아니라
-    <b>같아 보이는지 아닌지</b>를 재는 값이라 판정을 붙이지 않았다 — 1.00이면 완전히 같은 색이다.
+    “떠 보이는 정도”는 칩 면과 배경의 <b>OKLab 밝기 차이</b>다. 여기에 명암비를 쓰면 안 된다 —
+    명암비는 밝은 쪽에서 눌려서, 라이트의 1.10과 다크의 1.15가 같은 값처럼 보이지만 실제
+    밝기 차이는 0.031 대 0.088이다. 라이트에서만 칩이 안 보였던 게 그래서다.
+    0.06을 기준선으로 뒀다 — 다크에서 문제없던 0.088보다 살짝 낮은 값이다.
     <br><br>
     생성: <code>node doc/design/build-suggest-variants.mjs</code>
   </footer>
@@ -202,7 +209,7 @@ for (const key of Object.keys(T)) {
   for (const v of VARIANTS) {
     const bg = v.bgGrad ? t.gradFrom : v.bg(t);
     console.log(
-      `${t.label} ${v.name.padEnd(18)} 글자 ${fmt(contrast(bg, v.fg(t)))}  말풍선과 갈림 ${fmt(contrast(bg, t.surface))}`,
+      `${t.label} ${v.name.padEnd(18)} 글자 ${fmt(contrast(bg, v.fg(t)))}  배경과 밝기차 ${step(bg, t.page).toFixed(3)}`,
     );
   }
 }

@@ -14,7 +14,7 @@ function hexToRgb(hex) {
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 }
 
-function rgbToHex([r, g, b]) {
+export function rgbToHex([r, g, b]) {
   return (
     "#" +
     [r, g, b]
@@ -51,7 +51,7 @@ function oklabToRgb([L, a, b]) {
 const inGamut = ([r, g, b]) => [r, g, b].every((v) => v >= -0.0005 && v <= 1.0005);
 
 /** 주어진 L·H에서 sRGB 안에 들어오는 가장 진한 색을 찾는다(채도를 이분 탐색으로 줄인다). */
-function oklch(L, C, H) {
+export function oklch(L, C, H) {
   const rad = (H * Math.PI) / 180;
   const at = (c) => oklabToRgb([L, c * Math.cos(rad), c * Math.sin(rad)]);
   if (inGamut(at(C))) return at(C);
@@ -65,7 +65,7 @@ function oklch(L, C, H) {
   return at(lo);
 }
 
-function toOklch(hex) {
+export function toOklch(hex) {
   const [L, a, b] = rgbToOklab(hexToRgb(hex));
   return { L, C: Math.hypot(a, b), H: (Math.atan2(b, a) * 180) / Math.PI };
 }

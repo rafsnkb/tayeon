@@ -40,7 +40,7 @@ const THEMES = {
     text: "#2a1320",
     muted: "#7a5c60",
     chip: "#f6e4de",
-    tint: "#ffe9e3",
+    tint: "#ffd2c7",
     // 확정된 자홍 → 코랄
     gradFrom: "#c2005f",
     gradTo: "#d23c21",

@@ -34,7 +34,7 @@
 // 아이콘에 글자를 붙이는 원칙은 그대로 둔다 — 그건 크기와 무관한 문제다.
 
 import { writeFileSync } from "node:fs";
-import { contrast } from "./build-point-ramp.mjs";
+import { contrast, toOklch } from "./build-point-ramp.mjs";
 
 const T = {
   light: {
@@ -46,7 +46,7 @@ const T = {
     text: "#2a1320",
     muted: "#6d5257",
     chip: "#f6e4de",
-    tint: "#ffe9e3",
+    tint: "#ffd2c7",
     grad: "linear-gradient(30deg in oklab, #c2005f, #d23c21)",
     gradFrom: "#c2005f",
     onGrad: "#ffffff",
@@ -87,6 +87,10 @@ const FIXES = [
   { what: "궁합 상대 정보", before: "68×14 · 12px", after: "34h 줄 안의 링크, 13px", why: "높이 14px는 정밀 탭을 요구한다" },
   { what: "회사 정보", before: "37×15 · 10px", after: "32h 영역, 12px", why: "10px는 읽히지 않는다" },
 ];
+
+// 칩 면이 떠 보이는 정도는 명암비가 아니라 OKLab 밝기차로 잰다. 명암비는 밝은 쪽에서
+// 눌려서, 라이트 1.10 / 다크 1.15로 같아 보이던 것이 실제로는 0.031 대 0.088이었다.
+const chipStep = (t) => Math.abs(toOklch(t.tint).L - toOklch(t.page).L);
 
 const fmt = (n) => n.toFixed(2);
 
@@ -167,6 +171,7 @@ function frame(key) {
       <div><dt>가장 작은 터치 영역<small>이전 68×14 · 웹 하한 24px</small></dt><dd class="pass">30px</dd></div>
       <div><dt>본문 대비</dt><dd class="pass">${fmt(contrast(t.surface, t.text))}</dd></div>
       <div><dt>보조 글자 대비</dt><dd class="${contrast(t.surface, t.muted) >= 4.5 ? "pass" : "fail"}">${fmt(contrast(t.surface, t.muted))}</dd></div>
+      <div><dt>추천 질문 칩이 배경에서 떠 보이는 정도<small>OKLab 밝기차 — 명암비는 밝은 쪽에서 눌려 못 쓴다</small></dt><dd class="${chipStep(t) >= 0.06 ? "pass" : "fail"}">${chipStep(t).toFixed(3)}</dd></div>
     </dl>
   </figure>`;
 }
