@@ -38,7 +38,8 @@
   .primary.hover { background: var(--fill-hover); }
   .primary.pressed { background: var(--fill-pressed); }
   .primary[disabled] { background: var(--chip); color: var(--chip-muted); cursor: default; }
-  .ghost { background: transparent; color: var(--link); border: 1.5px solid var(--accent-line); }
+  /* 테두리만 있는 버튼은 쓰지 않는다(2026-09-22, 사용자 결정) — 보조 버튼도 면을 채운다. */
+  .secondary { background: var(--chip); color: #fff; }
   .link { color: var(--link); text-decoration: underline; font-weight: 600; }
   .badge { background: var(--fill); color: var(--on-fill); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
 
@@ -164,7 +165,7 @@
     <div class="card">
       <h3>보조 · 링크 · 강조</h3>
       <div class="row">
-        <button class="ghost">친구 초대하기</button>
+        <button class="secondary">친구 초대하기</button>
         <a class="link" href="#">이용약관</a>
         <span class="badge">환불 가능</span>
       </div>
@@ -228,7 +229,7 @@
     <div class="card">
       <h3>보조 · 링크 · 강조</h3>
       <div class="row">
-        <button class="ghost">친구 초대하기</button>
+        <button class="secondary">친구 초대하기</button>
         <a class="link" href="#">이용약관</a>
         <span class="badge">환불 가능</span>
       </div>

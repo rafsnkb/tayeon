@@ -231,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 router.push("/notifications");
               }}
               aria-label="알림"
-              className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-icon-muted text-icon-muted"
+              className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-chip-fill text-white"
             >
               <BellIcon className="h-5 w-5" />
               {hasUnreadNotifications && (

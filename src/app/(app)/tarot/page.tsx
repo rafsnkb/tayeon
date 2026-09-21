@@ -1281,7 +1281,7 @@ function TarotChat() {
                   type="button"
                   onClick={() => setRoomInfoOpen((v) => !v)}
                   aria-label="대화방 정보"
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-icon-muted text-icon-muted"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-chip-fill text-white"
                 >
                   <RoomInfoIcon className="h-1 w-4" />
                 </button>
@@ -1337,8 +1337,8 @@ function TarotChat() {
               aria-label="보유 시간제 이용권"
               className={`pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full ${
                 timePasses.length > 0
-                  ? "bg-point text-white dark:h-9 dark:w-9 dark:border dark:border-point dark:bg-point-bg dark:text-point-text"
-                  : "bg-[#79678f] text-white dark:h-9 dark:w-9 dark:border dark:border-icon-muted dark:bg-transparent dark:text-icon-muted"
+                  ? "bg-point text-white dark:h-9 dark:w-9"
+                  : "bg-chip-fill text-white dark:h-9 dark:w-9"
               }`}
             >
               <TicketIcon className="h-5 w-6 dark:h-4 dark:w-5" />
@@ -1454,7 +1454,7 @@ function TarotChat() {
                         setQuestion(s);
                         questionInputRef.current?.focus();
                       }}
-                      className="rounded-full border border-point px-3 py-1.5 text-left text-sm text-point-text"
+                      className="rounded-full bg-point-bg px-3 py-1.5 text-left text-sm text-point-text"
                     >
                       {j + 1}. {s}
                     </button>
