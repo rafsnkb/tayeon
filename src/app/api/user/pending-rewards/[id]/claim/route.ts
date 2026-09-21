@@ -31,11 +31,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const passId = await adminDb.runTransaction(async (tx) => {
       const userSnap = await tx.get(userRef);
+      // Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다 먼저 와야 한다. 아래 정지 해제가 쓰기라서,
+      // 보상 문서 읽기를 그 뒤에 두면 "정지가 만료된 사용자가 보상을 수령"하는 경로에서만
+      // 트랜잭션이 통째로 실패한다 — 읽기를 여기서 다 끝내둔다.
+      const snap = await tx.get(rewardRef);
       const userData = userSnap.data();
+      let liftExpiredSuspension = false;
       if (userData?.suspended) {
         const suspendedUntil = Date.parse(userData.suspendedUntil ?? "");
         if (Number.isFinite(suspendedUntil) && suspendedUntil <= Date.now()) {
-          tx.update(userRef, { suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
+          liftExpiredSuspension = true;
         } else {
           throw Object.assign(new Error("SUSPENDED"), {
             reason: userData.suspendedReason ?? null,
@@ -51,7 +56,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           throw new Error("NO_BIRTH_TIME");
         }
       }
-      const snap = await tx.get(rewardRef);
+      if (liftExpiredSuspension) {
+        tx.update(userRef, { suspended: false, suspendedAt: null, suspendedUntil: null, suspendedReason: null });
+      }
       if (!snap.exists) throw new Error("NOT_FOUND");
       const data = snap.data()!;
       if (data.status !== "pending") throw new Error("ALREADY_RESOLVED");

@@ -86,19 +86,21 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
     const passId =
       paymentData.productType === "countPass" ? paymentData.countPassId : paymentData.timePassId;
 
+    // Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다 먼저 와야 한다 — 아래 읽기를 쓰기 뒤로
+    // 옮기면 "Firestore transactions require all reads to be executed before all writes"로
+    // 실패한다. 읽기를 여기서 모두 끝내고, 쓰기는 그 뒤에 모아서 한다.
+    const passRef = passCollection && passId ? userRef.collection(passCollection).doc(passId) : null;
+    const passSnap = passRef ? await tx.get(passRef) : null;
+    const userSnap = await tx.get(userRef);
+
     let passStatusBefore: string | null = null;
-    if (passCollection && passId) {
-      const passRef = userRef.collection(passCollection).doc(passId);
-      const passSnap = await tx.get(passRef);
-      if (passSnap.exists) {
-        passStatusBefore = (passSnap.data()?.status as string | undefined) ?? null;
-        tx.update(passRef, { status: "refunded", refundedAt: now });
-      }
+    if (passRef && passSnap?.exists) {
+      passStatusBefore = (passSnap.data()?.status as string | undefined) ?? null;
+      tx.update(passRef, { status: "refunded", refundedAt: now });
     }
 
     // 사용자 문서의 활성 포인터가 회수된 이용권을 가리키고 있으면 같이 끊는다. 이걸 안 하면
     // 시간제는 activeTimePass.expiresAt이 남아있는 동안 계속 무제한으로 쓸 수 있다.
-    const userSnap = await tx.get(userRef);
     const userData = userSnap.data() as
       | { activeCountPass?: { passId?: string } | null; activeTimePass?: { passId?: string } | null }
       | undefined;
