@@ -25,7 +25,7 @@ env:
 
   # 로그인 허용 카카오 계정 이메일(쉼표 구분). 비워두면 아무도 로그인할 수 없다(fail-closed).
   - variable: LOGIN_ALLOWED_EMAILS
-    value: "seonghee.lee@rafraum.com"
+    value: "redteart@kakao.com"
     availability:
       - RUNTIME
 
