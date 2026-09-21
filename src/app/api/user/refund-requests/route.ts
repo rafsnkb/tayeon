@@ -3,7 +3,8 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { USERS, PAYMENTS, COUNT_PASSES, TIME_PASSES, REFUND_REQUESTS } from "@/lib/firestore/collections";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
-import { DISPUTE_RECORD_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
+import { DISPUTE_RECORD_RETENTION_MONTHS } from "@/lib/legal/retention";
+import { retentionExpiresAt } from "@/lib/legal/retentionTimestamp";
 
 const WINDOW_MS = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 

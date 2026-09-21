@@ -2,7 +2,8 @@ import { randomBytes } from "crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { addMonthsClamped } from "@/lib/util/dateMath";
-import { GRANT_MARKER_RETENTION_MONTHS, retentionExpiresAt } from "@/lib/legal/retention";
+import { GRANT_MARKER_RETENTION_MONTHS } from "@/lib/legal/retention";
+import { retentionExpiresAt } from "@/lib/legal/retentionTimestamp";
 import {
   REFERRAL_SIGNUP_FRIEND_CAP,
   REFERRAL_SIGNUP_FREE_PASSES,
