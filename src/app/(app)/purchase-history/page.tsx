@@ -19,6 +19,8 @@ type PurchaseEntry = {
   refundable: boolean;
   /** 구입한 옵션("타로 전용" 등). 조합 개념이 없던 시절 이용권은 null. */
   combo: string | null;
+  /** 환불이 거절된 경우의 사유. 왜 막혔는지 모르면 같은 사유로 다시 넣게 된다. */
+  rejectionReason: string | null;
 };
 
 /** 피그마 "Screen / PurchaseHistory" — 실제 결제(users/{uid}/payments) 내역을 보여준다.
@@ -120,6 +122,7 @@ ${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`,
                     {/* 초록 배지는 "아직 환불할 수 있다"는 신호다 — 라벨이 "미사용"이라도
                         환불 기간(7일)이 지났으면 환불이 불가능하므로 회색으로 내린다.
                         같은 조건으로 위의 "환불하기" 링크도 같이 사라진다. */}
+                    {/* 거절 사유는 배지 옆이 아니라 아래 줄에 둔다 — 문장이라 길다. */}
                     {e.badge && (
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -130,6 +133,9 @@ ${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`,
                       </span>
                     )}
                   </div>
+                  {e.rejectionReason && (
+                    <p className="mt-2 text-sm text-urgent">환불 거절 사유: {e.rejectionReason}</p>
+                  )}
                 </div>
               </div>
             ))}

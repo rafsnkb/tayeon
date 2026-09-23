@@ -72,8 +72,8 @@ export async function GET(req: NextRequest) {
   const requestSnaps = paymentsSnap.docs.length
     ? await adminDb.getAll(...paymentsSnap.docs.map((d) => adminDb.collection(REFUND_REQUESTS).doc(d.id)))
     : [];
-  const refundRequestStatus = new Map(
-    requestSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data()?.status as string | undefined])
+  const refundRequests = new Map(
+    requestSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data() ?? {}])
   );
 
   const entries = await Promise.all(
@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
           badge: "환불완료",
           refundable: false,
           combo,
+          rejectionReason: null,
         };
       }
       if (passData) {
@@ -114,15 +115,18 @@ export async function GET(req: NextRequest) {
       }
       // 환불을 요청해 둔 건은 이용권이 아직 "미사용"이어도 그렇게 보이면 안 된다 — 사용자가
       // 요청한 사실이 화면에서 사라져 버린다. 처리 중이므로 다시 요청할 수도 없다.
-      const requested = refundRequestStatus.get(doc.id);
+      const request = refundRequests.get(doc.id);
+      const requested = request?.status as string | undefined;
+      let rejectionReason: string | null = null;
       if (requested === "pending") {
         badge = "환불 대기 중";
         refundable = false;
       } else if (requested === "rejected") {
-        // 거절된 건은 재요청이 막혀 있다(refund-requests 가 paymentId 로 create 하므로 두 번째
-        // 요청은 already-exists 로 실패한다). "미사용 + 환불하기"로 두면 눌러도 에러만 난다.
+        // 거절돼도 이용권은 다시 unused 로 풀리므로(어드민 거절 라우트) 조건만 맞으면 다시
+        // 요청할 수 있다 — 청약철회는 소비자의 권리라 한 번 거절로 막을 수 없다. 왜 거절됐는지
+        // 모르면 같은 사유로 다시 넣게 되므로 사유를 같이 내려준다.
         badge = "환불 거절됨";
-        refundable = false;
+        rejectionReason = typeof request?.rejectionReason === "string" ? request.rejectionReason : null;
       }
       if (refundable) {
         const paidAt = Date.parse(data.paidAt ?? data.fulfilledAt);
@@ -137,6 +141,7 @@ export async function GET(req: NextRequest) {
         badge,
         refundable,
         combo,
+        rejectionReason,
       };
     })
   );

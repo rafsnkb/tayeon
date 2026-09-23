@@ -4,7 +4,7 @@ import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { DEFAULT_TONE } from "@/lib/tarot/tone";
 import { pickActiveCountPass } from "@/lib/tarot/activeCountPass";
 import type { ComboKey, CountPassStatus } from "@/lib/tarot/pricing";
-import { USERS, TIME_PASSES, COUNT_PASSES, PENDING_REWARDS } from "@/lib/firestore/collections";
+import { USERS, TIME_PASSES, COUNT_PASSES, PENDING_REWARDS, REFUND_REQUESTS } from "@/lib/firestore/collections";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -88,9 +88,20 @@ export async function GET(req: NextRequest) {
   // (/api/user/received-passes)과 같은 두 소스(admin-grant countPasses + pendingRewards)를
   // 훑어서, 마지막으로 알림을 확인한 시각(notificationsSeenAt) 이후 새로 생긴 게 있으면 켠다.
   const notificationsSeenAt = data?.notificationsSeenAt as string | undefined;
+  // 환불 진행(접수/거절/완료)도 알림 목록에 뜨므로 배지 판단에 같이 넣는다 — 목록에는
+  // 보이는데 점이 안 켜지면 사용자는 새 알림이 온 걸 모른다(2026-09-24).
+  const refundSnap = await adminDb
+    .collection(REFUND_REQUESTS)
+    .where("uid", "==", uid)
+    .get()
+    .catch(() => null);
   const notifiableCreatedAts = [
     ...countPassesSnap.docs.filter((doc) => doc.data().source === "admin-grant").map((doc) => doc.data().createdAt as string),
     ...pendingRewardsSnap.docs.map((doc) => doc.data().createdAt as string),
+    ...(refundSnap?.docs.flatMap((doc) => {
+      const data = doc.data();
+      return [data.requestedAt, data.rejectedAt, data.approvedAt].filter((v): v is string => typeof v === "string");
+    }) ?? []),
   ];
   const hasUnreadNotifications = notifiableCreatedAts.some(
     (createdAt) => typeof createdAt === "string" && (!notificationsSeenAt || createdAt > notificationsSeenAt)

@@ -35,9 +35,27 @@ export async function POST(req: NextRequest) {
     // 요청 접수와 이용권 잠금을 한 트랜잭션에 묶는다. 따로 하면 접수만 되고 이용권은 멀쩡한
     // 순간이 생기고, 그 틈에 쓰면 "요청 → 사용 → 환불"로 공짜가 된다.
     await adminDb.runTransaction(async (tx) => {
-      const passSnap = await tx.get(passRef);
+      const [passSnap, existingSnap] = await Promise.all([tx.get(passRef), tx.get(requestRef)]);
       if (passSnap.data()?.status !== "unused") throw new Error("PASS_NOT_UNUSED");
-      tx.create(requestRef, { uid, paymentId, reason: reason.trim().slice(0, 1000), status: "pending", requestedAt,
+      // 거절된 건은 다시 요청할 수 있다. 청약철회는 소비자의 권리라 한 번 거절됐다고 막으면
+      // 권리 행사를 막는 것이 된다(약관 제9조3항 — 제17조②에 해당할 때만 거절 가능).
+      // 이전 시도는 지우지 않고 history 에 쌓는다 — 분쟁처리 기록 3년 보존 대상이다.
+      const existing = existingSnap.data();
+      if (existing && existing.status !== "rejected") throw new Error("ALREADY_PENDING");
+      const history = Array.isArray(existing?.history) ? existing.history : [];
+      if (existing) {
+        history.push({
+          reason: existing.reason ?? null,
+          requestedAt: existing.requestedAt ?? null,
+          status: existing.status ?? null,
+          rejectedAt: existing.rejectedAt ?? null,
+          rejectionReason: existing.rejectionReason ?? null,
+        });
+      }
+      const write = existing ? tx.set.bind(tx) : tx.create.bind(tx);
+      write(requestRef, { uid, paymentId, reason: reason.trim().slice(0, 1000), status: "pending", requestedAt,
+        history, attempt: history.length + 1,
+        rejectedAt: null, rejectionReason: null, rejectedByUid: null,
         // 소비자 불만·분쟁처리 기록 3년(개인정보처리방침 제3조).
         expiresAt: retentionExpiresAt(requestedAt, DISPUTE_RECORD_RETENTION_MONTHS), productId: payment.productId ?? null, orderName: payment.orderName ?? null, productType: payment.productType ?? null, priceWon: payment.priceWon ?? 0, paidAt: payment.paidAt ?? null, paymentMethod: payment.paymentMethod ?? null });
       // 승인 전까지 못 쓰게 잠근다. "쓸 수 있는가"를 묻는 검사는 전부 unused/active 만 보므로
@@ -47,6 +65,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof Error && error.message === "PASS_NOT_UNUSED") return NextResponse.json({ error: "미사용 이용권만 환불을 요청할 수 있어요." }, { status: 409 });
+    if (error instanceof Error && error.message === "ALREADY_PENDING") return NextResponse.json({ error: "이미 환불 요청이 접수되어 있어요." }, { status: 409 });
     const code = typeof error === "object" && error && "code" in error ? (error as { code?: unknown }).code : null;
     if (code === 6 || code === "already-exists") return NextResponse.json({ error: "이미 환불 요청이 접수되어 있어요." }, { status: 409 });
     throw error;
@@ -104,4 +123,57 @@ async function notifyRefundRequested(input: {
       : undefined,
     link: { label: "어드민에서 처리", url: ADMIN_REFUND_REQUESTS_URL },
   });
+}
+
+/** GET /api/user/refund-requests — 내 환불 요청의 진행 상황.
+ *
+ * 알림 목록(/notifications)이 "이용권 도착"만 보여주고 있어서, 환불을 신청해도 앱 안에
+ * 아무 흔적이 남지 않았다(2026-09-24 사용자 지적). 결제 내역 화면은 배지로 보여주지만
+ * 그건 찾아 들어가야 보인다.
+ *
+ * 접수·거절·완료를 각각 하나의 알림 항목으로 펼쳐서 돌려준다 — 한 요청이 거절됐다가 다시
+ * 접수되면 둘 다 보여야 하므로 history 도 같이 훑는다. */
+export async function GET(req: NextRequest) {
+  const uid = await getUidFromRequest(req);
+  if (!uid) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const snap = await adminDb.collection(REFUND_REQUESTS).where("uid", "==", uid).get();
+  const entries: { id: string; source: string; label: string; createdAt: string; detail?: string }[] = [];
+
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    const name = String(data.orderName ?? data.productId ?? "이용권");
+    const past = Array.isArray(data.history) ? data.history : [];
+
+    // 지난 시도(거절된 것들)를 먼저 펼친다.
+    past.forEach((item: Record<string, unknown>, index: number) => {
+      if (typeof item.requestedAt === "string") {
+        entries.push({ id: `${doc.id}:h${index}:requested`, source: "refund-requested", label: name, createdAt: item.requestedAt });
+      }
+      if (typeof item.rejectedAt === "string") {
+        entries.push({
+          id: `${doc.id}:h${index}:rejected`, source: "refund-rejected", label: name,
+          createdAt: item.rejectedAt,
+          detail: typeof item.rejectionReason === "string" ? item.rejectionReason : undefined,
+        });
+      }
+    });
+
+    if (typeof data.requestedAt === "string") {
+      entries.push({ id: `${doc.id}:requested`, source: "refund-requested", label: name, createdAt: data.requestedAt });
+    }
+    if (data.status === "rejected" && typeof data.rejectedAt === "string") {
+      entries.push({
+        id: `${doc.id}:rejected`, source: "refund-rejected", label: name,
+        createdAt: data.rejectedAt,
+        detail: typeof data.rejectionReason === "string" ? data.rejectionReason : undefined,
+      });
+    }
+    if (data.status === "approved" && typeof data.approvedAt === "string") {
+      entries.push({ id: `${doc.id}:approved`, source: "refund-approved", label: name, createdAt: data.approvedAt });
+    }
+  }
+
+  entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return NextResponse.json({ entries });
 }

@@ -8,7 +8,7 @@ import SubPageTopBar from "@/components/SubPageTopBar";
 import { ChevronRightIcon } from "@/app/(app)/tarot/icons";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 
-type NotificationEntry = { id: string; source: string; label: string; createdAt: string };
+type NotificationEntry = { id: string; source: string; label: string; createdAt: string; detail?: string };
 
 function monthLabel(createdAt: string): string {
   return String(new Date(createdAt).getMonth() + 1);
@@ -26,6 +26,13 @@ function notificationTitle(entry: NotificationEntry): string {
       return `${monthLabel(entry.createdAt)}월 친구 결제 리워드 이용권 도착!`;
     case "referral-signup":
       return "친구 초대 리워드 이용권 도착!";
+    // 환불은 "도착"이 아니라 진행 상황이라 문구 틀을 따로 쓴다.
+    case "refund-requested":
+      return `${entry.label} 환불 요청이 접수되었어요`;
+    case "refund-rejected":
+      return `${entry.label} 환불 요청이 거절되었어요`;
+    case "refund-approved":
+      return `${entry.label} 환불이 완료되었어요`;
     default:
       return `${entry.label} 도착!`;
   }
@@ -49,15 +56,19 @@ export default function NotificationsPage() {
     return onAuthStateChanged(auth, async (user: User | null) => {
       if (!user) return;
       const idToken = await user.getIdToken();
-      const [listRes] = await Promise.all([
+      // 이용권 도착과 환불 진행을 각각 다른 곳에서 읽어 한 목록으로 합친다. 한쪽이 실패해도
+      // 나머지는 보여준다 — 알림이 통째로 비어 보이는 것보다 낫다.
+      const [passRes, refundRes] = await Promise.all([
         fetch("/api/user/received-passes", { headers: { Authorization: `Bearer ${idToken}` } }),
+        fetch("/api/user/refund-requests", { headers: { Authorization: `Bearer ${idToken}` } }),
         fetch("/api/user/notifications/mark-read", { method: "POST", headers: { Authorization: `Bearer ${idToken}` } }),
       ]);
       setHasUnreadNotifications(false);
-      if (listRes.ok) {
-        const data = await listRes.json();
-        setEntries(data.entries);
-      }
+      const read = async (res: Response) =>
+        res.ok ? ((await res.json().catch(() => ({}))).entries as NotificationEntry[] | undefined) ?? [] : [];
+      const merged = [...(await read(passRes)), ...(await read(refundRes))];
+      merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setEntries(merged);
     });
   }, [setHasUnreadNotifications]);
 
@@ -75,7 +86,9 @@ export default function NotificationsPage() {
               <button
                 key={entry.id}
                 type="button"
-                onClick={() => router.push("/received-passes")}
+                onClick={() =>
+                  router.push(entry.source.startsWith("refund-") ? "/purchase-history" : "/received-passes")
+                }
                 className="grid w-full grid-cols-[1fr_auto] text-left"
               >
                 {/* 화살표 자리를 "행 높이와 같은 폭의 정사각형" 영역으로 두고 그 정중앙에
@@ -86,6 +99,9 @@ export default function NotificationsPage() {
                 <span className="min-w-0 py-4">
                   <span className="block truncate text-base font-semibold text-bold-text">{notificationTitle(entry)}</span>
                   <span className="mt-1 block text-sm text-icon-muted">{formatDate(entry.createdAt)}</span>
+                  {entry.detail && (
+                    <span className="mt-1 block text-sm text-urgent">사유: {entry.detail}</span>
+                  )}
                 </span>
                 <span className="flex aspect-square items-center justify-center">
                   <ChevronRightIcon className="h-4 w-2 text-bold-text" />
