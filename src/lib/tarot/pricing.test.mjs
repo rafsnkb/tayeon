@@ -16,13 +16,15 @@ import {
   signupFreePassAllowances,
 } from "./pricing.ts";
 
+// 2026-09-24 사용자 확정 가격표. [상품][조합][스프레드] — 조합은 타로 / +사주 / +자미두수 /
+// +사주+자미두수, 스프레드는 원카드·쓰리카드·양자택일·켈틱크로스 순.
 const expected = [
-  [[15, 10, 8, 6], [13, 9, 7, 5], [11, 8, 6, 4], [8, 5, 4, 3]],
-  [[31, 21, 16, 12], [26, 18, 14, 10], [23, 16, 12, 9], [16, 11, 8, 6]],
-  [[70, 47, 35, 28], [60, 40, 30, 24], [53, 35, 26, 21], [35, 24, 18, 14]],
-  [[200, 133, 100, 80], [170, 113, 85, 68], [150, 100, 75, 60], [100, 67, 50, 40]],
-  [[325, 217, 163, 130], [276, 184, 139, 111], [244, 163, 122, 98], [163, 109, 82, 65]],
-  [[675, 450, 338, 270], [574, 383, 287, 230], [506, 338, 254, 203], [338, 225, 169, 135]],
+  [[10, 7, 5, 4], [9, 6, 4, 3], [8, 5, 3, 2], [5, 4, 2, 1]],
+  [[21, 14, 10, 8], [18, 12, 9, 7], [16, 11, 8, 6], [11, 7, 5, 4]],
+  [[47, 31, 23, 19], [40, 26, 20, 16], [35, 23, 17, 14], [24, 16, 12, 10]],
+  [[133, 89, 67, 53], [113, 76, 57, 45], [100, 67, 50, 40], [67, 45, 34, 27]],
+  [[217, 144, 108, 87], [184, 122, 92, 74], [163, 108, 81, 65], [109, 72, 54, 44]],
+  [[450, 300, 225, 180], [383, 255, 191, 153], [338, 225, 169, 135], [225, 150, 113, 90]],
 ];
 
 test("purchase allowances match the published table", () => {
@@ -80,11 +82,11 @@ test("every advertised last use is available, including rounded counts (combo:an
 test("switching options recalculates the same remaining entitlement (combo:any)", () => {
   const basis = COUNT_PACKAGES[1].basis;
   const pass = { basis, remaining: 1, expiresAt: "2099-01-01", combo: "any", status: "unused", allowances: countAllowances(basis) };
-  assert.equal(availableCount(pass, "one", false, false), 31);
-  assert.equal(availableCount(pass, "one", true, true), 16);
+  assert.equal(availableCount(pass, "one", false, false), 21);
+  assert.equal(availableCount(pass, "one", true, true), 11);
   pass.remaining = remainingAfterUse(pass, "one", true, true);
-  assert.equal(availableCount(pass, "one", true, true), 15);
-  assert.equal(availableCount(pass, "one", false, false), 29);
+  assert.equal(availableCount(pass, "one", true, true), 10);
+  assert.equal(availableCount(pass, "one", false, false), 19);
   assert.equal(availableCount({ ...pass, expiresAt: "2020-01-01" }, "one", false, false), 0);
 });
 
@@ -96,13 +98,17 @@ test("a fractional remainder with no usable question is exhausted (combo:any)", 
 });
 
 test("cashback is converted to rounded one-card passes", () => {
-  assert.equal(rewardPassesForWon(540_000, 0.05), 135);
-  assert.equal(rewardPassesForWon(100_000, 0.05), 25);
-  assert.equal(rewardPassesForWon(30_000, 0.01), 2);
+  // 원카드 단가 300원 기준(2026-09-24 개정). 27,000원 → 90회, 5,000원 → 16.67 → 17회.
+  assert.equal(rewardPassesForWon(540_000, 0.05), 90);
+  assert.equal(rewardPassesForWon(100_000, 0.05), 17);
+  assert.equal(rewardPassesForWon(30_000, 0.01), 1);
 });
 
-test("free rewards do not inherit a paid-package display exception", () => {
-  assert.equal(countAllowances(3_000, false)["celtic-0-1"], 5);
+test("free rewards do not inherit the published table's hand-tuned cells", () => {
+  // 공표표는 스타터(basis 3000) 켈틱+자미두수를 2회로 깎아뒀지만, 같은 basis 를 우연히 갖게 된
+  // 무료 리워드는 계산식 그대로 3회여야 한다(round(3000/750) = 4 → 4 × 0.75 = 3).
+  assert.equal(countAllowances(3_000, false)["celtic-0-1"], 3);
+  assert.equal(countAllowances(3_000, true)["celtic-0-1"], 2);
 });
 
 test("signup pass guarantees four uses regardless of spread or options", () => {

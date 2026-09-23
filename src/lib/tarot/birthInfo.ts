@@ -45,6 +45,13 @@ export const JASI_RULE_DESCRIPTION: Record<JasiRule, string> = {
 
 const VALID_JASI_RULES: JasiRule[] = ["midnight", "jasi", "splitJasi"];
 
+/** 바깥에서 들어온 값이 자시법인지 확인한다. 같은 목록이 `/api/user/` 의 signup·birth-info·
+ *  settings 세 라우트에 각자 복사돼 있었고, 그중 settings 것만 타입이 빠져 있어서
+ *  `JasiRule` 에 값이 늘어도 거기만 조용히 옛 목록을 쓰게 돼 있었다(2026-09-24 정리). */
+export function isJasiRule(value: unknown): value is JasiRule {
+  return typeof value === "string" && VALID_JASI_RULES.includes(value as JasiRule);
+}
+
 /** 계산 라이브러리에 넘기기 전 필수 필드가 유효한 형태인지 확인 (구버전 스키마로 저장된 데이터 방어) */
 export function isValidBirthInfo(info: unknown): info is BirthInfo {
   if (!info || typeof info !== "object") return false;
@@ -54,7 +61,6 @@ export function isValidBirthInfo(info: unknown): info is BirthInfo {
     b.birthDate.length > 0 &&
     (b.gender === "male" || b.gender === "female" || b.gender === "unspecified") &&
     (b.calendarType === "solar" || b.calendarType === "lunar") &&
-    typeof b.jasiRule === "string" &&
-    VALID_JASI_RULES.includes(b.jasiRule as JasiRule)
+    isJasiRule(b.jasiRule)
   );
 }

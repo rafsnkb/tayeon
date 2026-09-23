@@ -15,15 +15,10 @@ import { addMonthsClamped } from "@/lib/util/dateMath";
 import {
   COUNT_PASS_VALIDITY_MONTHS,
   TIME_PASS_VALIDITY_MONTHS,
-  COMBOS,
   countAllowancesForCombo,
-  type ComboKey,
+  isComboKey,
 } from "@/lib/tarot/pricing";
 import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
-
-function isComboKey(value: unknown): value is ComboKey {
-  return typeof value === "string" && value in COMBOS;
-}
 
 /** 운영자가 환불을 검토할 때 필요한 결제수단만 보관한다. 카드 전체 번호·계좌번호는 저장하지 않는다. */
 function paymentMethodSummary(method: unknown): { type: string; label: string } | null {

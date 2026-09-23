@@ -1,8 +1,11 @@
+// cost 는 "금액 ↔ 횟수" 환산 단가다(코인 차감가가 아니다 — 코인 경로는 리딩 API 안에 따로
+// 박혀 있다). 2026-09-24 사용자 가격표 개정으로 네 스프레드 모두 1.5배: 200/300/400/500 →
+// 300/450/600/750. 같은 금액으로 살 수 있는 횟수가 그만큼 줄어든다.
 export const SPREADS = {
-  one: { label: "원카드", cardCount: 1, cost: 200 },
-  three: { label: "쓰리카드", cardCount: 3, cost: 300 },
-  dual: { label: "양자택일", cardCount: 5, cost: 400 },
-  celtic: { label: "켈틱크로스", cardCount: 10, cost: 500 },
+  one: { label: "원카드", cardCount: 1, cost: 300 },
+  three: { label: "쓰리카드", cardCount: 3, cost: 450 },
+  dual: { label: "양자택일", cardCount: 5, cost: 600 },
+  celtic: { label: "켈틱크로스", cardCount: 10, cost: 750 },
 } as const;
 
 export type SpreadKey = keyof typeof SPREADS;
@@ -21,6 +24,12 @@ export const COMBOS: Record<ComboKey, { saju: boolean; ziwei: boolean; label: st
   "tarot-ziwei": { saju: false, ziwei: true, label: "타로+자미두수" },
   "tarot-saju-ziwei": { saju: true, ziwei: true, label: "타로+사주+자미두수" },
 };
+
+/** 바깥(요청 본문 등)에서 들어온 값이 조합 키인지 확인한다. 결제 준비·이용권 지급·리워드
+ *  수령 세 군데에 똑같은 함수가 각자 복사돼 있었다(2026-09-24 정리). */
+export function isComboKey(value: unknown): value is ComboKey {
+  return typeof value === "string" && value in COMBOS;
+}
 
 export function comboKeyFor(saju: boolean, ziwei: boolean): ComboKey {
   return saju && ziwei ? "tarot-saju-ziwei" : saju ? "tarot-saju" : ziwei ? "tarot-ziwei" : "tarot";
@@ -69,12 +78,16 @@ export function bonusRewardRateForWon(totalWon: number): number {
 }
 
 export function rewardPassesForWon(totalWon: number, rate: number): number {
-  // 원카드 200원 상당을 1회로 환산하며, 표에 표시되는 횟수처럼 반올림으로 지급한다.
+  // 원카드 1회 단가(SPREADS.one.cost) 상당을 1회로 환산하며, 표에 표시되는 횟수처럼 반올림으로
+  // 지급한다. 2026-09-24 단가가 200→300으로 오르면서 같은 금액에 대한 페이백 회수도 그만큼
+  // 줄어든다 — 요율(%)이 아니라 금액 기준 페이백이므로 이게 일관된 동작이다.
   return Math.round((totalWon * rate) / SPREADS.one.cost);
 }
 
-// 원카드(200) 기준 타로/타로+사주/타로+사주+자미두수 = 200/250/400 이었던
-// 기존 기획 가격표에서 유도한 추가금. 자미두수는 사주 선택 시에만 추가 가능.
+// 코인 경로(이용권 없이 리딩할 때)의 옵션 추가금. 원카드(200) 기준 타로/타로+사주/
+// 타로+사주+자미두수 = 200/250/400 이었던 기존 기획 가격표에서 유도한 값이라, 위 SPREADS.cost
+// 개정(2026-09-24)과 무관하게 코인 가격표 그대로 둔다 — 코인 차감 단가는 리딩 API 안에 따로
+// 박혀 있다(src/app/api/tarot/reading/route.ts의 { one: 200, three: 250, ... }).
 export const SAJU_ADD_ON_COST = 50;
 export const ZIWEI_ADD_ON_COST = 150;
 
@@ -99,7 +112,9 @@ export const COUNT_PACKAGES = [
   { id: "count-starter", name: "스타터", priceWon: 3000, basis: 3000, bonus: "타연 체험에 추천" },
   { id: "count-basic", name: "베이직", priceWon: 5900, basis: 6200, bonus: "추가 횟수 +5% 포함" },
   { id: "count-standard", name: "스탠다드", priceWon: 12900, basis: 14000, bonus: "추가 횟수 +8.5% 포함" },
-  { id: "count-plus", name: "플러스", priceWon: 35000, basis: 40000, bonus: "추가 횟수 +11% 포함" },
+  // 36,000원. 예전엔 35,000원이었는데 basis 40,000 대비 +14%라 옆의 "+11%" 표기와 어긋나 있었다
+  // — 2026-09-24 가격표가 36,000원으로 확정되면서 표기와 맞아떨어진다(40000/36000 = 1.111).
+  { id: "count-plus", name: "플러스", priceWon: 36000, basis: 40000, bonus: "추가 횟수 +11% 포함" },
   { id: "count-premium", name: "프리미엄", priceWon: 55000, basis: 65000, bonus: "추가 횟수 +18% 포함" },
   { id: "count-ultimate", name: "얼티밋", priceWon: 110000, basis: 135000, bonus: "추가 횟수 +23% 포함" },
 ] as const;
@@ -131,15 +146,46 @@ export function formatMonths(months: number): string {
   return months % 12 === 0 ? `${months / 12}년` : `${months}개월`;
 }
 
+/** 스프레드를 늘어놓는 순서. 아래 공표 가격표(PUBLISHED_COUNT_TABLE)의 열 순서이자,
+ *  화면에서 횟수 표를 그리는 순서다 — 두 곳이 어긋나면 표를 잘못 읽게 되므로 한 곳에 둔다. */
+export const SPREAD_ORDER = ["one", "three", "dual", "celtic"] as const satisfies readonly SpreadKey[];
+
+/** 공표 가격표(2026-09-24 사용자 확정본)의 확정 회차. basis → 16칸.
+ *
+ *  칸 순서는 사용자 표와 같다 — 조합 4묶음(타로 / +사주 / +자미두수 / +사주+자미두수)이고,
+ *  각 묶음 안은 원카드·쓰리카드·양자택일·켈틱크로스 순이다.
+ *
+ *  **표가 진실의 원천이다.** 아래 formula(단가로 나눈 뒤 조합 배율)는 96칸 중 92칸을 그대로
+ *  재현하지만, 스타터의 자미두수 쪽 4칸(양자·켈틱 × 자미두수, 사주+자미두수)은 계산값보다
+ *  1회씩 낮게 확정돼 있다 — 가장 싼 상품이 비싼 조합에서 유리해지지 않도록 손으로 깎은 값이다.
+ *  예전엔 이런 칸을 `if` 예외 하나로 붙여뒀는데, 개정 때마다 예외가 늘어날 자리라 표를 통째로
+ *  데이터로 두고 계산식은 표에 없는 basis(리워드·관리자 지급 등) 전용 폴백으로 남긴다. */
+const PUBLISHED_COUNT_TABLE: Record<number, readonly number[]> = {
+  //          타로                +사주               +자미두수           +사주+자미두수
+  3_000:   [ 10,   7,   5,   4,    9,   6,   4,   3,    8,   5,   3,   2,    5,   4,   2,   1],
+  6_200:   [ 21,  14,  10,   8,   18,  12,   9,   7,   16,  11,   8,   6,   11,   7,   5,   4],
+  14_000:  [ 47,  31,  23,  19,   40,  26,  20,  16,   35,  23,  17,  14,   24,  16,  12,  10],
+  40_000:  [133,  89,  67,  53,  113,  76,  57,  45,  100,  67,  50,  40,   67,  45,  34,  27],
+  65_000:  [217, 144, 108,  87,  184, 122,  92,  74,  163, 108,  81,  65,  109,  72,  54,  44],
+  135_000: [450, 300, 225, 180,  383, 255, 191, 153,  338, 225, 169, 135,  225, 150, 113,  90],
+};
+
+/** usePublishedTable=false 는 "구매 상품과 같은 basis 를 우연히 갖게 된 무료 리워드"가 공표표의
+ *  손질된 값을 물려받지 않게 하려고 남겨둔 통로다(기존 usePublishedException 과 같은 목적). */
 export function countAllowance(
   basis: number,
   spread: SpreadKey,
   saju: boolean,
   ziwei: boolean,
-  usePublishedException = true
+  usePublishedTable = true
 ): number {
-  // 목업 표는 스타터 켈틱크로스+자미두수를 4회로 명시한다(일반 반올림은 5회).
-  if (usePublishedException && basis === 3000 && spread === "celtic" && !saju && ziwei) return 4;
+  if (usePublishedTable) {
+    const row = PUBLISHED_COUNT_TABLE[basis];
+    if (row) {
+      const comboIndex = saju && ziwei ? 3 : saju ? 1 : ziwei ? 2 : 0;
+      return row[comboIndex * SPREAD_ORDER.length + SPREAD_ORDER.indexOf(spread)];
+    }
+  }
   const base = Math.round(basis / SPREADS[spread].cost);
   return Math.round(base * (saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1));
 }
@@ -149,13 +195,13 @@ export function countKey(spread: SpreadKey, saju: boolean, ziwei: boolean): stri
 }
 
 // combo:"any"(가입 무료체험 전용) 이용권을 위한 16-엔트리(스프레드4 × 사주2 × 자미두수2) 표.
-export function countAllowances(basis: number, usePublishedException = true): Record<string, number> {
+export function countAllowances(basis: number, usePublishedTable = true): Record<string, number> {
   return Object.fromEntries(
     (Object.keys(SPREADS) as SpreadKey[]).flatMap((spread) =>
       [false, true].flatMap((saju) =>
         [false, true].map((ziwei) => [
           countKey(spread, saju, ziwei),
-          countAllowance(basis, spread, saju, ziwei, usePublishedException),
+          countAllowance(basis, spread, saju, ziwei, usePublishedTable),
         ])
       )
     )

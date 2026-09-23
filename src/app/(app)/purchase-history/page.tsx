@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateTime } from "@/lib/util/formatDate";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
@@ -16,12 +17,6 @@ type PurchaseEntry = {
   badge: string;
   refundable: boolean;
 };
-
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 /** 피그마 "Screen / PurchaseHistory" — 실제 결제(users/{uid}/payments) 내역을 보여준다.
  * 미사용 이용권만(구매 후 7일 이내) "환불하기" 링크가 뜨고, 누르면 환불 요청 확인 모달

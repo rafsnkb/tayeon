@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8">
+<title>타연 — 토스 톤 적용</title>
+<style>
+  @font-face { font-family:"Pretendard"; src:url("/asset/font/Pretendard-SemiBold.otf") format("opentype"); font-weight:600; }
+  @font-face { font-family:"Pretendard"; src:url("/asset/font/Pretendard-Bold.otf") format("opentype"); font-weight:700; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px; background:#0b0b0d; color:#dddfe5;
+         font-family:"Pretendard",system-ui,sans-serif; font-weight:600; font-size:14px; }
+  h1 { font-size:22px; margin:0 0 6px; font-weight:700; }
+  h2 { font-size:16px; margin:26px 0 10px; font-weight:700; color:#b6b8bb; }
+  p.note { max-width:1000px; line-height:1.65; color:#b6b8bb; margin:0 0 4px; font-size:13px; }
+  table { border-collapse:collapse; font-size:12px; margin:8px 0 0; }
+  th,td { border:1px solid #2b2b2d; padding:5px 9px; text-align:left; }
+  th { color:#8b8d8f; font-weight:600; }
+  code { font-family:ui-monospace,monospace; }
+
+  .frames { display:flex; flex-wrap:wrap; gap:22px; align-items:flex-start; margin-top:12px; }
+  .frame { margin:0; }
+  figcaption { font-size:12px; color:#8b8d8f; margin-bottom:7px; }
+
+  /* 393x852 = 아이폰 15 Pro CSS 뷰포트. 스크린샷과 같은 자에 올려놓고 본다. */
+  .screen { width:393px; height:852px; border-radius:26px; overflow:hidden;
+            background:var(--page); color:var(--text); position:relative;
+            display:flex; flex-direction:column; }
+  .screen.light { box-shadow:0 0 0 1px #2b2b2d; }
+  .col { display:flex; flex-direction:column; height:100%; position:relative; }
+  .spacer { flex:1; }
+
+  /* ── 메인화면 ── */
+  .topbar { display:flex; align-items:center; gap:14px; padding:14px 16px 10px; }
+  .icobtn { display:flex; flex-direction:column; align-items:center; gap:2px;
+            background:none; border:0; padding:2px 4px; cursor:pointer; color:var(--text);
+            font-family:inherit; font-weight:600; }
+  .ico { width:26px; height:26px; display:grid; place-items:center; font-size:15px; line-height:1; }
+  .ico.av { background:var(--fill); color:var(--on-fill); border-radius:50%; }
+  .ico.sm { font-size:13px; width:auto; height:auto; }
+  .icolbl { font-size:13px; color:var(--caption); }
+  .scroll { flex:1; overflow:hidden; padding:8px 16px 0; }
+  .title { font-size:22px; line-height:1.35; margin:10px 0 8px; color:var(--strong); font-weight:700; }
+  .brand { color:var(--point); font-weight:700; }
+  .sub { font-size:15px; line-height:1.55; color:var(--muted); margin:0 0 18px; }
+  /* 패널 외곽선: 면을 올려 나누는 대신 가장자리만 1px 들어 올린다(토스 실측 ΔL 0.021). */
+  .group { background:var(--card); border:1px solid var(--panel-line);
+           border-radius:17.3px; padding:4px 14px; margin-bottom:20px; }
+  .grouphead { font-size:13px; color:var(--caption); padding:11px 0 5px; }
+  .row { display:flex; align-items:center; justify-content:space-between; padding:11px 0;
+         border-top:1px solid var(--raised); }
+  .group .row:first-of-type { border-top:0; }
+  .rowlbl { font-size:17px; color:var(--label); display:flex; align-items:center; }
+  /* 아이콘 칩: 토스 "금융 서비스" 행 실측 — 30x30css, 글자까지 12css. */
+  .rowico { width:30px; height:30px; flex:none; margin-right:12px; border-radius:10px;
+            background:var(--raised); color:var(--caption); display:grid; place-items:center;
+            font-size:14px; line-height:1; }
+  .rowval { font-size:15px; color:var(--muted); }
+  .rowval.point { color:var(--point); }
+  .sectionhead { font-size:18px; color:var(--text); font-weight:700; margin:0 0 10px; }
+  .composer { padding:10px 16px 8px; background:var(--card); border-top:1px solid var(--raised); }
+  .field { font-size:17px; color:var(--muted); padding:6px 2px 10px; }
+  .actions { display:flex; align-items:center; gap:8px; }
+  .act { font-family:inherit; font-weight:600; font-size:15px; cursor:pointer; border:0;
+         background:var(--raised); color:var(--label); border-radius:999px; padding:8px 13px;
+         display:inline-flex; align-items:center; gap:5px; }
+  .caret { font-size:10px; color:var(--caption); }
+  .sendbtn { font-family:inherit; font-weight:700; font-size:15px; cursor:pointer; border:0;
+             background:var(--fill); color:var(--on-fill); border-radius:999px; padding:9px 17px; }
+  .legal { font-size:11px; color:var(--muted); text-align:center; padding:9px 16px 14px;
+           background:var(--card); }
+  .link { color:var(--point); }
+
+  /* ── 대화방 ──
+     페이지가 카드 톤이고, 아래쪽에 키 컬러 워시가 깔린다. 그 위 요소들은 면을 올리지 않는다.
+     토스 실측: 워시는 CSS y 627~757에서 가장 진하고 맨 아래에서 다시 옅어진다 — 아래 가장자리
+     에서 시작하는 선형이 아니라 하단에 눌러 담은 타원형 글로우다. */
+  .chat { background:var(--chat-page); }
+  .wash { position:absolute; inset:0; pointer-events:none;
+          background:
+            radial-gradient(120% 42% at 50% 92%, var(--wash-end) 0%, transparent 70%),
+            radial-gradient(135% 30% at 50% 78%, var(--wash) 0%, transparent 72%); }
+  /* 워시 위로 내용을 올린다. 선택자를 .chat > * 로 넓게 잡으면 아래 .scrim/.dialog 의
+     position:absolute 까지 relative 로 덮어써서 다이얼로그가 흐름에 끼어버린다 — 그래서
+     겹침 순서가 따로 필요한 둘은 .chat > 로 한 단계 더 좁혀 다시 지정한다. */
+  .chat > *:not(.wash) { position:relative; z-index:1; }
+  .chat > .scrim { position:absolute; z-index:2; }
+  .chat > .dialog { position:absolute; z-index:3; }
+  .chat > .drawer { position:absolute; z-index:2; }
+  .chat > .drawerScrim { position:absolute; z-index:1; }
+
+  .chatbar { display:flex; align-items:center; padding:12px 16px 6px; }
+  .back { font-family:inherit; background:none; border:0; cursor:pointer; color:var(--bot);
+          font-size:26px; line-height:1; padding:0 6px 4px; }
+  .endbtn { font-family:inherit; font-weight:600; background:none; border:0; cursor:pointer;
+            color:var(--text); font-size:16px; padding:4px; }
+
+  .chatscroll { padding:2px 16px 0; overflow:hidden; }
+  .notice { text-align:center; font-size:15px; color:var(--quiet); margin:16px 0; }
+  .rule { display:flex; align-items:center; gap:10px; margin:18px 0 22px; }
+  .rule::before, .rule::after { content:""; flex:1; height:1px; background:var(--raised); }
+  .rule span { font-size:15px; color:var(--quiet); }
+
+  /* 봇은 말풍선이 없다 — 페이지 위에 글만 얹힌다. 토스가 그렇게 한다. */
+  .bot { font-size:17px; line-height:1.5; color:var(--bot); margin:0 0 22px; max-width:330px; }
+  .cardname { font-size:22px; font-weight:700; color:var(--point); margin:0 0 6px; }
+
+  .mine { display:flex; flex-direction:column; align-items:flex-end; margin:0 0 20px; }
+  .bubble { background:var(--fill); color:var(--on-fill); border-radius:15.3px;
+            padding:11px 16px; font-size:17px; line-height:1.45; max-width:280px; }
+  .time { font-size:11px; color:var(--quiet); margin-top:7px; }
+
+  /* 제안 패널: 페이지와 같은 색인데 워시 위에 놓여 저절로 갈린다 */
+  .suggest { position:relative; margin:0 16px 4px; background:var(--chat-page);
+             border:1px solid var(--panel-line);
+             border-radius:18.7px; padding:6px 4px; }
+  .sugrow { display:block; width:100%; text-align:left; font-family:inherit; font-weight:600;
+            background:none; border:0; cursor:pointer; color:var(--strong);
+            font-size:16px; padding:14px 16px; }
+  .sugrow b { color:var(--point); font-weight:600; }
+  .sugrow.sep { border-top:1px solid var(--raised); padding-right:62px; }
+  .sendfab { position:absolute; right:14px; bottom:12px; width:44px; height:44px; border:0;
+             border-radius:50%; cursor:pointer; background:var(--send); color:var(--on-fill);
+             font-size:19px; line-height:1; }
+
+  .fieldwrap { padding:6px 16px 4px; }
+  .fieldpill { background:var(--raised); border-radius:16px; padding:15px 18px;
+               font-size:17px; color:var(--quiet); }
+  .ainote { text-align:center; font-size:13px; color:var(--ai-note); margin:10px 0 14px; }
+  .spark { color:var(--point); }
+  .info { color:var(--quiet); }
+
+  /* 선택 카드: 면을 올리는 대신 브랜드색 실선으로 잡는다 */
+  .choicecard { border:1px solid var(--border); border-radius:18.7px; padding:6px 4px 12px; }
+  .choicerow { display:flex; width:100%; align-items:center; justify-content:space-between; gap:12px;
+               font-family:inherit; font-weight:700; background:none; border:0; cursor:pointer;
+               color:var(--bot); font-size:18px; line-height:1.4; text-align:left;
+               padding:14px 14px; }
+  .check { flex:none; width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+           color:var(--quiet); font-size:13px; box-shadow:inset 0 0 0 1.5px var(--quiet); }
+  .ctadis { display:block; width:calc(100% - 28px); margin:6px 14px 0; font-family:inherit;
+            font-weight:700; font-size:17px; cursor:pointer; border:0;
+            background:var(--dis-fill); color:var(--dis-text); border-radius:14px; padding:16px; }
+
+  /* 종료 다이얼로그 */
+  .scrim { position:absolute; inset:0; background:rgba(0,0,0,.5); z-index:2; }
+  .dialog { position:absolute; left:26px; right:26px; top:355px; z-index:3;
+            background:var(--dialog); border-radius:20px; padding:22px 20px 20px; }
+  .dtitle { font-size:20px; font-weight:700; color:var(--dialog-text); margin:0 0 18px; }
+  .dbtns { display:flex; gap:10px; }
+  .dbtn { flex:1; font-family:inherit; font-weight:700; font-size:18px; cursor:pointer;
+          border:0; border-radius:14px; padding:15px; background:var(--dialog-btn); color:var(--dialog-btn-text); }
+  .dbtn.danger { background:var(--danger); color:#ffffff; }
+
+  /* ── 서브페이지 공통 ── */
+  .subbar { display:flex; align-items:center; padding:14px 16px 10px; background:var(--page); }
+  .subtitle { flex:1; text-align:center; font-size:17px; font-weight:700; color:var(--text); }
+  .backspace { width:26px; }
+  /* 섹션 라벨은 토스 홈 "금융 서비스" 실측 기준이다. 잉크 13.67css 를 Bold 로 환산하면 15.27 →
+     15px 이고(600 기준 15.53 을 16 으로 반올림했던 게 틀렸다), 색은 흐린 회색이 아니라
+     본문색이다. 위계는 색이 아니라 크기(15 vs 행 17)로만 준다. */
+  .grouplbl { font-size:15px; font-weight:700; color:var(--text); margin:20px 0 10px 4px; }
+  .grouplbl:first-child { margin-top:6px; }
+  .group.pad { padding:2px 16px; }
+  .rowstrong { font-size:17px; font-weight:700; color:var(--text); }
+  .rowlbl em { display:block; font-style:normal; font-size:11px; color:var(--caption); margin-top:2px; }
+  .chev { color:var(--caption); font-size:19px; line-height:1; }
+  .rowlbl.danger, .chev.danger { color:var(--danger); }
+  .rowico.danger { color:var(--danger); }
+
+  .acct { display:flex; align-items:center; gap:12px; padding:14px 0; }
+  .avatar { width:26px; height:26px; border-radius:50%; background:var(--raised); flex:none; }
+  /* 알약 안의 아바타는 알약과 같은 면이라 안 보인다 — 한 단계 내린 색을 쓴다. */
+  .mypill .avatar { background:var(--page); }
+  .avatar.big { width:46px; height:46px; }
+  .acctname { flex:1; font-size:17px; font-weight:700; color:var(--text); }
+  .acctname em { display:block; font-style:normal; font-size:15px;
+                 font-weight:600; color:var(--muted); margin-top:3px; }
+  .pill { font-family:inherit; font-weight:700; font-size:13px; cursor:pointer; border:0;
+          background:var(--fill); color:var(--on-fill); border-radius:999px; padding:6px 12px; }
+  .chip { font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; border:0;
+          background:var(--raised); color:var(--label); border-radius:999px; padding:7px 12px; }
+
+  /* ── 메뉴 드로어 ── */
+  .drawer { position:absolute; inset:0 101px 0 0; z-index:2; background:var(--card);
+            display:flex; flex-direction:column; }
+  .drawerScrim { position:absolute; inset:0 0 0 292px; z-index:1; background:rgba(0,0,0,.45); }
+  .brand { text-align:center; padding:16px 0 14px; font-size:22px; font-weight:700;
+           border-bottom:1px solid var(--raised); }
+  .brand b { color:var(--text); }
+  .brand i { font-style:normal; color:var(--point); }
+  .drawerbody { flex:1; padding:14px 12px; }
+  .drawerlbl { font-size:15px; font-weight:700; color:var(--text); margin:0 0 10px 6px; }
+  /* 목록 행은 토스 설정 행 라벨 "언어"(17)에 맞춘다. */
+  .roomrow { display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+             font-family:inherit; font-weight:700; font-size:17px; cursor:pointer;
+             border:0; background:none; color:var(--label); border-radius:12px; padding:13px 12px; }
+  .roomrow.on { background:var(--raised); color:var(--text); }
+  .dot { width:5px; height:5px; border-radius:50%; background:var(--caption); flex:none; }
+  .roomrow.on .dot { background:var(--point); }
+  .drawerfoot { padding:12px; display:flex; flex-direction:column; gap:10px; }
+  .footrow { display:flex; align-items:center; gap:10px; }
+  .mypill { flex:1; display:flex; align-items:center; gap:10px; font-family:inherit; font-weight:700;
+            font-size:15px; cursor:pointer; border:0; background:var(--raised);
+            color:var(--text); border-radius:999px; padding:9px 14px; }
+  .bell { position:relative; width:42px; height:42px; flex:none; border:0; cursor:pointer;
+          border-radius:50%; background:var(--raised); }
+  .bellico { font-size:15px; filter:grayscale(1) brightness(1.7); }
+  .badge { position:absolute; top:7px; right:8px; width:8px; height:8px; border-radius:50%;
+           background:var(--danger); }
+  .ctaFill { width:100%; font-family:inherit; font-weight:700; font-size:17px; cursor:pointer;
+             border:0; background:var(--fill); color:var(--on-fill); border-radius:999px; padding:15px; }
+  .ctaQuiet { width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+              font-family:inherit; font-weight:700; font-size:17px; cursor:pointer; border:0;
+              background:var(--raised); color:var(--text); border-radius:999px; padding:15px; }
+  .plus { font-size:15px; color:var(--caption); }
+
+  /* ── 프로필 편집 ── */
+  .form { padding:16px; }
+  .fieldlbl { display:block; font-size:15px; color:var(--muted); margin:18px 0 7px; }
+  .form .fieldlbl:first-child { margin-top:2px; }
+  .fieldlbl em { font-style:normal; color:var(--caption); }
+  .input { background:var(--page); border-radius:12px; padding:14px 15px;
+           font-size:17px; font-weight:700; color:var(--text); }
+  .seg { display:flex; gap:9px; margin-top:9px; }
+  .segbtn { flex:1; font-family:inherit; font-weight:700; font-size:15px; cursor:pointer;
+            border:0; background:var(--raised); color:var(--label); border-radius:12px; padding:13px 0; }
+  .segbtn.on { background:var(--fill); color:var(--on-fill); }
+  .warn { font-size:13px; color:var(--danger); margin:9px 0 0; }
+  .chkrow { display:flex; align-items:center; gap:9px; margin-top:11px;
+            font-size:15px; color:var(--label); }
+  .box { width:18px; height:18px; flex:none; border-radius:6px; background:var(--raised); }
+  .req { font-style:normal; color:var(--danger); margin-left:3px; }
+  .rowend { display:flex; align-items:center; gap:9px; }
+  .mag { display:inline-grid; place-items:center; width:17px; height:17px; margin-left:6px;
+         border-radius:50%; background:var(--raised); color:var(--caption); font-size:10px;
+         vertical-align:middle; }
+  .payhead { font-size:15px; font-weight:700; color:var(--text); margin:0 0 6px; }
+  .ctaFill.sq { border-radius:14px; }
+  .help { font-size:13px; color:var(--muted); margin:9px 0 0; }
+  .ctabar { padding:12px 16px 16px; background:var(--card); border-top:1px solid var(--raised); }
+
+  /* ── 이용권 구매 ── */
+  .product { border-radius:17.3px; padding:18px 18px 20px; margin:4px 0 4px;
+             background:var(--dis-fill); box-shadow:inset 0 0 0 1px var(--border); }
+  .prodname { font-size:22px; font-weight:700; color:var(--text); margin:0 0 10px; }
+  .prodchip { display:inline-block; font-size:13px; font-weight:700;
+              background:var(--fill); color:var(--on-fill); border-radius:999px; padding:6px 11px; }
+  .lead { text-align:center; font-size:15px; color:var(--muted); margin:18px 0 12px; }
+  .optcard { background:var(--card); border:1px solid var(--panel-line);
+             border-radius:17.3px; padding:14px; margin-bottom:12px; }
+  .optcard.on { box-shadow:inset 0 0 0 1px var(--border); }
+  .opthead { display:flex; align-items:flex-start; gap:12px; margin-bottom:12px; }
+  .opttitle { flex:1; text-align:center; font-size:17px; font-weight:700; color:var(--text); }
+  .opttitle em { display:block; font-style:normal; font-size:13px; font-weight:600;
+                 color:var(--muted); margin-top:4px; }
+  .radio { width:18px; height:18px; flex:none; border-radius:50%; background:var(--raised); }
+  .radio.on { background:var(--fill); box-shadow:inset 0 0 0 4px var(--card); }
+  .opttable { background:var(--page); border-radius:12px; padding:4px 13px; }
+  .optheadrow { display:flex; justify-content:space-between; padding:11px 0;
+                font-size:15px; font-weight:700; color:var(--label);
+                border-bottom:1px solid var(--raised); }
+  .optrow { display:flex; justify-content:space-between; padding:9px 0;
+            font-size:15px; color:var(--muted); }
+  .optrow b { color:var(--text); }
+  .paybar { padding:12px 16px 16px; background:var(--card); border-top:1px solid var(--raised); }
+  .payrow { display:flex; justify-content:space-between; font-size:15px;
+            color:var(--muted); padding:5px 0; }
+  .payrow.total { font-size:17px; color:var(--text); font-weight:700;
+                  border-top:1px solid var(--raised); margin-top:6px; padding-top:11px; }
+  .payrow.total b { color:var(--text); }
+  .paybar .ctaFill { margin-top:12px; }
+
+  /* ── 코랄 버튼의 그라데이션·글로우 (sample_005 실측을 옮긴 것) ──
+     background 단축속성이 앞에서 image 를 지우므로, 이 블록은 반드시 뒤에 와야 한다. */
+  .ctaFill, .sendbtn, .sendfab, .pill, .segbtn.on, .prodchip {
+    background-image:linear-gradient(to top right, var(--fill-light) 0%, var(--fill) 100%);
+  }
+  /* outer glow: 오프셋 0 + 스프레드. 아래로 치우치지 않고 면 둘레로 고르게 퍼진다. */
+  .ctaFill, .sendbtn { box-shadow:0 0 20px 3px var(--fill-glow); }
+  .sendfab { box-shadow:0 0 16px 2px var(--fill-glow); }
+  .pill, .segbtn.on, .prodchip { box-shadow:0 0 11px 1px var(--fill-glow); }
+</style>
+<body>
+<h1>타연 — 토스 톤 적용</h1>
+<p class="note">
+  토스 스크린샷 8장(아이폰 15 Pro, 1179×2556 @3x)에서 색·글자 크기·대화방 구조를 실측해 옮긴 판이다.
+  무채색 계단과 대화방 구조는 토스 실측값을 그대로 쓰고, 글자 크기는 토스의 잉크 높이를
+  Pretendard font-size로 환산해 맞췄다. 핑크는 색상각만 타연 것이고 명도·채도 절제는 토스 파랑에서 가져왔다.
+</p>
+<p class="note">
+  <b>대화방에서 배운 것 세 가지.</b> ① 봇은 말풍선이 없다 — 페이지 위에 글만 얹힌다. 말풍선은 사용자 쪽만.
+  ② 제안 패널·선택 카드·입력창이 전부 페이지와 같은 색이다. 면을 올려 나누지 않는다.
+  ③ <b>화면 아래쪽에 키 컬러 워시가 깔린다.</b> 홈·설정이 완전한 무채색이었던 것과 정반대다 —
+  즉 토스도 워시를 쓰되 <b>하단 조작 영역에만</b> 눌러 담는다.
+</p>
+
+<h2>시안</h2>
+<div class="frames">
+
+  <figure class="frame">
+    <figcaption>다크 · 대화방</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col chat">
+        <div class="wash"></div>
+        
+        <header class="chatbar">
+          <button class="back">‹</button>
+          <span class="spacer"></span>
+          <button class="endbtn">상담 종료</button>
+        </header>
+        <div class="scroll chatscroll">
+          <p class="notice">최근 3개월 대화만 보관돼요</p>
+          <p class="notice">2026년 9월 22일</p>
+          <div class="rule"><span>상담을 시작했어요 · 오후 8:54</span></div>
+          <p class="bot">안녕하세요, 타로 상담사 루미예요.<br>어떤 고민이든 편하게 말씀해 주세요.</p>
+          <div class="mine">
+            <div class="bubble">올해 이직해도 괜찮을까?</div>
+            <div class="time">20:55</div>
+          </div>
+          <p class="cardname">완드 7</p>
+          <p class="bot">지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+            버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.</p>
+        </div>
+        <div class="suggest">
+          <button class="sugrow">지금 <b>준비</b>해야 할 건 뭘까?</button>
+          <button class="sugrow"><b>올해 안에</b> 결정해도 될까?</button>
+          <button class="sugrow sep">이 카드를 더 <b>자세히</b> 풀어줘</button>
+          <button class="sendfab">↑</button>
+        </div>
+        <p class="ainote"><span class="spark">✦</span> AI가 리딩을 제공하고 있어요 <span class="info">ⓘ</span></p>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 대화방</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col chat">
+        <div class="wash"></div>
+        
+        <header class="chatbar">
+          <button class="back">‹</button>
+          <span class="spacer"></span>
+          <button class="endbtn">상담 종료</button>
+        </header>
+        <div class="scroll chatscroll">
+          <p class="notice">최근 3개월 대화만 보관돼요</p>
+          <p class="notice">2026년 9월 22일</p>
+          <div class="rule"><span>상담을 시작했어요 · 오후 8:54</span></div>
+          <p class="bot">안녕하세요, 타로 상담사 루미예요.<br>어떤 고민이든 편하게 말씀해 주세요.</p>
+          <div class="mine">
+            <div class="bubble">올해 이직해도 괜찮을까?</div>
+            <div class="time">20:55</div>
+          </div>
+          <p class="cardname">완드 7</p>
+          <p class="bot">지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+            버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.</p>
+        </div>
+        <div class="suggest">
+          <button class="sugrow">지금 <b>준비</b>해야 할 건 뭘까?</button>
+          <button class="sugrow"><b>올해 안에</b> 결정해도 될까?</button>
+          <button class="sugrow sep">이 카드를 더 <b>자세히</b> 풀어줘</button>
+          <button class="sendfab">↑</button>
+        </div>
+        <p class="ainote"><span class="spark">✦</span> AI가 리딩을 제공하고 있어요 <span class="info">ⓘ</span></p>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 선택 카드</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col chat">
+        <div class="wash"></div>
+        
+        <header class="chatbar">
+          <button class="back">‹</button>
+          <span class="spacer"></span>
+          <button class="endbtn">상담 종료</button>
+        </header>
+        <div class="scroll chatscroll">
+          <div class="mine">
+            <div class="bubble">요즘 자꾸 지쳐</div>
+            <div class="time">20:55</div>
+          </div>
+          <p class="bot">정확한 리딩을 위해 조금만 더 알려주세요.<br>아래 중에서 골라주세요.</p>
+          <div class="choicecard">
+            <button class="choicerow"><span>일 때문에 지치는 것<br>같아요</span><span class="check">✓</span></button>
+            <button class="choicerow"><span>사람 관계가 힘들어요</span><span class="check">✓</span></button>
+            <button class="choicerow"><span>이유를 잘 모르겠어요</span><span class="check">✓</span></button>
+            <button class="ctadis">선택했어요</button>
+          </div>
+        </div>
+        <div class="fieldwrap"><div class="fieldpill">내용을 입력해주세요</div></div>
+        <p class="ainote"><span class="spark">✦</span> AI가 리딩을 제공하고 있어요 <span class="info">ⓘ</span></p>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 종료 다이얼로그</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col chat">
+        <div class="wash"></div>
+        
+        <header class="chatbar">
+          <button class="back">‹</button>
+          <span class="spacer"></span>
+          <button class="endbtn">상담 종료</button>
+        </header>
+        <div class="scroll chatscroll">
+          <div class="mine">
+            <div class="bubble">요즘 자꾸 지쳐</div>
+            <div class="time">20:55</div>
+          </div>
+          <p class="bot">정확한 리딩을 위해 조금만 더 알려주세요.<br>아래 중에서 골라주세요.</p>
+          <div class="choicecard">
+            <button class="choicerow"><span>일 때문에 지치는 것<br>같아요</span><span class="check">✓</span></button>
+            <button class="choicerow"><span>사람 관계가 힘들어요</span><span class="check">✓</span></button>
+            <button class="choicerow"><span>이유를 잘 모르겠어요</span><span class="check">✓</span></button>
+            <button class="ctadis">선택했어요</button>
+          </div>
+        </div>
+        <div class="fieldwrap"><div class="fieldpill">내용을 입력해주세요</div></div>
+        <p class="ainote"><span class="spark">✦</span> AI가 리딩을 제공하고 있어요 <span class="info">ⓘ</span></p>
+        <div class="scrim"></div>
+        <div class="dialog">
+          <p class="dtitle">상담을 종료할까요?</p>
+          <div class="dbtns">
+            <button class="dbtn">닫기</button>
+            <button class="dbtn danger">종료하기</button>
+          </div>
+        </div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 종료 다이얼로그</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col chat">
+        <div class="wash"></div>
+        
+        <header class="chatbar">
+          <button class="back">‹</button>
+          <span class="spacer"></span>
+          <button class="endbtn">상담 종료</button>
+        </header>
+        <div class="scroll chatscroll">
+          <div class="mine">
+            <div class="bubble">요즘 자꾸 지쳐</div>
+            <div class="time">20:55</div>
+          </div>
+          <p class="bot">정확한 리딩을 위해 조금만 더 알려주세요.<br>아래 중에서 골라주세요.</p>
+          <div class="choicecard">
+            <button class="choicerow"><span>일 때문에 지치는 것<br>같아요</span><span class="check">✓</span></button>
+            <button class="choicerow"><span>사람 관계가 힘들어요</span><span class="check">✓</span></button>
+            <button class="choicerow"><span>이유를 잘 모르겠어요</span><span class="check">✓</span></button>
+            <button class="ctadis">선택했어요</button>
+          </div>
+        </div>
+        <div class="fieldwrap"><div class="fieldpill">내용을 입력해주세요</div></div>
+        <p class="ainote"><span class="spark">✦</span> AI가 리딩을 제공하고 있어요 <span class="info">ⓘ</span></p>
+        <div class="scrim"></div>
+        <div class="dialog">
+          <p class="dtitle">상담을 종료할까요?</p>
+          <div class="dbtns">
+            <button class="dbtn">닫기</button>
+            <button class="dbtn danger">종료하기</button>
+          </div>
+        </div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 메뉴 오픈</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col chat">
+        <div class="wash"></div>
+        <div class="drawer">
+          <div class="brand"><b>타</b><i>연</i></div>
+          <div class="drawerbody">
+            <p class="drawerlbl">최근 대화</p>
+            <button class="roomrow"><span class="dot"></span>이직 고민 상담</button>
+            <button class="roomrow on"><span class="dot"></span>요즘 자꾸 지치는 이유</button>
+            <button class="roomrow"><span class="dot"></span>이 관계를 계속할까</button>
+          </div>
+          <div class="drawerfoot">
+            <div class="footrow">
+              <button class="mypill"><span class="avatar"></span>마이 페이지</button>
+              <button class="bell"><span class="bellico">🔔</span><i class="badge"></i></button>
+            </div>
+            <button class="ctaFill">이용권 구입하기</button>
+            <button class="ctaQuiet"><span class="plus">⊕</span>새 대화</button>
+          </div>
+        </div>
+        <div class="drawerScrim"></div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 메뉴 오픈</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col chat">
+        <div class="wash"></div>
+        <div class="drawer">
+          <div class="brand"><b>타</b><i>연</i></div>
+          <div class="drawerbody">
+            <p class="drawerlbl">최근 대화</p>
+            <button class="roomrow"><span class="dot"></span>이직 고민 상담</button>
+            <button class="roomrow on"><span class="dot"></span>요즘 자꾸 지치는 이유</button>
+            <button class="roomrow"><span class="dot"></span>이 관계를 계속할까</button>
+          </div>
+          <div class="drawerfoot">
+            <div class="footrow">
+              <button class="mypill"><span class="avatar"></span>마이 페이지</button>
+              <button class="bell"><span class="bellico">🔔</span><i class="badge"></i></button>
+            </div>
+            <button class="ctaFill">이용권 구입하기</button>
+            <button class="ctaQuiet"><span class="plus">⊕</span>새 대화</button>
+          </div>
+        </div>
+        <div class="drawerScrim"></div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 마이 페이지</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col">
+        
+        <header class="subbar">
+          <button class="back">‹</button>
+          <span class="subtitle">마이 페이지</span>
+          <span class="backspace"></span>
+        </header>
+        <div class="scroll">
+          <p class="grouplbl">계정</p>
+          <div class="group pad">
+            <div class="acct">
+              <span class="avatar big"></span>
+              <span class="acctname">라프라움<em>redteart@kakao.com</em></span>
+              <button class="chip">계정정보</button>
+            </div>
+            <div class="row"><span class="rowlbl">횟수제 이용권</span>
+              <span class="rowend"><b class="rowstrong">프리미엄 이용권</b><button class="pill">구입</button></span></div>
+            <div class="row"><span class="rowlbl">9월 보너스 리워드<span class="mag">⌕</span></span><span class="rowstrong">135회 예상</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">＋</i>친구 초대하기</span><span class="chev">›</span></div>
+          </div>
+
+          <p class="grouplbl">이용권 구입</p>
+          <div class="group pad">
+            <div class="row"><span class="rowlbl"><i class="rowico">▤</i>이용권 구입</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">▭</i>결제 내역</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">☰</i>받은 이용권 내역</span><span class="chev">›</span></div>
+          </div>
+
+          <p class="grouplbl">프로필</p>
+          <div class="group pad">
+            <div class="row"><span class="rowlbl"><i class="rowico">▣</i>내 프로필 관리</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">◑</i>궁합 상대 프로필 관리</span><span class="chev">›</span></div>
+          </div>
+
+          <p class="grouplbl">시스템</p>
+          <div class="group pad">
+            <div class="row"><span class="rowlbl"><i class="rowico">◎</i>공지사항</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">⚙</i>설정</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl danger"><i class="rowico danger">⇥</i>로그아웃</span><span class="chev danger">›</span></div>
+          </div>
+        </div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 마이 페이지</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col">
+        
+        <header class="subbar">
+          <button class="back">‹</button>
+          <span class="subtitle">마이 페이지</span>
+          <span class="backspace"></span>
+        </header>
+        <div class="scroll">
+          <p class="grouplbl">계정</p>
+          <div class="group pad">
+            <div class="acct">
+              <span class="avatar big"></span>
+              <span class="acctname">라프라움<em>redteart@kakao.com</em></span>
+              <button class="chip">계정정보</button>
+            </div>
+            <div class="row"><span class="rowlbl">횟수제 이용권</span>
+              <span class="rowend"><b class="rowstrong">프리미엄 이용권</b><button class="pill">구입</button></span></div>
+            <div class="row"><span class="rowlbl">9월 보너스 리워드<span class="mag">⌕</span></span><span class="rowstrong">135회 예상</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">＋</i>친구 초대하기</span><span class="chev">›</span></div>
+          </div>
+
+          <p class="grouplbl">이용권 구입</p>
+          <div class="group pad">
+            <div class="row"><span class="rowlbl"><i class="rowico">▤</i>이용권 구입</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">▭</i>결제 내역</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">☰</i>받은 이용권 내역</span><span class="chev">›</span></div>
+          </div>
+
+          <p class="grouplbl">프로필</p>
+          <div class="group pad">
+            <div class="row"><span class="rowlbl"><i class="rowico">▣</i>내 프로필 관리</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">◑</i>궁합 상대 프로필 관리</span><span class="chev">›</span></div>
+          </div>
+
+          <p class="grouplbl">시스템</p>
+          <div class="group pad">
+            <div class="row"><span class="rowlbl"><i class="rowico">◎</i>공지사항</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl"><i class="rowico">⚙</i>설정</span><span class="chev">›</span></div>
+            <div class="row"><span class="rowlbl danger"><i class="rowico danger">⇥</i>로그아웃</span><span class="chev danger">›</span></div>
+          </div>
+        </div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 내 프로필 관리</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col">
+        
+        <header class="subbar">
+          <button class="back">‹</button>
+          <span class="subtitle">내 프로필 관리</span>
+          <span class="backspace"></span>
+        </header>
+        <div class="scroll">
+          <div class="group pad form">
+            <label class="fieldlbl">닉네임 <em>(변경 가능)</em><i class="req">*</i></label>
+            <div class="input">라프라움</div>
+
+            <label class="fieldlbl">생년월일<i class="req">*</i></label>
+            <div class="input">1987.09.14</div>
+            <div class="seg">
+              <button class="segbtn on">양력</button>
+              <button class="segbtn">음력</button>
+              <button class="segbtn">음력(윤달)</button>
+            </div>
+
+            <label class="fieldlbl">태어난 시간</label>
+            <div class="input">09:07</div>
+            <label class="chkrow"><span class="box"></span>태어난 시간을 몰라요</label>
+            <p class="warn">태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요</p>
+
+            <label class="fieldlbl">성별<i class="req">*</i></label>
+            <div class="seg">
+              <button class="segbtn">여성</button>
+              <button class="segbtn on">남성</button>
+              <button class="segbtn">선택안함</button>
+            </div>
+
+            <label class="fieldlbl">출생지 <em>(선택)</em></label>
+            <div class="input">대전</div>
+            <p class="help">출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요</p>
+          </div>
+        </div>
+        <div class="ctabar"><button class="ctaFill sq">저장하기</button></div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 내 프로필 관리</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col">
+        
+        <header class="subbar">
+          <button class="back">‹</button>
+          <span class="subtitle">내 프로필 관리</span>
+          <span class="backspace"></span>
+        </header>
+        <div class="scroll">
+          <div class="group pad form">
+            <label class="fieldlbl">닉네임 <em>(변경 가능)</em><i class="req">*</i></label>
+            <div class="input">라프라움</div>
+
+            <label class="fieldlbl">생년월일<i class="req">*</i></label>
+            <div class="input">1987.09.14</div>
+            <div class="seg">
+              <button class="segbtn on">양력</button>
+              <button class="segbtn">음력</button>
+              <button class="segbtn">음력(윤달)</button>
+            </div>
+
+            <label class="fieldlbl">태어난 시간</label>
+            <div class="input">09:07</div>
+            <label class="chkrow"><span class="box"></span>태어난 시간을 몰라요</label>
+            <p class="warn">태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요</p>
+
+            <label class="fieldlbl">성별<i class="req">*</i></label>
+            <div class="seg">
+              <button class="segbtn">여성</button>
+              <button class="segbtn on">남성</button>
+              <button class="segbtn">선택안함</button>
+            </div>
+
+            <label class="fieldlbl">출생지 <em>(선택)</em></label>
+            <div class="input">대전</div>
+            <p class="help">출생지를 입력하면 사주ㆍ자미두수 분석 정확도가 올라가요</p>
+          </div>
+        </div>
+        <div class="ctabar"><button class="ctaFill sq">저장하기</button></div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 이용권 구입</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col">
+        
+        <header class="subbar">
+          <button class="back">‹</button>
+          <span class="subtitle">구입하기</span>
+          <span class="backspace"></span>
+        </header>
+        <div class="scroll">
+          <div class="product">
+            <p class="prodname">스탠다드 이용권</p>
+            <span class="prodchip">추가 횟수 +8.5% 포함</span>
+          </div>
+          <p class="lead">구입하실 이용권의 옵션을 선택하세요</p>
+
+          <div class="optcard on">
+            <div class="opthead">
+              <span class="opttitle">타로 전용</span>
+              <span class="radio on"></span>
+            </div>
+            
+            <div class="opttable">
+              <div class="optheadrow"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+              <div class="optrow"><span>원 카드</span><b>70회</b></div><div class="optrow"><span>쓰리 카드</span><b>47회</b></div><div class="optrow"><span>양자택일</span><b>35회</b></div><div class="optrow"><span>켈틱 크로스</span><b>28회</b></div>
+            </div>
+          </div>
+
+          <div class="optcard">
+            <div class="opthead">
+              <span class="opttitle">타로+사주</span>
+              <span class="radio"></span>
+            </div>
+            
+            <div class="opttable">
+              <div class="optheadrow"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+              <div class="optrow"><span>원 카드+사주</span><b>60회</b></div><div class="optrow"><span>쓰리 카드+사주</span><b>40회</b></div><div class="optrow"><span>양자택일+사주</span><b>30회</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="paybar">
+          <p class="payhead">결제금액</p>
+          <div class="payrow"><span>상품금액 (VAT 포함)</span><span>12,900원</span></div>
+          <div class="payrow total"><span>총 결제금액</span><b>12,900원</b></div>
+          <button class="ctaFill sq">₩12,900 결제하기</button>
+        </div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 이용권 구입</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col">
+        
+        <header class="subbar">
+          <button class="back">‹</button>
+          <span class="subtitle">구입하기</span>
+          <span class="backspace"></span>
+        </header>
+        <div class="scroll">
+          <div class="product">
+            <p class="prodname">스탠다드 이용권</p>
+            <span class="prodchip">추가 횟수 +8.5% 포함</span>
+          </div>
+          <p class="lead">구입하실 이용권의 옵션을 선택하세요</p>
+
+          <div class="optcard on">
+            <div class="opthead">
+              <span class="opttitle">타로 전용</span>
+              <span class="radio on"></span>
+            </div>
+            
+            <div class="opttable">
+              <div class="optheadrow"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+              <div class="optrow"><span>원 카드</span><b>70회</b></div><div class="optrow"><span>쓰리 카드</span><b>47회</b></div><div class="optrow"><span>양자택일</span><b>35회</b></div><div class="optrow"><span>켈틱 크로스</span><b>28회</b></div>
+            </div>
+          </div>
+
+          <div class="optcard">
+            <div class="opthead">
+              <span class="opttitle">타로+사주</span>
+              <span class="radio"></span>
+            </div>
+            
+            <div class="opttable">
+              <div class="optheadrow"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+              <div class="optrow"><span>원 카드+사주</span><b>60회</b></div><div class="optrow"><span>쓰리 카드+사주</span><b>40회</b></div><div class="optrow"><span>양자택일+사주</span><b>30회</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="paybar">
+          <p class="payhead">결제금액</p>
+          <div class="payrow"><span>상품금액 (VAT 포함)</span><span>12,900원</span></div>
+          <div class="payrow total"><span>총 결제금액</span><b>12,900원</b></div>
+          <button class="ctaFill sq">₩12,900 결제하기</button>
+        </div>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>다크 · 메인화면</figcaption>
+    <div class="screen dark" style="
+      --page:#130f0f; --card:#1a1616; --raised:#2f2a2a; --chat-page:#1d1818;
+      --strong:#ffffff; --text:#e3dede; --label:#bcb6b6;
+      --caption:#908b8b; --muted:#6f6b6b;
+      --bot:#f1ecec; --quiet:#8b8786; --ai-note:#b2a2a0;
+      --fill:#f53a63; --fill-light:#ff7e8e; --fill-glow:rgba(245, 58, 99, 0.355);
+      --point:#fc5f78; --on-fill:#ffffff; --send:#fc5f78;
+      --wash:#4a2229; --wash-end:#442126;
+      --border:#573238; --panel-line:#1f1b1b; --dis-fill:#471a23; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#322b2b; --dialog-btn:#473e3e; --dialog-text:#f1ecec;
+      --dialog-btn-text:#d0cbcb;">
+      <div class="col">
+        <header class="topbar">
+          <button class="icobtn"><span class="ico">☰</span><span class="icolbl">메뉴</span></button>
+          <span class="spacer"></span>
+          <button class="icobtn"><span class="ico av">◕</span><span class="icolbl">루미</span></button>
+        </header>
+        <div class="scroll">
+          <p class="title">안녕하세요,<br><b class="brand">올빼미</b>님</p>
+          <p class="sub">판단 없이, 재촉 없이. 오늘 마음에 걸리는 걸 편하게 말씀해 주세요.</p>
+          <div class="group">
+            <div class="grouphead">이용권</div>
+            <div class="row"><span class="rowlbl">스탠다드 이용권</span><span class="rowval">14회 남았어요</span></div>
+            <div class="row"><span class="rowlbl">시간제 이용권</span><span class="rowval point">구입하기</span></div>
+          </div>
+          <div class="sectionhead">최근 대화</div>
+          <div class="group">
+            <div class="row"><span class="rowlbl">이직 고민 상담</span><span class="rowval">어제 · 완드 7</span></div>
+            <div class="row"><span class="rowlbl">요즘 자꾸 지치는 이유</span><span class="rowval">3일 전 · 컵 5</span></div>
+            <div class="row"><span class="rowlbl">이 관계를 계속할까</span><span class="rowval">지난주 · 소드 2</span></div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="field">지금 마음을 편하게 적어보세요</div>
+          <div class="actions">
+            <button class="act"><span class="ico sm">◷</span>시간제</button>
+            <button class="act">원 카드 <span class="caret">▾</span></button>
+            <span class="spacer"></span>
+            <button class="sendbtn">보내기</button>
+          </div>
+        </div>
+        <footer class="legal">타연 · 사업자등록번호 000-00-00000 · <span class="link">회사 정보</span></footer>
+      </div></div>
+  </figure>
+
+  <figure class="frame">
+    <figcaption>라이트 · 메인화면</figcaption>
+    <div class="screen light" style="
+      --page:#f9f3f3; --card:#ffffff; --raised:#e7e2e1; --chat-page:#f5f0f0;
+      --strong:#1a1616; --text:#312d2d; --label:#4d4848;
+      --caption:#6e6969; --muted:#8e8989;
+      --bot:#1f1b1b; --quiet:#6b6666; --ai-note:#534e4e;
+      --fill:#e04e6e; --fill-light:#ff758e; --fill-glow:rgba(224, 78, 110, 0.400);
+      --point:#c31145; --on-fill:#ffffff; --send:#e04e6e;
+      --wash:#e9c9cb; --wash-end:#eacfd0;
+      --border:#e1c6c8; --panel-line:#f2ecec; --dis-fill:#f1d0d2; --dis-text:#7e3043; --danger:#d54229;
+      --dialog:#ffffff; --dialog-btn:#ebe4e4; --dialog-text:#1f1b1b;
+      --dialog-btn-text:#383434;">
+      <div class="col">
+        <header class="topbar">
+          <button class="icobtn"><span class="ico">☰</span><span class="icolbl">메뉴</span></button>
+          <span class="spacer"></span>
+          <button class="icobtn"><span class="ico av">◕</span><span class="icolbl">루미</span></button>
+        </header>
+        <div class="scroll">
+          <p class="title">안녕하세요,<br><b class="brand">올빼미</b>님</p>
+          <p class="sub">판단 없이, 재촉 없이. 오늘 마음에 걸리는 걸 편하게 말씀해 주세요.</p>
+          <div class="group">
+            <div class="grouphead">이용권</div>
+            <div class="row"><span class="rowlbl">스탠다드 이용권</span><span class="rowval">14회 남았어요</span></div>
+            <div class="row"><span class="rowlbl">시간제 이용권</span><span class="rowval point">구입하기</span></div>
+          </div>
+          <div class="sectionhead">최근 대화</div>
+          <div class="group">
+            <div class="row"><span class="rowlbl">이직 고민 상담</span><span class="rowval">어제 · 완드 7</span></div>
+            <div class="row"><span class="rowlbl">요즘 자꾸 지치는 이유</span><span class="rowval">3일 전 · 컵 5</span></div>
+            <div class="row"><span class="rowlbl">이 관계를 계속할까</span><span class="rowval">지난주 · 소드 2</span></div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="field">지금 마음을 편하게 적어보세요</div>
+          <div class="actions">
+            <button class="act"><span class="ico sm">◷</span>시간제</button>
+            <button class="act">원 카드 <span class="caret">▾</span></button>
+            <span class="spacer"></span>
+            <button class="sendbtn">보내기</button>
+          </div>
+        </div>
+        <footer class="legal">타연 · 사업자등록번호 000-00-00000 · <span class="link">회사 정보</span></footer>
+      </div></div>
+  </figure>
+</div>
+
+<h2>핑크 — 토스 파랑의 절제를 옮김</h2>
+<table>
+  <tr><th>색</th><th>L</th><th>C</th><th>그 L·H 최대채도</th><th>사용률</th></tr>
+  <tr><td>토스 채움 <code>#3182f6</code></td><td>0.620</td><td>0.191</td>
+      <td>0.207</td><td><b>92.2%</b></td></tr>
+  <tr><td>타연 원래 <code>#ff007f</code></td><td>0.645</td><td>0.260</td>
+      <td>0.260</td><td><b>99.2%</b></td></tr>
+  <tr><td>새 채움 <code>#f53a63</code></td><td>0.644</td><td>0.221</td>
+      <td>0.259</td><td>92.2%</td></tr>
+  <tr><td>새 글자(다크) <code>#fc5f78</code></td><td>0.695</td><td>0.191</td>
+      <td>0.210</td><td>96.3%</td></tr>
+  <tr><td>새 글자(라이트) <code>#c31145</code></td><td>0.525</td><td>0.203</td>
+      <td>0.212</td><td>96.3%</td></tr>
+</table>
+
+<h2>글자 크기 — 토스 잉크 실측 → Pretendard</h2>
+<table>
+  <tr><th>역할</th><th>px</th><th>토스에서 어디</th></tr>
+  <tr><td>말풍선 시각</td><td>11</td><td>대화방 "20:55"</td></tr>
+  <tr><td>AI 고지 · 캡션</td><td>13</td><td>대화방 "AI가 답변을…", 홈 "미니앱"</td></tr>
+  <tr><td>안내 · 날짜 · 구분선</td><td>15</td><td>대화방 "최근 3개월 대화만 보관돼요"</td></tr>
+  <tr><td>제안 줄 · 상담 종료</td><td>16</td><td>대화방 제안 패널, 우상단 "상담 종료"</td></tr>
+  <tr><td>본문 · 봇 글 · 말풍선</td><td>17</td><td>대화방 봇 글, 설정 "언어"</td></tr>
+  <tr><td>선택 카드 줄 · 섹션 헤더</td><td>18</td><td>선택 카드 줄, 설정 "인증 및 보안"</td></tr>
+  <tr><td>다이얼로그 제목</td><td>20</td><td>"상담을 종료할까요?"</td></tr>
+  <tr><td>화면 제목</td><td>22</td><td>뱅크 "가입해둔 보험이 있네요"</td></tr>
+</table>
+
+<h2>토큰</h2>
+<table>
+  <tr><th>토큰</th><th>다크</th><th>라이트</th><th>근거 / 대비</th></tr>
+  <tr><td>page</td><td><code>#130f0f</code></td><td><code>#f9f3f3</code></td><td>토스 그룹 배경</td></tr>
+  <tr><td>card</td><td><code>#1a1616</code></td><td><code>#ffffff</code></td><td>ΔL 0.032</td></tr>
+  <tr><td>raised</td><td><code>#2f2a2a</code></td><td><code>#e7e2e1</code></td><td>ΔL 0.084, 라이트는 반대방향</td></tr>
+  <tr><td>chat-page</td><td><code>#1d1818</code></td><td><code>#f5f0f0</code></td><td>대화방은 카드 톤이 페이지</td></tr>
+  <tr><td>wash</td><td><code>#4a2229</code></td><td><code>#e9c9cb</code></td><td>토스 <code>#212f4d</code> 이식</td></tr>
+  <tr><td>wash-end</td><td><code>#442126</code></td><td><code>#eacfd0</code></td><td>토스 <code>#202c45</code> 이식</td></tr>
+  <tr><td>bot</td><td><code>#f1ecec</code></td><td><code>#1f1b1b</code></td><td>15.01 / 15.12</td></tr>
+  <tr><td>quiet</td><td><code>#8b8786</code></td><td><code>#6b6666</code></td><td>4.94 / 5.00</td></tr>
+  <tr><td>ai-note</td><td><code>#b2a2a0</code></td><td><code>#534e4e</code></td><td>7.16 / 7.25</td></tr>
+  <tr><td>text</td><td><code>#e3dede</code></td><td><code>#312d2d</code></td><td>13.48 / 13.60</td></tr>
+  <tr><td>label</td><td><code>#bcb6b6</code></td><td><code>#4d4848</code></td><td>8.98 / 8.99</td></tr>
+  <tr><td>muted</td><td><code>#6f6b6b</code></td><td><code>#8e8989</code></td><td>3.41 / 3.45</td></tr>
+  <tr><td>fill + 흰글자</td><td><code>#f53a63</code></td><td><code>#e04e6e</code></td><td>3.71 양쪽 동일</td></tr>
+  <tr><td>point(글자)</td><td><code>#fc5f78</code></td><td><code>#c31145</code></td><td>6.02 / 6.02</td></tr>
+  <tr><td>send(원형 버튼)</td><td><code>#fc5f78</code></td><td><code>#e04e6e</code></td><td>흰 화살표 2.98 / 3.83</td></tr>
+  <tr><td>dis-fill / dis-text</td><td><code>#471a23</code> / <code>#7e3043</code></td>
+      <td><code>#f1d0d2</code> / <code>#7e3043</code></td>
+      <td>1.66 / 6.15</td></tr>
+  <tr><td>danger</td><td colspan="2"><code>#d54229</code></td>
+      <td>글자 <code>#ffffff</code>(토스와 동일) · 대비 4.53</td></tr>
+</table>
+<p class="note" style="margin-top:14px">
+  <b>파괴적 버튼의 글자는 토스와 같은 순백</b>이다 — 토스 라벨의 글리프 내부 최빈색이
+  <code>#ffffff</code>(1397px)로 실측됐다. <b>면만 토스보다 한 단계 어둡다.</b>
+  토스 <code>#f04452</code>는 흰 글자가 3.71뿐이라,
+  색상각을 H 32°로 밀고(<code>#ef4b30</code>, 3.67)
+  명도를 내려 <code>#d54229</code> 4.53를 맞췄다.
+  토스에서는 빨강 H 21°와 파랑 H -102°가 123° 떨어져
+  "위험"과 "브랜드"가 섞일 일이 없었지만, 코랄은 H 14.1°라 그 빨강과 7°밖에 차이가 안 난다 —
+  면을 민 덕에 그 거리도 같이 벌어졌다.
+</p>
+<p class="note">생성: <code>node doc/design/build-toss-tone-mockup.mjs</code> ·
+  실측: <code>measure-toss.mjs</code>, <code>measure-toss-chat.mjs</code>, <code>calibrate-type.mjs</code></p>
+</body></html>

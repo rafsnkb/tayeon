@@ -10,12 +10,12 @@ import {
   COMBOS,
   countAllowanceForCombo,
   type ComboKey,
-  type SpreadKey,
   COUNT_PASS_VALIDITY_MONTHS,
   TIME_PASS_VALIDITY_MONTHS,
   formatMonths,
 } from "@/lib/tarot/pricing";
-import { TIER_TEXTURE, TIME_COMBO_TIER } from "@/lib/tarot/timePassTiers";
+import { TIME_COMBO_TIER, countPackageTier } from "@/lib/tarot/passTiers";
+import { ComboAllowanceList, COMBO_KEYS } from "@/components/ComboAllowanceCard";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { CompanyFooter } from "@/components/CompanyFooter";
@@ -32,23 +32,7 @@ function formatWon(won: number) {
   return `₩${won.toLocaleString("ko-KR")}`;
 }
 
-// 피그마 카드 테두리가 가격대별로 2개씩 짝지어 청록→파랑→보라→핑크로 올라간다
-// (asset/Screen/Buy - Coin.png 픽셀 샘플링으로 확인, 2026-09-14) — 텍스처 등급 짝(COIN_TEXTURE)과
-// 정확히 같은 경계라, 시간제 이용권 티어 색(TIME_PASS_TIER)을 그대로 재사용하고 청록만 추가한다.
-const COUNT_TIERS = [
-  { border: "#9de9ed", text: "#9de9ed", tagBg: "rgba(12, 68, 86, 0.86)", bg: TIER_TEXTURE[4] },
-  { border: "#2f8bee", text: "#66b0ff", tagBg: "rgba(15, 52, 98, 0.86)", bg: TIER_TEXTURE[3] },
-  { border: "#2f8bee", text: "#66b0ff", tagBg: "rgba(15, 52, 98, 0.86)", bg: TIER_TEXTURE[3] },
-  { border: "#8335d6", text: "#a04ff8", tagBg: "rgba(56, 24, 82, 0.86)", bg: TIER_TEXTURE[2] },
-  { border: "#8335d6", text: "#a04ff8", tagBg: "rgba(56, 24, 82, 0.86)", bg: TIER_TEXTURE[2] },
-  { border: "#ff007f", text: "#ff007f", tagBg: "rgba(82, 17, 59, 0.86)", bg: TIER_TEXTURE[1] },
-];
 
-const SPREAD_KEYS: SpreadKey[] = ["one", "three", "dual", "celtic"];
-const SPREAD_SHORT: Record<SpreadKey, string> = {
-  one: "원 카드", three: "쓰리 카드", dual: "양자택일", celtic: "켈틱 크로스",
-};
-const COMBO_KEYS = Object.keys(COMBOS) as ComboKey[];
 
 const TIME_DURATIONS: TimeDuration[] = [15, 30, 60];
 
@@ -71,6 +55,8 @@ export default function ChargePage() {
     (pass) => pass.source === "purchase" && (pass.status === "unused" || pass.status === "active")
   );
   const hasTimePassHeld = timePasses.length > 0 || activeTimePass !== null;
+  // 고른 상품의 등급 색. 예전엔 쓰는 자리마다 COUNT_PACKAGES.indexOf(selected) 를 다시 돌렸다.
+  const selectedTier = selected ? countPackageTier(selected.id) : null;
 
   function selectCombo(combo: ComboKey) {
     if (COMBOS[combo].ziwei && !hasBirthTime) {
@@ -169,20 +155,20 @@ export default function ChargePage() {
       />
       <div className={`flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto ${!selected && tab === "time" ? "pb-40" : "pb-24"}`}>
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-          {selected && (
+          {selected && selectedTier && (
             <>
               <div
                 className="relative flex h-20 items-center overflow-hidden rounded-[28px] border bg-cover bg-center p-4"
-                style={{ borderColor: COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].border, backgroundImage: `url(${COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].bg})` }}
+                style={{ borderColor: selectedTier.border, backgroundImage: `url(${selectedTier.bg})` }}
               >
-                <div className="absolute inset-0 bg-[#19191d]/70" />
+                <div className="absolute inset-0 bg-topbar/70" />
                 <div className="relative">
                   <p className="text-xl font-bold text-white">{selected.name} 이용권</p>
                   <span
                     className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-sm font-semibold"
                     style={{
-                      color: COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].text,
-                      backgroundColor: COUNT_TIERS[COUNT_PACKAGES.indexOf(selected)].tagBg,
+                      color: selectedTier.tagText,
+                      backgroundColor: selectedTier.tagBg,
                     }}
                   >
                     {selected.bonus}
@@ -190,42 +176,11 @@ export default function ChargePage() {
                 </div>
               </div>
               <p className="text-center text-sm font-semibold text-icon-muted">구입하실 이용권의 옵션을 선택하세요</p>
-              <div className="flex flex-col gap-3">
-                {COMBO_KEYS.map((combo) => {
-                  const isSelected = selectedCombo === combo;
-                  return (
-                    <button
-                      key={combo}
-                      type="button"
-                      onClick={() => selectCombo(combo)}
-                      className={`relative rounded-[28px] bg-topbar p-4 text-left ${
-                        isSelected ? "border-2 border-point" : "border border-border"
-                      }`}
-                    >
-                      <div className="mb-4 flex items-center justify-center gap-2">
-                        <span className="h-6 w-6 shrink-0" aria-hidden="true" />
-                        <p className="flex-1 text-center text-sm font-semibold text-bold-text">{COMBOS[combo].label}</p>
-                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSelected ? "bg-point" : "bg-[#34363c]"}`}>
-                          <span className={`h-2.5 w-2.5 rounded-full ${isSelected ? "bg-white" : "bg-[#70747d]"}`} />
-                        </span>
-                      </div>
-                      <div className="rounded-2xl bg-border p-3 text-xs">
-                        <div className="flex justify-between rounded bg-topbar px-2 py-1 font-semibold text-icon-muted"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
-                        {SPREAD_KEYS.map((spread) => (
-                          <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-icon-muted">
-                            <span>
-                              {SPREAD_SHORT[spread]}
-                              {COMBOS[combo].saju ? "+사주" : ""}
-                              {COMBOS[combo].ziwei ? "+자미두수" : ""}
-                            </span>
-                            <strong className="shrink-0 text-white">{countAllowanceForCombo(selected.basis, spread, combo)}회</strong>
-                          </div>
-                        ))}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              <ComboAllowanceList
+                allowanceFor={(combo, spread) => countAllowanceForCombo(selected.basis, spread, combo)}
+                selected={selectedCombo}
+                onSelect={selectCombo}
+              />
               <div className="px-4 text-sm font-semibold text-bold-text">
                 <p>결제금액</p>
                 <div className="mt-2 flex justify-between text-icon-muted"><span>상품금액 (VAT 포함)</span><span>{selected.priceWon.toLocaleString("ko-KR")}원</span></div>
@@ -236,8 +191,8 @@ export default function ChargePage() {
           )}
           {!selected && tab === "count" && (
             <div className="flex flex-col gap-3">
-              {COUNT_PACKAGES.map((pkg, i) => {
-                const tier = COUNT_TIERS[i];
+              {COUNT_PACKAGES.map((pkg) => {
+                const tier = countPackageTier(pkg.id);
                 return (
                   <button
                     key={pkg.id}
@@ -247,14 +202,14 @@ export default function ChargePage() {
                     className="relative flex h-20 items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left disabled:opacity-60"
                     style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}
                   >
-                    <div className="absolute inset-0 bg-[#19191d]/70" />
+                    <div className="absolute inset-0 bg-topbar/70" />
                     <div className="relative">
                       <p className="text-xl font-bold text-white">
                         {pkg.name} 이용권
                       </p>
                       <span
                         className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-sm font-semibold"
-                        style={{ color: tier.text, backgroundColor: tier.tagBg }}
+                        style={{ color: tier.tagText, backgroundColor: tier.tagBg }}
                       >
                         {pkg.bonus}
                       </span>
@@ -288,7 +243,7 @@ export default function ChargePage() {
                     className="relative flex items-center justify-between overflow-hidden rounded-[28px] border bg-cover bg-center p-4 text-left disabled:opacity-60"
                     style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}
                   >
-                    <div className="absolute inset-0 bg-[#19191d]/70" />
+                    <div className="absolute inset-0 bg-topbar/70" />
                     <div className="relative">
                       <p className="text-xl font-bold text-white">{timeDuration}분 {COMBOS[combo].label}</p>
                       <span

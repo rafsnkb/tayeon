@@ -135,7 +135,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
     <div className="flex min-h-dvh flex-col bg-bg xl:h-dvh">
       <div className="app-topbar-glass fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-center border-b border-border">
         <div className="relative mx-auto flex h-full w-full max-w-2xl items-center justify-center">
-          <Link href="/tarot" aria-label="뒤로가기" className="absolute left-6 flex h-16 w-8 items-center justify-center text-bold-text"><BackIcon className="h-5 w-2.5" /></Link>
+          <Link href="/" aria-label="뒤로가기" className="absolute left-6 flex h-16 w-8 items-center justify-center text-bold-text"><BackIcon className="h-5 w-2.5" /></Link>
           <span className="text-xl font-semibold text-bold-text">고객센터</span>
         </div>
       </div>
@@ -146,7 +146,7 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
             <div className="divide-y divide-border overflow-hidden rounded-[28px] border border-border bg-surface px-4">
               {faqs.map((faq, index) => {
                 const open = openIndex === index;
-                return <article key={faq.question} className="pt-4 pb-[22px]"><button type="button" onClick={() => setOpenIndex(open ? -1 : index)} aria-expanded={open} className="flex w-full items-center gap-3 text-left"><span className="min-w-0 flex-1 break-keep text-sm font-semibold leading-5 text-bold-text dark:text-[#dcdee3]">{faq.question}</span><BackIcon className={`mr-4 h-4 w-2 shrink-0 text-bold-text transition-transform dark:text-[#dcdee3] ${open ? "rotate-90" : "-rotate-90"}`} /></button>{open && <p className="mt-3 whitespace-pre-line rounded-2xl bg-[#f7f4fb] p-4 text-sm leading-5 text-text dark:bg-chip-fill dark:text-[#868b9a]">{faq.answer}</p>}</article>;
+                return <article key={faq.question} className="pt-4 pb-[22px]"><button type="button" onClick={() => setOpenIndex(open ? -1 : index)} aria-expanded={open} className="flex w-full items-center gap-3 text-left"><span className="min-w-0 flex-1 break-keep text-sm font-semibold leading-5 text-bold-text">{faq.question}</span><BackIcon className={`mr-4 h-4 w-2 shrink-0 text-bold-text transition-transform ${open ? "rotate-90" : "-rotate-90"}`} /></button>{open && <p className="mt-3 whitespace-pre-line rounded-2xl bg-bg p-4 text-sm leading-5 text-text dark:bg-chip-fill dark:text-icon-muted">{faq.answer}</p>}</article>;
               })}
             </div>
           </section>

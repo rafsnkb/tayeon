@@ -3,14 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { resolveProduct } from "@/lib/payment/products";
 import { adminDb } from "@/lib/firebase/admin";
-import { COMBOS, type ComboKey } from "@/lib/tarot/pricing";
+import { COMBOS, isComboKey } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
 import { blockIfSuspended } from "@/lib/auth/suspension";
-
-function isComboKey(value: unknown): value is ComboKey {
-  return typeof value === "string" && value in COMBOS;
-}
 
 // 결제창(PortOne.requestPayment)을 열기 직전에 프론트가 호출하는 엔드포인트.
 //

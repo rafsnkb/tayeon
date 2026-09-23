@@ -1,8 +1,8 @@
-import { CompanyInfoBar } from "tayeon";
+import { CompanyInfoLink } from "tayeon";
 
 export const Default = () => (
   <div className="w-[420px] bg-bg p-4">
-    <CompanyInfoBar />
+    <CompanyInfoLink />
   </div>
 );
 
@@ -15,7 +15,7 @@ export const Default = () => (
 export const Dark = () => (
   <div className="dark">
     <div className="w-[420px] bg-bg p-4">
-      <CompanyInfoBar />
+      <CompanyInfoLink />
     </div>
   </div>
 );

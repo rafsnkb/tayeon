@@ -1,5 +1,4 @@
-import TestAccountLogin from "./TestAccountLogin";
-import { CompanyInfoLink } from "@/components/CompanyInfoBar";
+import { CompanyInfoLink } from "@/components/CompanyInfoLink";
 import { LoginPanel } from "@/components/LoginPanel";
 
 /** 카카오 OAuth 콜백이 실패를 되돌려 보낼 곳이자, 친구 초대 링크(/login?ref=CODE)가 가리키는
@@ -14,8 +13,9 @@ export default async function LoginPage({
   return (
     <main className="relative flex min-h-dvh items-center justify-center bg-bg p-6">
       <div className="flex w-full max-w-sm flex-col gap-5">
+        {/* 테스트계정 로그인은 LoginPanel 안으로 들어갔다(2026-09-23) — 로그인 모달에도
+            같이 필요해서 카드 자체가 들고 있는 편이 맞다. */}
         <LoginPanel referralCode={ref} error={error} />
-        <TestAccountLogin />
       </div>
 
       {/* 초기 화면이 요구하는 사업자 정보 접근 경로. */}

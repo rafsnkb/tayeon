@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateTime } from "@/lib/util/formatDate";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { useRooms } from "@/lib/tarot/RoomsContext";
-import { CompanyFooter } from "@/components/CompanyFooter";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { PAYMENT_BONUS_REWARD_TIERS, countPassDisplayName } from "@/lib/tarot/pricing";
@@ -76,14 +76,6 @@ export function ComingSoon() {
 // 완벽한 UA 파싱은 아니고, 계정정보 모달의 "접속환경" 표시용 대략적인 추정치.
 // 계정정보 모달 "가입일"/"최근 로그인" — 피그마는 0패딩 24시간제(YYYY.MM.DD HH:mm:ss)인데
 // toLocaleString("ko-KR") 기본값은 "2026. 1. 10. 오전 9:00:00"처럼 패딩 없는 12시간제로 나와서 다름.
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(
-    d.getMinutes()
-  )}:${pad(d.getSeconds())}`;
-}
-
 function formatWonShort(won: number): string {
   return `${(won / 10_000).toLocaleString("ko-KR")}만원`;
 }
@@ -235,8 +227,11 @@ export default function MyPage() {
               onClick={() => setLogoutConfirmOpen(true)}
             />
           </Section>
-
-          <CompanyFooter />
+          {/* 하단 사업자정보(CompanyFooter)는 걷어냈다(2026-09-24 사용자 지시). 표시 의무가
+              걸리는 자리가 아니다 — 전자상거래법 제10조①·시행규칙 제7조①은 **초기 화면**
+              (메인, MainCompanyInfo)을, 제13조①은 **청약을 받을 목적의 표시·광고**(이용권
+              구입 화면 /charge)를 대상으로 한다. 마이페이지는 둘 중 어디에도 안 들어간다.
+              /charge 쪽은 그대로 둔다. */}
         </div>
       </div>
 
@@ -247,7 +242,7 @@ export default function MyPage() {
           onClick={() => setAccountInfoOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-[32px] border border-[#e4d8ef] bg-[#fefeff] p-4 dark:border-border dark:bg-topbar"
+            className="w-full max-w-sm rounded-[32px] border border-border bg-surface p-4 dark:border-border dark:bg-topbar"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -257,7 +252,7 @@ export default function MyPage() {
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="rounded-2xl bg-[#f7f4fb] p-4 dark:bg-border">
+            <div className="rounded-2xl bg-bg p-4 dark:bg-border">
               <div className="flex flex-col gap-[28px] text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-icon-muted">아이디</span>
@@ -304,55 +299,55 @@ export default function MyPage() {
           >
             <div className="mb-0 flex items-center justify-between pt-3">
               <div className="w-5" />
-              <p className="flex-1 text-center text-lg font-bold text-[#2a1a43] dark:text-bold-text">보너스 리워드 안내</p>
-              <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-[#75628b] dark:text-icon-muted">
+              <p className="flex-1 text-center text-lg font-bold text-bold-text">보너스 리워드 안내</p>
+              <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-icon-muted">
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-4 text-center text-sm font-semibold text-[#75628b] dark:text-icon-muted">
+            <p className="mb-4 text-center text-sm font-semibold text-icon-muted">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
             </p>
-            <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-[#f6f1fb] p-4 text-sm dark:bg-border">
+            <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-bg p-4 text-sm dark:bg-border">
               <div className="flex items-center justify-between">
-                <span className="text-[#75628b] dark:text-icon-muted">
+                <span className="text-icon-muted">
                   {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
                 </span>
-                <span className="font-semibold text-[#2a1a43] dark:text-bold-text">
+                <span className="font-semibold text-bold-text">
                   {(bonusReward?.totalWon ?? 0).toLocaleString("ko-KR")}원
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#75628b] dark:text-icon-muted">
+                <span className="text-icon-muted">
                   {bonusReward ? <>{bonusReward.month}월 예상 리워드<br /><span className="text-xs">(원카드 스프레드 기준)</span></> : "이번 달 예상 리워드"}
                 </span>
-                <span className="font-bold text-[#2a1a43] dark:text-bold-text">
+                <span className="font-bold text-bold-text">
                   {(bonusReward?.projectedPasses ?? 0).toLocaleString("ko-KR")}회 예상
                 </span>
               </div>
             </div>
-            <p className="mb-2 text-center text-sm font-bold text-[#2a1a43] dark:text-bold-text">리워드 지급 비율</p>
+            <p className="mb-2 text-center text-sm font-bold text-bold-text">리워드 지급 비율</p>
             {/* 다크모드 RewardInfoModal.png 실측(sharp 픽셀 샘플, 2026-09-20): 헤더 칩이 바깥 박스
                 가장자리에 딱 붙지 않고 안쪽에 여백을 두고 떠 있는 형태(박스 bg=--border, 헤더 칩
                 bg=--topbar로 안쪽이 더 어둡게 "패인" 느낌). 라이트모드 목업은 헤더가 박스 끝까지
                 꽉 차 있었지만, 사용자 요청(2026-09-20)으로 두 모드 구조를 동일하게 통일함 —
-                라이트도 같은 여백/독립 라운딩을 쓰고, 행 라벨은 톤을 유지한 진한 색(#2a1a43)으로. */}
-            <div className="mb-3 rounded-3xl border border-[#f0eaf6] bg-[#f6f1fb] p-3 dark:border-border dark:bg-border">
-              <div className="grid grid-cols-2 rounded-xl bg-[#79678f] px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+                라이트도 같은 여백/독립 라운딩을 쓰고, 행 라벨은 톤을 유지한 진한 색(--bold-text)으로. */}
+            <div className="mb-3 rounded-3xl border border-border bg-bg p-3 dark:border-border dark:bg-border">
+              <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
                 <span>당월 결제금액</span>
                 <span className="text-right">리워드 비율</span>
               </div>
               {REWARD_TIER_ROWS.map((row) => (
                 <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
-                  <span className="font-semibold text-[#2a1a43] dark:text-white">{row.label}</span>
+                  <span className="font-semibold text-bold-text dark:text-white">{row.label}</span>
                   <span className="text-right font-bold text-point-text">
                     {Number((row.rate * 100).toFixed(2))}%
                   </span>
                 </div>
               ))}
             </div>
-            <p className="text-center text-xs text-[#75628b] dark:text-icon-muted">보너스 리워드 이용권은 매월 5일에 지급됩니다.</p>
+            <p className="text-center text-xs text-icon-muted">보너스 리워드 이용권은 매월 5일에 지급됩니다.</p>
           </div>
         </div>
       )}
@@ -364,7 +359,11 @@ export default function MyPage() {
           confirmLabel="로그아웃"
           onConfirm={() => {
             setLogoutConfirmOpen(false);
-            signOut(auth);
+            void signOut(auth);
+            // 모달이 "메인 화면으로 이동합니다"라고 약속하므로 여기서 직접 보낸다. AppShell의
+            // 비로그인 리다이렉트에만 맡기면 user가 null로 바뀌는 한 프레임 동안 /me가 빈
+            // 화면으로 남는다(authChecked는 이미 true라 로딩 표시도 없다).
+            router.replace("/");
           }}
           onClose={() => setLogoutConfirmOpen(false)}
         />

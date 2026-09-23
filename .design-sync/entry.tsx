@@ -6,7 +6,7 @@ import "./preview-env";
 // -- shared components (src/components) -------------------------------------
 export { BrandBi } from "../src/components/BrandBi";
 export { CompanyFooter } from "../src/components/CompanyFooter";
-export { CompanyInfoBar } from "../src/components/CompanyInfoBar";
+export { CompanyInfoLink } from "../src/components/CompanyInfoLink";
 export { default as ConfirmModal } from "../src/components/ConfirmModal";
 export { default as InfoModal } from "../src/components/InfoModal";
 export { default as ModalViewportChrome } from "../src/components/ModalViewportChrome";
@@ -16,6 +16,8 @@ export { default as RoomLimitModal } from "../src/components/RoomLimitModal";
 export { default as SubPageTopBar } from "../src/components/SubPageTopBar";
 export { default as SupportCenter } from "../src/components/SupportCenter";
 export { default as SuspensionModal } from "../src/components/SuspensionModal";
+export { FieldLabel, ToggleGroup } from "../src/components/FormControls";
+export { ComboAllowanceCard, ComboAllowanceList } from "../src/components/ComboAllowanceCard";
 
 // -- icons (src/app/(app)/tarot/icons.tsx) ----------------------------------
 export {
@@ -27,18 +29,26 @@ export {
   PencilIcon, TrashIcon, InfoCircleIcon, BellIcon, TicketIcon,
 } from "../src/app/(app)/tarot/icons";
 
-// -- tarot screen pieces (src/app/(app)/tarot/page.tsx) ---------------------
+// -- tarot screen pieces ----------------------------------------------------
+// 한 파일(TarotScreen.tsx)이 1783줄까지 자라서 셋으로 나눴다(2026-09-24). 이 목록은 tsc 가
+// 봐 주지 않는다 — tsconfig 의 include 글롭이 점으로 시작하는 폴더를 건너뛰기 때문에
+// .design-sync 는 타입 검사 대상 밖이다. 그래서 이 배럴은 개편 때마다 조용히 썩는다:
+// 실제로 CountPassUsageModal / HeldTimepassListModal / NoHeldTimepassModal 세 개가
+// 사라진 이름인 채로 남아 있었다. 화면 조각을 옮기거나 지우면 여기도 같이 고칠 것.
 export {
-  CountPassUsageModal, ReadingLoadingMessage, CardImage, CelticCrossLayout,
-  DualPathLayout, WelcomePopup, TimePassCard, HeldTimepassListModal,
-  HeldTimepassUseModal, NoHeldTimepassModal, PurchaseTicketModal,
-  RenameRoomModal, SpreadSelectSheet, Switch,
-} from "../src/app/(app)/tarot/page";
+  ProgressRing, PassUsageModal, PassBar, TimePassCard, HeldTimepassUseModal,
+  PurchaseTicketModal,
+} from "../src/app/(app)/tarot/passes";
+export {
+  ReadingLoadingMessage, CardImage, CelticCrossLayout, DualPathLayout,
+} from "../src/app/(app)/tarot/reading";
+export { SpreadSelectSheet, Switch } from "../src/app/(app)/tarot/composer";
+export { WelcomePopup, RenameRoomModal } from "../src/app/(app)/tarot/TarotScreen";
 
 // -- other screen pieces ----------------------------------------------------
 export { ListRow, Section, ComingSoon } from "../src/app/(app)/me/page";
 export { SectionPanel } from "../src/app/(app)/settings/page";
-export { PolicyModal, FieldLabel } from "../src/app/signup/page";
+export { PolicyModal } from "../src/app/signup/page";
 export { AppShell } from "../src/app/(app)/layout";
 
 // -- preview-only cards (no app source; see componentSrcMap null entries) ---

@@ -67,7 +67,7 @@ const router = {
 export function DsPreviewProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppRouterContext.Provider value={router as never}>
-      <PathnameContext.Provider value="/tarot">
+      <PathnameContext.Provider value="/">
         <SearchParamsContext.Provider value={new URLSearchParams() as never}>
           <RoomsContext.Provider value={roomsValue as never}>{children}</RoomsContext.Provider>
         </SearchParamsContext.Provider>

@@ -301,3 +301,4 @@ export function TicketIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+

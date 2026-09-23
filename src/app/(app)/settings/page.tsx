@@ -150,7 +150,8 @@ export default function SettingsPage() {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       await signOut(auth);
-      router.replace("/login");
+      // 로그아웃과 같은 규칙 — 탈퇴한 사람도 로그인 카드가 아니라 메인 화면에서 나간다.
+      router.replace("/");
     } finally {
       setDeleting(false);
     }

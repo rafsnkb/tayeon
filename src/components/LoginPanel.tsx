@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandBi } from "./BrandBi";
+import TestAccountLogin from "./TestAccountLogin";
 
 // 친구 초대 링크(/login?ref=CODE)로 들어온 경우, OAuth 왕복 동안 유일하게 그대로 되돌아오는
 // state 파라미터에 초대 코드를 실어서 콜백(src/app/api/auth/kakao/callback/route.ts)까지
@@ -25,9 +26,8 @@ export function kakaoAuthorizeUrl(referralCode?: string) {
 /** 피그마 "Screen / LoginModal"의 카드. `/login` 페이지와 대화 화면 위에 뜨는 모달이 같은 것을
  * 쓴다 — 목업상 둘은 같은 카드고, 놓이는 자리만 다르다.
  *
- * 색은 목업에서 직접 뽑았다(sharp, 2026-09-22): 카드 #19191d = --topbar(다크), 칩 #141517 /
- * #f7f4fb = --bg(양쪽 테마 정확히 일치). 즉 원래 토큰 기반 설계인데 코드가 라이트 값을 박아둬서
- * 다크 모드에서 흰 카드가 떠 있었다. 노란색만 카카오 브랜드 색이라 그대로 둔다. */
+ * 색은 전부 토큰이다 — 카드는 --topbar, 칩은 --bg. 예전엔 라이트 값을 코드에 박아둬서 다크
+ * 모드에서 흰 카드가 떠 있었다. 노란색만 카카오 브랜드 색이라 토큰화하지 않고 그대로 둔다. */
 export function LoginPanel({
   referralCode,
   error,
@@ -62,12 +62,23 @@ export function LoginPanel({
         최초 가입 시 무료 4회(모든 기능 무제한) 지급
       </p>
 
-      <a
-        href={kakaoAuthorizeUrl(referralCode)}
-        className="flex h-12 items-center justify-center rounded-2xl bg-[#fae100] text-base font-bold text-black"
-      >
-        로그인ㆍ회원가입
+      {/* 버튼은 받은 이미지 에셋 한 장이다(public/textures/btn_kakao.png, 448x92 2배수).
+          메뉴 드로어와 같은 그림을 쓴다(2026-09-23 사용자 지시). 카드 폭(336)에 꽉 채우면
+          높이가 69까지 커져 카드 비례가 깨지므로, 원래 버튼과 같은 높이 48로 두고 폭은
+          비율대로(≈234) 따라오게 한 뒤 가운데 정렬한다 — 그림이라 가로로만 늘리면 모서리
+          라운드가 찌그러진다. */}
+      <a href={kakaoAuthorizeUrl(referralCode)} className="self-center">
+        <img
+          src="/textures/btn_kakao.png"
+          alt="카카오로 시작하기"
+          width={448}
+          height={92}
+          className="h-12 w-auto"
+        />
       </a>
+
+      {/* PG 심사용 ID/PW 로그인. 심사자가 카카오 계정 없이 가입·결제 흐름을 볼 수 있어야 한다. */}
+      <TestAccountLogin />
 
       <p className="text-center text-xs text-text">
         로그인 시{" "}

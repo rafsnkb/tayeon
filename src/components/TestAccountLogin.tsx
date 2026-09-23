@@ -3,10 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** 카카오 로그인 버튼 아래 "테스트계정 로그인" — KG이니시스 전자계약 사전점검의 "회원가입
- * 필수" 항목에 심사자가 쓸 ID/PW를 제공하기 위한 것(src/app/api/auth/pg-review-login/route.ts).
- * 일반 회원가입 기능이 아니라 .env.local의 PG_REVIEW_TEST_ID/PASSWORD와 정확히 일치할 때만
- * 동작하는 좁은 통로 — 심사 끝나면 그 값을 지우거나 바꿔서 비활성화할 수 있다. */
+/** 카카오 로그인 버튼 아래 "테스트계정 로그인" — PG 심사자가 쓸 ID/PW를 제공하기 위한 것
+ * (src/app/api/auth/pg-review-login/route.ts). 일반 회원가입 기능이 아니라 .env.local의
+ * PG_REVIEW_TEST_ID/PASSWORD와 정확히 일치할 때만 동작하는 좁은 통로 — 심사 끝나면 그 값을
+ * 지우거나 바꿔서 비활성화할 수 있다.
+ *
+ * 원래 /login 페이지에만 있었는데, 토스페이먼츠 심사도 받게 되면서 심사자가 실제로 마주치는
+ * 로그인 지점 **전부**에 있어야 한다는 지시(2026-09-23) — 그래서 app/login 밑에서 공용
+ * components 로 옮겼다. 지금 쓰는 곳: LoginPanel(= /login 페이지 + 대화 화면 위 로그인 모달),
+ * 비로그인 메뉴 드로어. 드로어 폭(226)에서도 접히지 않게 전부 세로 한 줄짜리다. */
 export default function TestAccountLogin() {
   const router = useRouter();
   const [id, setId] = useState("");

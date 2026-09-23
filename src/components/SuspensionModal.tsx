@@ -1,6 +1,7 @@
 "use client";
 
 import { CloseIcon } from "@/app/(app)/tarot/icons";
+import { formatDateTime } from "@/lib/util/formatDate";
 
 export type SuspensionInfo = { reason: string | null; suspendedUntil: string | null };
 
@@ -14,12 +15,6 @@ export function parseSuspensionError(body: unknown): SuspensionInfo | null {
     reason: typeof b.reason === "string" ? b.reason : null,
     suspendedUntil: typeof b.suspendedUntil === "string" ? b.suspendedUntil : null,
   };
-}
-
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /** 피그마 "SuspensionPopup" — 정지 중 사용자가 리딩/결제/보상수령/시간제 활성화를 시도했을 때. */

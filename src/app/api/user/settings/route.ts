@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { isToneKey } from "@/lib/tarot/tone";
-
-const JASI_RULES = ["midnight", "jasi", "splitJasi"];
+import { isJasiRule } from "@/lib/tarot/birthInfo";
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest) {
   const update: Record<string, unknown> = {};
   if (isToneKey(tone)) update.tone = tone;
   if (typeof useReversedCards === "boolean") update.useReversedCards = useReversedCards;
-  if (typeof jasiRule === "string" && JASI_RULES.includes(jasiRule)) {
+  if (isJasiRule(jasiRule)) {
     update["birthInfo.jasiRule"] = jasiRule;
   }
   if (typeof useTrueSolarTime === "boolean") {

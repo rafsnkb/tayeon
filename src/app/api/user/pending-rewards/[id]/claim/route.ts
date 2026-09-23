@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { addMonthsClamped } from "@/lib/util/dateMath";
-import { COMBOS, COUNT_PASS_VALIDITY_MONTHS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
+import { COMBOS, isComboKey, COUNT_PASS_VALIDITY_MONTHS, countAllowancesForCombo } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
 import { checkSuspension, SUSPENSION_CLEARED } from "@/lib/auth/suspension";
-
-function isComboKey(value: unknown): value is ComboKey {
-  return typeof value === "string" && value in COMBOS;
-}
 
 /** POST /api/user/pending-rewards/[id]/claim — 미수령 리워드를 고른 조합으로 실제 이용권으로
  * 전환한다. 구매(source:"purchase") 1개 제한(src/app/api/payment/prepare/route.ts)은 여기엔
