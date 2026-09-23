@@ -36,7 +36,10 @@ function toPassItem(id: string, data: Record<string, unknown>, type: PassSourceT
   return {
     id,
     type,
+    // 시간제 이용권은 source 를 안 쓴다(fulfill.ts 가 구매분만 만든다) — 없으면 구매분이다.
     source: typeof data.source === "string" ? data.source : "purchase",
+    // 구매분을 환불하려면 결제 건을 알아야 한다. 이용권 문서가 이미 들고 있다.
+    paymentId: typeof data.paymentId === "string" ? data.paymentId : null,
     status: typeof data.status === "string" ? data.status : "unknown",
     combo: typeof data.combo === "string" ? data.combo : null,
     minutes: typeof data.minutes === "number" ? data.minutes : null,

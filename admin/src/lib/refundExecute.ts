@@ -6,8 +6,21 @@ import { portone } from "@/lib/payment/portone";
 export const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type RefundExecuteResult =
-  | { ok: true; cancellation: unknown }
+  /** `alreadyCancelled` 면 포트원에서는 이미 취소돼 있었고 여기서는 앱 상태만 맞춘 것이다. */
+  | { ok: true; cancellation: unknown; alreadyCancelled: boolean }
   | { ok: false; status: number; error: string };
+
+/** 포트원이 "이미 취소된 결제"라고 답했는지. 운영자가 포트원 콘솔에서 직접 취소했거나, 취소는
+ *  됐는데 웹훅이 우리 쪽에 닿지 못한 경우다(로컬 개발 중에는 웹훅이 아예 못 온다).
+ *
+ *  이건 실패가 아니다 — 돈은 이미 돌아갔고 앱 기록만 뒤처진 상태라, 그대로 오류를 내면
+ *  이용권이 refund_pending 에 갇혀 사용자는 쓰지도 사지도 못한다(2026-09-24). */
+function isAlreadyCancelled(error: unknown): boolean {
+  const data = (error as { data?: { type?: unknown } })?.data;
+  if (data?.type === "PAYMENT_ALREADY_CANCELLED") return true;
+  // 타입이 안 잡히는 경로(래핑된 에러 등)를 위한 보조 판정.
+  return /already cancelled/i.test(error instanceof Error ? error.message : String(error));
+}
 
 /** 환불을 실제로 실행한다 — 포트원 결제 취소 + 결제·이용권·환불요청 문서 갱신.
  *
@@ -58,13 +71,19 @@ export async function executeRefund(input: {
     return { ok: false, status: 409, error: "한 번도 사용하거나 활성화하지 않은 이용권만 환불할 수 있어요." };
   }
 
-  let cancellation;
+  let cancellation: unknown = null;
+  let alreadyCancelled = false;
   try {
     const response = await portone.cancelPayment({ paymentId, reason });
     cancellation = response.cancellation;
   } catch (error) {
-    console.error("[refund] cancelPayment 실패", paymentId, error);
-    return { ok: false, status: 502, error: error instanceof Error ? error.message : "포트원 결제 취소에 실패했어요." };
+    if (isAlreadyCancelled(error)) {
+      console.warn("[refund] 포트원에서 이미 취소된 결제 — 앱 상태만 맞춘다", paymentId);
+      alreadyCancelled = true;
+    } else {
+      console.error("[refund] cancelPayment 실패", paymentId, error);
+      return { ok: false, status: 502, error: error instanceof Error ? error.message : "포트원 결제 취소에 실패했어요." };
+    }
   }
 
   const approvedByEmail = input.approvedBy
@@ -82,6 +101,9 @@ export async function executeRefund(input: {
       refundedByUid: input.approvedBy,
       refundedByEmail: approvedByEmail,
       refundedVia: input.approvedBy ? "admin" : "auto",
+      // 포트원에서 이미 취소돼 있던 건은 우리가 취소한 게 아니라 맞춘 것이다 — 나중에
+      // 정산을 대조할 때 구분이 된다.
+      refundReconciled: alreadyCancelled,
     });
     tx.update(passRef, { status: "refunded" });
     // 사용자 요청에서 시작한 건은 PG 취소와 동일한 트랜잭션에서 완료 처리한다. 취소는 됐는데
@@ -96,5 +118,5 @@ export async function executeRefund(input: {
     }
   });
 
-  return { ok: true, cancellation };
+  return { ok: true, cancellation, alreadyCancelled };
 }

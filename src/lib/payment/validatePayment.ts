@@ -47,9 +47,13 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
     return { ok: false, outcome: { kind: "not_paid", status: String(payment.status) } };
   }
 
-  // 프로덕션에서는 TEST 채널 결제(실제 카드 승인 없이 항상 성공하는 테스트 카드)로 지급되는 걸
-  // 막는다 — 실채널이 없는 동안 로컬/개발에서는 통과시키고, 실제 배포에서만 거부한다.
-  // (2026-09-15, 프로덕션 채널키가 실수로 TEST로 남아 있어도 무료 지급되는 사고 방지.)
+  // 프로덕션에서는 TEST 채널 결제로 이용권이 지급되는 걸 막는다 — 실채널 계약 전이라
+  // 로컬/개발에서는 통과시키고, 실제 배포에서만 거부한다(2026-09-15, 프로덕션 채널키가
+  // 실수로 TEST 로 남아 있어도 무료 지급되는 사고 방지).
+  //
+  // ⚠️ TEST 채널이라고 카드에 아무 일도 안 일어나는 게 아니다 — 실제로 카드사 사용 알림이
+  // 온다(2026-09-24 사용자 확인). 포트원 기록은 channelType=TEST / isTest=true 로 남지만,
+  // 테스트로 만든 결제는 반드시 취소해서 정리할 것.
   if (opts.isProduction && payment.channel?.type !== "LIVE") {
     return {
       ok: false,

@@ -16,5 +16,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ uid
 
   const result = await executeRefund({ uid, paymentId, reason, approvedBy: adminUid });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
-  return NextResponse.json({ cancellation: result.cancellation });
+  return NextResponse.json({ cancellation: result.cancellation, alreadyCancelled: result.alreadyCancelled });
 }

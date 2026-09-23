@@ -35,6 +35,7 @@ type PassItem = {
   createdAt: string;
   expiresAt: string | null;
   usableUntil: string | null;
+  paymentId: string | null;
 };
 
 type ReviewReading = {
@@ -108,9 +109,46 @@ function HeldPassesPanel({
   onUpdate: (uid: string, updater: (prev: UserOverview) => UserOverview) => void;
 }) {
   const [category, setCategory] = useState<PassCategory>("all");
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
   const [revokeBusy, setRevokeBusy] = useState<string | null>(null);
   const passes = [...purchasedPasses, ...rewardPasses].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const filtered = passes.filter((pass) => matchesPassCategory(pass, category));
+
+  /** 구매분 환불 — 포트원 결제 취소까지 실제로 실행된다(executeRefund).
+   *
+   *  환불 요청 목록에는 status 가 pending 인 건만 나온다. 메일로 접수된 요청(약관 제9조9항)
+   *  이나 한 번 거절됐다가 다시 처리해야 하는 건은 그 목록에 안 잡혀서, 여기가 유일한
+   *  경로다(2026-09-24). 결제 후 7일 이내 · 미사용 조건은 서버가 다시 강제한다. */
+  async function refund(pass: PassItem) {
+    const admin = auth.currentUser;
+    if (!admin || !pass.paymentId) return;
+    const reason = prompt("환불 사유를 입력하세요. (사용자에게 노출되지 않지만 기록에 남습니다)");
+    if (!reason?.trim()) return;
+    if (!confirm("결제를 실제로 취소하고 이용권을 회수합니다. 진행할까요?")) return;
+    setRefundBusy(pass.id);
+    try {
+      const token = await admin.getIdToken();
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/refund-payment`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ paymentId: pass.paymentId, reason: reason.trim() }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(body.error ?? "환불에 실패했습니다.");
+        return;
+      }
+      if (body.alreadyCancelled) {
+        alert("포트원에서 이미 취소된 결제였습니다. 앱 기록만 맞췄습니다(추가 환불은 일어나지 않았습니다).");
+      }
+      onUpdate(uid, (prev) => ({
+        ...prev,
+        purchasedPasses: prev.purchasedPasses.map((p) => (p.id === pass.id ? { ...p, status: "refunded" } : p)),
+      }));
+    } finally {
+      setRefundBusy(null);
+    }
+  }
 
   async function revoke(pass: PassItem) {
     const admin = auth.currentUser;
@@ -164,12 +202,29 @@ function HeldPassesPanel({
         <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {filtered.map((pass) => {
             const revocable = pass.source === "admin-grant" && pass.status === "unused" && (pass.type === "countPass" || pass.type === "timePass");
+            // 구매분은 회수가 아니라 환불이다 — 사용자가 돈을 낸 이용권을 돌려주지 않고 뺏을 수
+            // 없다. refund_pending 도 포함한다: 환불을 신청했다가 거절돼 멈춰 있는 건을 풀 수
+            // 있는 경로가 여기뿐이다(요청 목록은 pending 만 보여준다).
+            const refundable =
+              pass.source === "purchase" &&
+              !!pass.paymentId &&
+              (pass.status === "unused" || pass.status === "refund_pending") &&
+              (pass.type === "countPass" || pass.type === "timePass");
             return (
               <li key={pass.id} className="rounded-xl bg-[#FAF8FB] px-3 py-2 text-xs text-[#665A70]">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-[#4B3D56]">{SOURCE_LABEL[pass.source] ?? pass.source}</span>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{pass.status}</span>
+                    {refundable && (
+                      <button
+                        onClick={() => refund(pass)}
+                        disabled={refundBusy === pass.id}
+                        className="rounded-full border border-[#E4DDE9] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#B81D6E] disabled:opacity-50"
+                      >
+                        {refundBusy === pass.id ? "처리 중..." : "환불"}
+                      </button>
+                    )}
                     {revocable && (
                       <button
                         onClick={() => revoke(pass)}
