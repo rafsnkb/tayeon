@@ -52,6 +52,27 @@ export function isJasiRule(value: unknown): value is JasiRule {
   return typeof value === "string" && VALID_JASI_RULES.includes(value as JasiRule);
 }
 
+/** 달력 선택 UI 가 쓰는 3지선다. 저장 스키마는 `calendarType`(양/음) + `isLeapMonth`(윤달)
+ *  두 필드로 나뉘어 있는데, 화면에서는 "양력 / 음력 / 음력(윤달)" 한 줄로 고른다. */
+export type CalendarMode = "solar" | "lunar" | "lunarLeap";
+
+/** 저장된 두 필드를 화면용 3지선다로 바꾼다. 가입·내 정보·궁합 세 화면이 같이 쓴다.
+ *
+ *  `calendarType` 이 없는 경우(`Partner.calendarType` 은 선택 필드다 — 이 필드가 생기기
+ *  전에 저장된 상대 정보) **양력으로 본다.** `partnerToBirthInfo` 가 `?? "solar"` 로 같은
+ *  규칙을 쓰고 partner.ts 주석에도 그렇게 적혀 있다.
+ *
+ *  ⚠️ 2026-09-24 이전 궁합 화면의 사본은 반대로 동작했다(없으면 음력). 그래서 옛 상대
+ *  정보를 열면 **화면엔 음력인데 실제 사주/자미두수 계산은 양력**이었고, 그 상태로 다른 칸을
+ *  하나 고쳐 저장하면 `calendarType: "lunar"` 가 진짜로 저장돼 양력 생일이 음력으로 바뀌었다. */
+export function toCalendarMode(
+  calendarType: "solar" | "lunar" | undefined,
+  isLeapMonth?: boolean,
+): CalendarMode {
+  if (calendarType !== "lunar") return "solar";
+  return isLeapMonth ? "lunarLeap" : "lunar";
+}
+
 /** 계산 라이브러리에 넘기기 전 필수 필드가 유효한 형태인지 확인 (구버전 스키마로 저장된 데이터 방어) */
 export function isValidBirthInfo(info: unknown): info is BirthInfo {
   if (!info || typeof info !== "object") return false;

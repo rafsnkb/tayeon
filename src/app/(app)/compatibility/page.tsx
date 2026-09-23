@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FieldLabel, ToggleGroup } from "@/components/FormControls";
+import { toCalendarMode, type CalendarMode } from "@/lib/tarot/birthInfo";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
@@ -16,8 +18,6 @@ type Partner = {
   birthPlace?: string | null;
 };
 
-type CalendarMode = "solar" | "lunar" | "lunarLeap";
-
 type ProfileSnapshot = {
   nickname: string;
   calendarMode: CalendarMode;
@@ -27,49 +27,6 @@ type ProfileSnapshot = {
   gender: Partner["gender"];
   birthPlace: string;
 };
-
-function toCalendarMode(calendarType: Partner["calendarType"], isLeapMonth?: boolean): CalendarMode {
-  if (calendarType === "solar") return "solar";
-  return isLeapMonth ? "lunarLeap" : "lunar";
-}
-
-function ToggleGroup<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex gap-2 pt-2">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
-            value === opt.value
-              ? "border border-point-strong bg-point text-white"
-              : "bg-chip-fill text-white"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
-  return (
-    <span className="text-sm font-semibold text-icon-muted">
-      {children}
-      {required && <span className="text-urgent">*</span>}
-    </span>
-  );
-}
 
 /** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 닉네임만 필수, 나머지는
  * 전부 선택 입력. 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을 보여주고 기존
