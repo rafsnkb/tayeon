@@ -23,6 +23,15 @@ export type AlertLevel =
   /** 방치하면 돈이 새거나 법정 기한을 넘긴다. 메일도 간다. */
   | "urgent";
 
+/** 알림을 어느 디스코드 채널로 보낼지. 환불과 고객문의가 한 채널에 섞이면 둘 다 놓친다.
+ *  해당 채널이 설정돼 있지 않으면 기본 채널로 떨어진다. */
+export type AlertChannel = "default" | "support";
+
+const CHANNEL_ENV: Record<AlertChannel, string> = {
+  default: "DISCORD_WEBHOOK_URL",
+  support: "DISCORD_SUPPORT_WEBHOOK_URL",
+};
+
 export type OwnerAlert = {
   /** 중복 발송 방지 키. 같은 키로 다시 부르면 보내지 않는다 — 스케줄러가 매시 도는데
    *  같은 건을 매번 알리면 알림이 무의미해진다. */
@@ -34,6 +43,7 @@ export type OwnerAlert = {
   /** 이상 징후처럼 눈에 띄어야 하는 블록. */
   note?: string;
   link?: { label: string; url: string };
+  channel?: AlertChannel;
 };
 
 const COLOR: Record<AlertLevel, number> = {
@@ -52,14 +62,15 @@ function todayKey(now: Date): string {
 }
 
 async function sendDiscord(alert: OwnerAlert): Promise<boolean> {
-  const url = process.env.DISCORD_WEBHOOK_URL;
+  const url =
+    process.env[CHANNEL_ENV[alert.channel ?? "default"]] || process.env.DISCORD_WEBHOOK_URL;
   if (!url) return false;
-  // 디스코드 embed 의 fields 는 폭이 남으면 자동으로 2~3열 그리드가 되고, 라벨과 값이 같은
-  // 크기·색이라 눈으로 구분이 잘 안 된다. 전부 description 에 직접 그려서 세로로 세우고,
-  // 라벨은 `-#`(subtext — 더 작고 회색)로 내려 값과 층을 만든다.
+  // embed 의 fields 는 폭이 남으면 2~3열 그리드로 접히고 라벨과 값이 같은 크기·색이라 구분이
+  // 안 된다. description 에 직접 그려서 세로로 세우고, 라벨은 굵게(흰색), 값은 `-#`(subtext —
+  // 더 작고 흐림)로 내려 층을 만든다. 항목 사이는 빈 줄 하나.
   const rows = alert.fields
-    .map(([name, value]) => `-# ${name}${nlEsc}${value || "-"}`)
-    .join(nlEsc);
+    .map(([name, value]) => `**${name}**${nlEsc}-# ${value || "-"}`)
+    .join(`${nlEsc}${nlEsc}`);
   const description = [alert.note, rows].filter(Boolean).join(`${nlEsc}${nlEsc}`);
   const body = {
     embeds: [
@@ -67,13 +78,17 @@ async function sendDiscord(alert: OwnerAlert): Promise<boolean> {
         title: `${PREFIX[alert.level]} ${alert.title}`,
         color: COLOR[alert.level],
         description,
-        ...(alert.link ? { url: alert.link.url } : {}),
         timestamp: new Date().toISOString(),
       },
     ],
-    ...(alert.link ? { components: [] } : {}),
+    // 서버 설정에서 만든(=애플리케이션 소유가 아닌) 웹훅은 **링크 버튼만** 보낼 수 있고,
+    // 그마저 with_components=true 가 없으면 조용히 무시된다. 눌러서 동작하는 버튼을 쓰려면
+    // 디스코드 앱(봇)과 인터랙션 엔드포인트가 필요하다 — 지금은 링크로 충분하다고 판단.
+    ...(alert.link
+      ? { components: [{ type: 1, components: [{ type: 2, style: 5, label: alert.link.label, url: alert.link.url }] }] }
+      : {}),
   };
-  const response = await fetch(url, {
+  const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}with_components=true`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -267,3 +267,36 @@ export const monthlyBonusRewardPayout = onSchedule(
     console.log(`[bonus-reward-payout] ${payoutKey} 정산 완료 — 유저 ${totalByUid.size}명`);
   }
 );
+
+/**
+ * 매시 :17에 어드민의 환불 자동 승인을 깨운다.
+ *
+ * 여기서는 판정도 결제 취소도 하지 않는다 — 환불 실행 로직은 어드민 한 곳에만 두고
+ * (admin/src/lib/refundExecute.ts) 이 함수는 호출만 한다. Functions 에 포트원 SDK 를 또
+ * 넣으면 "돈을 움직이는 코드"가 세 벌이 되고, 토스페이먼츠로 교체할 때 전부 고쳐야 한다.
+ *
+ * 정시(:00)를 피한 건 전 세계 스케줄러가 몰리는 시각이라서다. 2영업일 기한이라 몇 분 차이는
+ * 아무 의미가 없다.
+ */
+export const hourlyRefundAutoApprove = onSchedule(
+  { schedule: "17 * * * *", timeZone: "Asia/Seoul", region: "asia-east1" },
+  async () => {
+    const base = process.env.ADMIN_BASE_URL?.replace(/\/+$/, "");
+    const secret = process.env.INTERNAL_API_SECRET;
+    if (!base || !secret) {
+      console.warn("[refund-auto] ADMIN_BASE_URL/INTERNAL_API_SECRET 미설정 — 건너뛴다");
+      return;
+    }
+    const response = await fetch(`${base}/api/admin/refund-requests/auto-approve`, {
+      method: "POST",
+      headers: { "x-internal-secret": secret },
+    });
+    const text = await response.text().catch(() => "");
+    if (!response.ok) {
+      // 여기서 던지면 Functions 가 재시도한다 — 자동 승인은 멱등(이미 approved 면 건너뜀)이라
+      // 재시도가 안전하다.
+      throw new Error(`자동 승인 호출 실패 ${response.status}: ${text.slice(0, 300)}`);
+    }
+    console.log("[refund-auto]", text.slice(0, 300));
+  }
+);
