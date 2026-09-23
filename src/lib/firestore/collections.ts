@@ -11,6 +11,8 @@ export const REFUND_REQUESTS = "refundRequests";
 /** 회원 탈퇴 시 users/{uid}/payments에서 복사되는 결제 기록 아카이브(전자상거래법 시행령
  * 제6조 5년 보존 의무 — src/app/api/user/delete/route.ts 참고). */
 export const PAYMENT_ARCHIVE = "paymentArchive";
+/** 운영 알림 발송 기록 — 중복 발송 방지 키와 일일 메일 사용량을 담는다. */
+export const OWNER_ALERTS = "ownerAlerts";
 
 /** users/{uid} 서브컬렉션. */
 export const PAYMENTS = "payments";

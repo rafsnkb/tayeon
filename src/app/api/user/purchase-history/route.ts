@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { COUNT_PACKAGES, TIME_PASS_PACKAGES } from "@/lib/tarot/pricing";
-import { USERS, PAYMENTS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
+import { COMBOS, COUNT_PACKAGES, TIME_PASS_PACKAGES, isComboKey } from "@/lib/tarot/pricing";
+import { USERS, PAYMENTS, COUNT_PASSES, TIME_PASSES, REFUND_REQUESTS } from "@/lib/firestore/collections";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
 
 const ENTRY_LIMIT = 50;
@@ -19,6 +19,26 @@ function productName(productId: string, productType: string): string {
     return pkg ? `시간제 이용권 ${pkg.minutes}분 무제한` : "시간제 이용권";
   }
   return "충전 상품";
+}
+
+/** 어떤 옵션으로 산 이용권인지 — "타로 전용" / "타로+사주" 등.
+ *
+ *  두 상품이 조합을 다른 곳에 들고 있다. 시간제는 조합이 상품에 박혀 있어서(`timepass-tarot-15`)
+ *  productId 만으로 알 수 있고, 횟수제는 구매 시점에 고르는 값이라 이용권 문서에 들어 있다
+ *  (결제 문서에는 없다). 아래 호출부가 배지를 만들려고 어차피 이용권 문서를 읽으므로 그 값을
+ *  그대로 넘겨받는다 — 저장 구조를 바꾸지 않아도 지난 결제까지 전부 표시된다.
+ *
+ *  조합이 없던 시절(2026-09-18 개편 전)에 만들어진 이용권은 null 이 되고, 화면은 그 줄을
+ *  그리지 않는다. */
+function comboLabel(productId: string, productType: string, passCombo: unknown): string | null {
+  if (productType === "timePass") {
+    const pkg = TIME_PASS_PACKAGES.find((p) => p.id === productId);
+    return pkg ? COMBOS[pkg.combo].label : null;
+  }
+  if (productType === "countPass") {
+    return isComboKey(passCombo) ? COMBOS[passCombo].label : null;
+  }
+  return null;
 }
 
 function badgeLabel(status: string | undefined): string {
@@ -47,9 +67,28 @@ export async function GET(req: NextRequest) {
     .limit(ENTRY_LIMIT)
     .get();
 
+  // 환불 요청은 최상위 refundRequests 에 paymentId 를 문서 id 로 들어간다. 행마다 따로 읽지
+  // 않고 한 번에 가져온다(최대 ENTRY_LIMIT 건).
+  const requestSnaps = paymentsSnap.docs.length
+    ? await adminDb.getAll(...paymentsSnap.docs.map((d) => adminDb.collection(REFUND_REQUESTS).doc(d.id)))
+    : [];
+  const refundRequestStatus = new Map(
+    requestSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data()?.status as string | undefined])
+  );
+
   const entries = await Promise.all(
     paymentsSnap.docs.map(async (doc) => {
       const data = doc.data();
+      // 예전엔 환불 분기가 먼저 return 해서 이용권 문서를 읽지 않았다. 옵션 표시가 환불 건에만
+      // 빠지는 걸 막으려고 조회를 앞으로 당겼다(행당 읽기 1회, 최대 ENTRY_LIMIT 건).
+      const passRef =
+        data.productType === "countPass" && data.countPassId
+          ? userRef.collection(COUNT_PASSES).doc(data.countPassId)
+          : data.productType === "timePass" && data.timePassId
+            ? userRef.collection(TIME_PASSES).doc(data.timePassId)
+            : null;
+      const passData = passRef ? (await passRef.get()).data() : undefined;
+      const combo = comboLabel(data.productId, data.productType, passData?.combo);
       let badge = "";
       let refundable = false;
       // 환불/취소된 결제는 이용권 상태 대신 "환불완료" 배지를 달고, 다시 환불할 수는 없다.
@@ -65,18 +104,25 @@ export async function GET(req: NextRequest) {
           refunded: true,
           badge: "환불완료",
           refundable: false,
+          combo,
         };
       }
-      if (data.productType === "countPass" && data.countPassId) {
-        const passSnap = await userRef.collection(COUNT_PASSES).doc(data.countPassId).get();
-        const status = passSnap.data()?.status as string | undefined;
+      if (passData) {
+        const status = passData.status as string | undefined;
         badge = badgeLabel(status);
         refundable = status === "unused";
-      } else if (data.productType === "timePass" && data.timePassId) {
-        const passSnap = await userRef.collection(TIME_PASSES).doc(data.timePassId).get();
-        const status = passSnap.data()?.status as string | undefined;
-        badge = badgeLabel(status);
-        refundable = status === "unused";
+      }
+      // 환불을 요청해 둔 건은 이용권이 아직 "미사용"이어도 그렇게 보이면 안 된다 — 사용자가
+      // 요청한 사실이 화면에서 사라져 버린다. 처리 중이므로 다시 요청할 수도 없다.
+      const requested = refundRequestStatus.get(doc.id);
+      if (requested === "pending") {
+        badge = "환불 대기 중";
+        refundable = false;
+      } else if (requested === "rejected") {
+        // 거절된 건은 재요청이 막혀 있다(refund-requests 가 paymentId 로 create 하므로 두 번째
+        // 요청은 already-exists 로 실패한다). "미사용 + 환불하기"로 두면 눌러도 에러만 난다.
+        badge = "환불 거절됨";
+        refundable = false;
       }
       if (refundable) {
         const paidAt = Date.parse(data.paidAt ?? data.fulfilledAt);
@@ -90,6 +136,7 @@ export async function GET(req: NextRequest) {
         refunded: false,
         badge,
         refundable,
+        combo,
       };
     })
   );

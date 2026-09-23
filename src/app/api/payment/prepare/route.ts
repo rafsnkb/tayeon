@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { resolveProduct } from "@/lib/payment/products";
 import { adminDb } from "@/lib/firebase/admin";
-import { COMBOS, isComboKey } from "@/lib/tarot/pricing";
+import { COMBOS, isComboKey, HELD_PASS_STATUSES } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
 import { blockIfSuspended } from "@/lib/auth/suspension";
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const passes = await userRef.collection(COUNT_PASSES).get();
     if (passes.docs.some((doc) => {
       const data = doc.data();
-      return data.source === "purchase" && (data.status === "unused" || data.status === "active");
+      return data.source === "purchase" && HELD_PASS_STATUSES.includes(data.status);
     })) {
       return NextResponse.json({ error: "보유 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
     }
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   if (product.type === "timePass") {
     const passes = await userRef.collection(TIME_PASSES).get();
-    if (passes.docs.some((doc) => ["unused", "active"].includes(doc.data().status))) {
+    if (passes.docs.some((doc) => HELD_PASS_STATUSES.includes(doc.data().status))) {
       return NextResponse.json({ error: "보유 시간제 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
     }
   }

@@ -220,7 +220,19 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
   );
 }
 
-export type CountPassStatus = "unused" | "active" | "exhausted" | "expired" | "refunded" | "revoked";
+/** `refund_pending` 은 환불을 신청해 두고 아직 승인/거절이 안 난 상태다(2026-09-24).
+ *  "쓸 수 있는가"를 묻는 모든 검사가 unused/active 만 보기 때문에, 이 값이 되는 순간
+ *  자동으로 사용 불가가 된다 — 신청 후에도 쓸 수 있으면 "신청 → 사용 → 환불"로 공짜가 된다.
+ *  반대로 "보유 중인가"(중복 구매 차단)는 여전히 참이라 그쪽엔 따로 넣어 줘야 한다. */
+/** "아직 이 사람이 들고 있는" 이용권으로 볼 상태들 — 중복 구매를 막을 때 쓴다.
+ *  `refund_pending` 이 들어 있는 게 핵심이다: 환불을 신청했어도 승인 전까지는 보유 중이라
+ *  또 살 수 없어야 한다(거절되면 그대로 다시 쓰게 된다).
+ *
+ *  **"쓸 수 있는가"를 묻는 검사에는 이걸 쓰면 안 된다.** 그쪽은 unused/active 만 봐야 한다. */
+export const HELD_PASS_STATUSES: readonly string[] = ["unused", "active", "refund_pending"];
+
+export type CountPassStatus =
+  | "unused" | "active" | "exhausted" | "expired" | "refunded" | "revoked" | "refund_pending";
 
 export type CountPassBalance = {
   basis: number;

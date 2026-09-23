@@ -1,0 +1,156 @@
+// 운영자에게 "지금 봐야 하는 일"을 알린다 — 지금은 환불 요청/자동 승인 결과가 유일한 사용처.
+//
+// 채널을 하나로 고정하지 않는다. 설정된 곳으로 전부 보내고, 한 곳이 실패해도 나머지는 나간다.
+// 나중에 텔레그램·카카오("나에게 보내기")를 붙일 때도 sendX 함수 하나와 환경변수 하나만 더
+// 추가하면 된다.
+//
+// **Discord 가 주 채널이고 메일은 예외 상황용이다.** Resend 무료 플랜이 하루 100통이고 그
+// 할당량을 고객센터 문의 전달이 같이 쓰기 때문에, 일상적인 알림까지 메일로 보내면 정작
+// 문의가 안 나가는 날이 생긴다. Discord 웹훅은 한도도 만료도 없다.
+import { FieldValue } from "firebase-admin/firestore";
+import { adminDb } from "@/lib/firebase/admin";
+import { OWNER_ALERTS } from "@/lib/firestore/collections";
+import { SUPPORT_EMAIL } from "@/lib/company";
+
+/** 하루에 운영 알림으로 쓸 수 있는 메일 수. Resend 무료 한도 100통 중 나머지는 고객센터 몫. */
+const DAILY_EMAIL_BUDGET = 60;
+
+export type AlertLevel =
+  /** 정상 흐름. Discord 만 간다. */
+  | "info"
+  /** 사람이 봐야 한다(자동 승인 보류 등). 메일도 간다. */
+  | "warn"
+  /** 방치하면 돈이 새거나 법정 기한을 넘긴다. 메일도 간다. */
+  | "urgent";
+
+export type OwnerAlert = {
+  /** 중복 발송 방지 키. 같은 키로 다시 부르면 보내지 않는다 — 스케줄러가 매시 도는데
+   *  같은 건을 매번 알리면 알림이 무의미해진다. */
+  key: string;
+  level: AlertLevel;
+  title: string;
+  /** [라벨, 값] 목록. Discord 는 표로, 메일은 줄 단위로 그린다. */
+  fields: [string, string][];
+  /** 이상 징후처럼 눈에 띄어야 하는 블록. */
+  note?: string;
+  link?: { label: string; url: string };
+};
+
+const COLOR: Record<AlertLevel, number> = {
+  info: 0x5865f2,   // 디스코드 기본 블루
+  warn: 0xf5a524,   // 주황
+  urgent: 0xe5484d, // 빨강
+};
+const PREFIX: Record<AlertLevel, string> = { info: "🔔", warn: "⚠️", urgent: "🚨" };
+
+/** 디스코드 메시지 안에서 줄을 바꾸는 문자. 소스의 줄바꿈과 헷갈리지 않게 상수로 둔다. */
+const nlEsc = "\n";
+
+function todayKey(now: Date): string {
+  // 발송 예산은 한국 기준 하루로 센다(운영자가 보는 시간대).
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(now);
+}
+
+async function sendDiscord(alert: OwnerAlert): Promise<boolean> {
+  const url = process.env.DISCORD_WEBHOOK_URL;
+  if (!url) return false;
+  // 디스코드 embed 의 fields 는 폭이 남으면 자동으로 2~3열 그리드가 되고, 라벨과 값이 같은
+  // 크기·색이라 눈으로 구분이 잘 안 된다. 전부 description 에 직접 그려서 세로로 세우고,
+  // 라벨은 `-#`(subtext — 더 작고 회색)로 내려 값과 층을 만든다.
+  const rows = alert.fields
+    .map(([name, value]) => `-# ${name}${nlEsc}${value || "-"}`)
+    .join(nlEsc);
+  const description = [alert.note, rows].filter(Boolean).join(`${nlEsc}${nlEsc}`);
+  const body = {
+    embeds: [
+      {
+        title: `${PREFIX[alert.level]} ${alert.title}`,
+        color: COLOR[alert.level],
+        description,
+        ...(alert.link ? { url: alert.link.url } : {}),
+        timestamp: new Date().toISOString(),
+      },
+    ],
+    ...(alert.link ? { components: [] } : {}),
+  };
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    console.error("[notify] Discord 발송 실패", response.status, await response.text().catch(() => ""));
+    return false;
+  }
+  return true;
+}
+
+async function sendEmail(alert: OwnerAlert): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from) return false;
+  const text = [
+    ...alert.fields.map(([name, value]) => `${name}: ${value}`),
+    ...(alert.note ? ["", alert.note] : []),
+    ...(alert.link ? ["", `${alert.link.label}: ${alert.link.url}`] : []),
+  ].join("\n");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      // 같은 알림이 두 번 나가지 않도록 — 고객센터 문의와 같은 방식.
+      "Idempotency-Key": `owner-alert/${alert.key}`,
+    },
+    body: JSON.stringify({
+      from,
+      to: [process.env.RESEND_ADMIN_EMAIL ?? SUPPORT_EMAIL],
+      subject: `${PREFIX[alert.level]} [타연] ${alert.title}`,
+      text,
+    }),
+  });
+  if (!response.ok) {
+    console.error("[notify] 메일 발송 실패", response.status, await response.text().catch(() => ""));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 같은 키로는 한 번만 보낸다. 보냈으면 true.
+ *
+ * 스케줄러가 매시 도는 구조라 이게 없으면 "마감 임박" 같은 알림이 하루에 24번 온다.
+ * 트랜잭션으로 잡아서 두 인스턴스가 동시에 보내는 것도 막는다.
+ */
+async function claim(alert: OwnerAlert, now: Date): Promise<{ send: boolean; emailAllowed: boolean }> {
+  const ref = adminDb.collection(OWNER_ALERTS).doc(alert.key);
+  const budgetRef = adminDb.collection(OWNER_ALERTS).doc(`quota-${todayKey(now)}`);
+  return adminDb.runTransaction(async (tx) => {
+    const [snap, budgetSnap] = await Promise.all([tx.get(ref), tx.get(budgetRef)]);
+    if (snap.exists) return { send: false, emailAllowed: false };
+    const used = (budgetSnap.data()?.emails as number | undefined) ?? 0;
+    const wantsEmail = alert.level !== "info";
+    const emailAllowed = wantsEmail && used < DAILY_EMAIL_BUDGET;
+    tx.set(ref, { level: alert.level, title: alert.title, createdAt: now.toISOString() });
+    if (emailAllowed) tx.set(budgetRef, { emails: FieldValue.increment(1) }, { merge: true });
+    return { send: true, emailAllowed };
+  });
+}
+
+/** 실패해도 호출부를 막지 않는다 — 알림이 안 갔다고 환불 처리까지 멈추면 안 된다. */
+export async function notifyOwner(alert: OwnerAlert): Promise<void> {
+  try {
+    const now = new Date();
+    const { send, emailAllowed } = await claim(alert, now);
+    if (!send) return;
+
+    const discordOk = await sendDiscord(alert).catch(() => false);
+    // Discord 가 실패했으면 등급과 무관하게 메일로라도 알린다 — 채널이 죽은 걸 모르는 게
+    // 제일 위험하다. 예산을 이미 쓴 경우에도 이때만은 보낸다.
+    if (!discordOk || emailAllowed) {
+      await sendEmail(alert).catch(() => false);
+    }
+  } catch (error) {
+    console.error("[notify] 알림 처리 실패", alert.key, error);
+  }
+}

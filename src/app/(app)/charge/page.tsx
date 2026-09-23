@@ -13,6 +13,7 @@ import {
   COUNT_PASS_VALIDITY_MONTHS,
   TIME_PASS_VALIDITY_MONTHS,
   formatMonths,
+  HELD_PASS_STATUSES,
 } from "@/lib/tarot/pricing";
 import { TIME_COMBO_TIER, countPackageTier } from "@/lib/tarot/passTiers";
 import { ComboAllowanceList, COMBO_KEYS } from "@/components/ComboAllowanceCard";
@@ -52,7 +53,7 @@ export default function ChargePage() {
   const { user, email, nickname, refreshMe, countPasses, timePasses, activeTimePass, hasBirthInfo, myTimeUnknown } = useRooms();
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
   const hasCountPass = countPasses.some(
-    (pass) => pass.source === "purchase" && (pass.status === "unused" || pass.status === "active")
+    (pass) => pass.source === "purchase" && HELD_PASS_STATUSES.includes(pass.status)
   );
   const hasTimePassHeld = timePasses.length > 0 || activeTimePass !== null;
   // 고른 상품의 등급 색. 예전엔 쓰는 자리마다 COUNT_PACKAGES.indexOf(selected) 를 다시 돌렸다.

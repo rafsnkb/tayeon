@@ -29,3 +29,10 @@ export const COMPANY_PHONE = "010-8609-0037";
 // 전자상거래법 시행규칙 제7조②가 초기 화면에 연결하도록 요구하는 공정위 사업자정보 공개페이지.
 // 사업자등록번호에서 직접 만들어, 번호가 바뀌었는데 링크만 옛것으로 남는 일이 없게 한다.
 export const FTC_BUSINESS_INFO_URL = `https://www.ftc.go.kr/bizCommPop.do?wrkr_no=${BUSINESS_REGISTRATION_NUMBER.replace(/-/g, "")}`;
+
+/** 운영자용 어드민의 환불 요청 화면. 운영 알림에 "바로 처리" 링크로 넣는다 — 별도 앱이라
+ *  커스텀 도메인 없이 App Hosting 기본 주소를 쓴다(2026-09-12 결정). */
+export const ADMIN_REFUND_REQUESTS_URL =
+  process.env.ADMIN_BASE_URL?.replace(/\/$/, "")
+    ? `${process.env.ADMIN_BASE_URL.replace(/\/$/, "")}/refund-requests`
+    : "https://tayeon-admin--tayeon-d5149.asia-east1.hosted.app/refund-requests";

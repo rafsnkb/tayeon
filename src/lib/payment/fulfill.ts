@@ -100,7 +100,7 @@ export async function fulfillPayment(
       product.type === "countPass" ? COUNT_PASSES : product.type === "timePass" ? TIME_PASSES : null;
     if (heldCollection) {
       const heldSnap = await tx.get(
-        userRef.collection(heldCollection).where("status", "in", ["unused", "active"])
+        userRef.collection(heldCollection).where("status", "in", ["unused", "active", "refund_pending"])
       );
       const conflict = heldSnap.docs.some((doc) => {
         const data = doc.data();

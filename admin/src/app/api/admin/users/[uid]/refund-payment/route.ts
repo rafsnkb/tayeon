@@ -55,7 +55,10 @@ export async function POST(
   }
   const passRef = userRef.collection(passCollection).doc(passId);
   const passSnap = await passRef.get();
-  if (!passSnap.exists || passSnap.data()?.status !== "unused") {
+  // 사용자가 환불을 신청하면 이용권이 즉시 refund_pending 으로 잠긴다(2026-09-24). 그 상태도
+  // "한 번도 안 쓴" 것이므로 승인 대상이다 — unused 만 보면 사용자 요청 건을 승인할 수 없다.
+  const passStatus = passSnap.data()?.status;
+  if (!passSnap.exists || (passStatus !== "unused" && passStatus !== "refund_pending")) {
     return NextResponse.json({ error: "한 번도 사용하거나 활성화하지 않은 이용권만 환불할 수 있어요." }, { status: 409 });
   }
 

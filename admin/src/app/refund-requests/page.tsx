@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { refundDue } from "@/lib/refundDue";
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 
 type RefundRequest = { id: string; uid: string; nickname: string | null; productId: string | null; orderName?: string | null; priceWon: number; paidAt: string | null; requestedAt: string; reason: string; status: "pending" | "approved" | "rejected"; paymentMethod: { type?: string; label?: string } | null; rejectionReason?: string };
@@ -12,6 +13,31 @@ const date = (value: string | null | undefined) => {
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value));
 };
 const statusLabel = { pending: "검토 대기", approved: "환불 완료", rejected: "거절됨" };
+
+/** 환불 마감 배지 — 전자상거래법 제18조②2호의 "청약철회한 날부터 3영업일". 넘기면 같은 항
+ *  후단의 지연배상금 대상이 되므로, 남은 영업일을 눈에 띄게 보여 준다(공휴일 미반영 —
+ *  admin/src/lib/refundDue.ts 주석 참고). 처리가 끝난 건에는 띄우지 않는다. */
+function DueBadge({ requestedAt }: { requestedAt: string }) {
+  const due = refundDue(requestedAt);
+  if (!due) return null;
+  const label = due.overdue
+    ? "환불 마감 지남"
+    : due.businessDaysLeft === 0
+      ? "환불 마감 오늘"
+      : `환불 마감 D-${due.businessDaysLeft}`;
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs ${
+        due.overdue || due.businessDaysLeft === 0
+          ? "bg-[#FDECEC] text-[#B42318]"
+          : "bg-[#FFF6E5] text-[#8A5A00]"
+      }`}
+      title={`${date(due.dueAt.toISOString())}까지 (전자상거래법 제18조②2호, 3영업일)`}
+    >
+      {label}
+    </span>
+  );
+}
 
 export default function RefundRequestsPage() {
   const router = useRouter(); const [items, setItems] = useState<RefundRequest[]>([]); const [loading, setLoading] = useState(true); const [workingId, setWorkingId] = useState<string | null>(null);
@@ -29,5 +55,5 @@ export default function RefundRequestsPage() {
     if (!response.ok) return alert((await response.json()).error ?? "요청을 처리하지 못했습니다.");
     setItems((current) => current.map((value) => value.id === item.id ? { ...value, status: action === "approve" ? "approved" : "rejected", rejectionReason: action === "reject" ? reason : undefined } : value));
   }
-  return <main className="admin-page pb-12"><AdminPageHeader title="환불" description="결제와 이용권 상태를 확인한 뒤 안전하게 처리합니다." /><div className="mx-auto max-w-[1180px] px-6"><section className="overflow-hidden rounded-[28px] bg-white">{loading ? <p className="p-12 text-center text-[#817789]">불러오는 중...</p> : items.length === 0 ? <p className="p-12 text-center text-[#817789]">접수된 환불 요청이 없습니다.</p> : items.map((item) => <article key={item.id} className="border-b border-[#EEEAF0] p-5 last:border-0"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[#30253A]">{item.nickname ?? "(닉네임 없음)"}</p><span className={`rounded-full px-2.5 py-1 text-xs ${item.status === "pending" ? "bg-[#FCEEF5] text-[#A31459]" : item.status === "approved" ? "bg-[#EAF6EF] text-[#23754B]" : "bg-[#F2EFF4] text-[#64586B]"}`}>{statusLabel[item.status]}</span></div><p className="mt-1 font-mono text-xs text-[#817789]">UID · {item.uid}</p></div><div className="text-right"><p className="font-semibold text-[#30253A]">{item.priceWon.toLocaleString("ko-KR")}원</p><p className="mt-1 text-xs text-[#817789]">{item.paymentMethod?.label ?? "결제수단 정보 없음"}</p></div></div><dl className="mt-4 grid gap-2 text-sm text-[#51475B] sm:grid-cols-2"><div><dt className="inline text-[#9A8FA0]">이용권 · </dt><dd className="inline">{item.orderName ?? item.productId ?? "-"}</dd></div><div><dt className="inline text-[#9A8FA0]">구매 일시 · </dt><dd className="inline">{date(item.paidAt)}</dd></div><div><dt className="inline text-[#9A8FA0]">요청 일시 · </dt><dd className="inline">{date(item.requestedAt)}</dd></div><div><dt className="inline text-[#9A8FA0]">사유 · </dt><dd className="inline">{item.reason}</dd></div>{item.rejectionReason && <div className="sm:col-span-2"><dt className="inline text-[#9A8FA0]">거절 사유 · </dt><dd className="inline">{item.rejectionReason}</dd></div>}</dl>{item.status === "pending" && <div className="mt-5 flex gap-2"><button disabled={workingId === item.id} onClick={() => act(item, "approve")} className="rounded-full bg-[#0071E3] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{workingId === item.id ? "처리 중..." : "환불 승인"}</button><button disabled={workingId === item.id} onClick={() => act(item, "reject")} className="rounded-full border border-[#D2D2D7] px-4 py-2 text-sm font-medium text-[#424245] disabled:opacity-50">거절</button></div>}</article>)}</section></div></main>;
+  return <main className="admin-page pb-12"><AdminPageHeader title="환불" description="결제와 이용권 상태를 확인한 뒤 안전하게 처리합니다." /><div className="mx-auto max-w-[1180px] px-6"><section className="overflow-hidden rounded-[28px] bg-white">{loading ? <p className="p-12 text-center text-[#817789]">불러오는 중...</p> : items.length === 0 ? <p className="p-12 text-center text-[#817789]">접수된 환불 요청이 없습니다.</p> : items.map((item) => <article key={item.id} className="border-b border-[#EEEAF0] p-5 last:border-0"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[#30253A]">{item.nickname ?? "(닉네임 없음)"}</p><span className={`rounded-full px-2.5 py-1 text-xs ${item.status === "pending" ? "bg-[#FCEEF5] text-[#A31459]" : item.status === "approved" ? "bg-[#EAF6EF] text-[#23754B]" : "bg-[#F2EFF4] text-[#64586B]"}`}>{statusLabel[item.status]}</span>{item.status === "pending" && <DueBadge requestedAt={item.requestedAt} />}</div><p className="mt-1 font-mono text-xs text-[#817789]">UID · {item.uid}</p></div><div className="text-right"><p className="font-semibold text-[#30253A]">{item.priceWon.toLocaleString("ko-KR")}원</p><p className="mt-1 text-xs text-[#817789]">{item.paymentMethod?.label ?? "결제수단 정보 없음"}</p></div></div><dl className="mt-4 grid gap-2 text-sm text-[#51475B] sm:grid-cols-2"><div><dt className="inline text-[#9A8FA0]">이용권 · </dt><dd className="inline">{item.orderName ?? item.productId ?? "-"}</dd></div><div><dt className="inline text-[#9A8FA0]">구매 일시 · </dt><dd className="inline">{date(item.paidAt)}</dd></div><div><dt className="inline text-[#9A8FA0]">요청 일시 · </dt><dd className="inline">{date(item.requestedAt)}</dd></div><div><dt className="inline text-[#9A8FA0]">사유 · </dt><dd className="inline">{item.reason}</dd></div>{item.rejectionReason && <div className="sm:col-span-2"><dt className="inline text-[#9A8FA0]">거절 사유 · </dt><dd className="inline">{item.rejectionReason}</dd></div>}</dl>{item.status === "pending" && <div className="mt-5 flex gap-2"><button disabled={workingId === item.id} onClick={() => act(item, "approve")} className="rounded-full bg-[#0071E3] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{workingId === item.id ? "처리 중..." : "환불 승인"}</button><button disabled={workingId === item.id} onClick={() => act(item, "reject")} className="rounded-full border border-[#D2D2D7] px-4 py-2 text-sm font-medium text-[#424245] disabled:opacity-50">거절</button></div>}</article>)}</section></div></main>;
 }

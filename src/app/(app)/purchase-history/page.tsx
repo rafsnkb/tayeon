@@ -7,6 +7,7 @@ import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { REFUND_PROCESSING_BUSINESS_DAYS } from "@/lib/payment/refundPolicy";
 import { CloseIcon } from "@/app/(app)/tarot/icons";
+import InfoModal from "@/components/InfoModal";
 
 type PurchaseEntry = {
   paymentId: string;
@@ -16,6 +17,8 @@ type PurchaseEntry = {
   refunded: boolean;
   badge: string;
   refundable: boolean;
+  /** 구입한 옵션("타로 전용" 등). 조합 개념이 없던 시절 이용권은 null. */
+  combo: string | null;
 };
 
 /** 피그마 "Screen / PurchaseHistory" — 실제 결제(users/{uid}/payments) 내역을 보여준다.
@@ -26,6 +29,9 @@ export default function PurchaseHistoryPage() {
   const [selected, setSelected] = useState<PurchaseEntry | null>(null);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // 예전엔 브라우저 alert() 였다 — 앱 안의 다른 안내와 생김새가 전혀 달랐고, 모바일에서는
+  // 도메인이 같이 뜬다. 성공·실패 모두 같은 자리에 같은 모양으로 띄운다.
+  const [notice, setNotice] = useState<{ message: string; tone: "info" | "error" } | null>(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u: User | null) => {
@@ -47,9 +53,21 @@ export default function PurchaseHistoryPage() {
     setSubmitting(true);
     const response = await fetch("/api/user/refund-requests", { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken()}`, "content-type": "application/json" }, body: JSON.stringify({ paymentId: selected.paymentId, reason }) });
     setSubmitting(false);
-    if (!response.ok) return alert((await response.json()).error ?? "환불 요청에 실패했어요.");
-    setEntries((items) => items?.map((item) => item.paymentId === selected.paymentId ? { ...item, refundable: false } : item) ?? items);
-    setSelected(null); setReason(""); alert("환불 요청이 접수되었어요.");
+    if (!response.ok) {
+      setNotice({ message: (await response.json()).error ?? "환불 요청에 실패했어요.", tone: "error" });
+      return;
+    }
+    // 접수되면 이용권이 즉시 잠기므로(refund_pending) 배지도 그 자리에서 바꿔 준다 — 새로
+      // 불러오지 않아도 화면이 서버 상태와 맞는다.
+    setEntries((items) => items?.map((item) => item.paymentId === selected.paymentId
+      ? { ...item, refundable: false, badge: "환불 대기 중" }
+      : item) ?? items);
+    setSelected(null); setReason("");
+    setNotice({
+      message: `환불 요청이 접수되었어요.
+${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`,
+      tone: "info",
+    });
   }
 
   return (
@@ -89,8 +107,16 @@ export default function PurchaseHistoryPage() {
                   >
                     {e.productName}
                   </p>
-                  <div className="mt-1 flex items-center gap-2">
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-icon-muted">{e.priceWon.toLocaleString("ko-KR")}원</span>
+                    {/* 어떤 옵션으로 산 이용권인지 — 특히 횟수제는 이 값이 무엇을 쓸 수 있는지를
+                        결정하는데 내역에 전혀 안 나와 있었다(2026-09-24 사용자 지적). 상품명
+                        줄(실측으로 크기를 맞춘 text-xl)을 건드리지 않으려고 금액 옆에 둔다. */}
+                    {e.combo && (
+                      <span className="rounded-full bg-border px-2 py-0.5 text-xs font-semibold text-icon-muted">
+                        {e.combo}
+                      </span>
+                    )}
                     {/* 초록 배지는 "아직 환불할 수 있다"는 신호다 — 라벨이 "미사용"이라도
                         환불 기간(7일)이 지났으면 환불이 불가능하므로 회색으로 내린다.
                         같은 조건으로 위의 "환불하기" 링크도 같이 사라진다. */}
@@ -110,6 +136,9 @@ export default function PurchaseHistoryPage() {
           </div>
         )}
       </div>
+      {notice && (
+        <InfoModal title={notice.message} tone={notice.tone} onClose={() => setNotice(null)} />
+      )}
       {selected && (
         <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setSelected(null)}>
           <div className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7" onClick={(e) => e.stopPropagation()}>
