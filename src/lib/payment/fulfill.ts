@@ -10,13 +10,12 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { portone } from "@/lib/payment/portone";
-import { resolvePaidProduct } from "@/lib/payment/products";
+import { validatePaidPayment } from "@/lib/payment/validatePayment";
 import { addMonthsClamped } from "@/lib/util/dateMath";
 import {
   COUNT_PASS_VALIDITY_MONTHS,
   TIME_PASS_VALIDITY_MONTHS,
   countAllowancesForCombo,
-  isComboKey,
 } from "@/lib/tarot/pricing";
 import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
 
@@ -62,75 +61,25 @@ export async function fulfillPayment(
     return { kind: "rejected", reason: "결제 정보를 조회하지 못했어요." };
   }
 
+  // 이 검사는 validatePaidPayment 안에도 같은 내용으로 들어 있다. 중복이지만 지우면 안 된다 —
+  // 포트원 SDK 의 Payment 는 status 로 갈리는 유니온이라, 여기서 한 번 좁혀 주지 않으면
+  // 아래에서 payment.orderName / channel / method / paidAt 에 접근할 수 없다. 두 곳이 같은
+  // 결과를 내는 것은 타입으로 보장된다(둘 다 not_paid).
   if (payment.status !== "PAID") {
     return { kind: "not_paid", status: String(payment.status) };
   }
 
-  // 프로덕션에서는 TEST 채널 결제(실제 카드 승인 없이 항상 성공하는 테스트 카드)로 지급되는 걸
-  // 막는다 — 지금은 KG이니시스 실채널이 없어서 TEST 채널만 존재하니 로컬/개발 환경에서는 그대로
-  // 통과시키고, 실제 배포(NODE_ENV=production)에서만 LIVE 채널이 아니면 거부한다. 실계약 승인 후
-  // NEXT_PUBLIC_PORTONE_CHANNEL_KEY를 LIVE 채널로 교체하면 이 체크가 자연히 정상 통과된다
-  // (2026-09-15, 검증 에이전트 지적 — 프로덕션 채널키가 실수로 TEST로 남아있어도 무료로 코인이
-  // 지급되는 사고를 막기 위한 안전장치).
-  if (process.env.NODE_ENV === "production" && payment.channel?.type !== "LIVE") {
-    console.error("[payment] 프로덕션에서 LIVE 채널이 아닌 결제", {
-      paymentId,
-      channelType: payment.channel?.type,
-    });
-    return { kind: "rejected", reason: "테스트 채널 결제는 프로덕션에서 지급되지 않아요." };
+  const checked = validatePaidPayment(payment, {
+    expectedUid,
+    isProduction: process.env.NODE_ENV === "production",
+    legacyCoinPaidBefore: process.env.LEGACY_COIN_PAID_BEFORE,
+  });
+  if (!checked.ok) {
+    // 로그는 순수 함수 밖에서 찍는다 — 판정 자체는 validatePayment.ts 가, 관측은 여기가 맡는다.
+    if (checked.log) console.error(`[payment] ${checked.log.message}`, paymentId, checked.log.detail ?? "");
+    return checked.outcome;
   }
-
-  let customData: { uid?: unknown; productId?: unknown; combo?: unknown } = {};
-  try {
-    customData = payment.customData ? JSON.parse(payment.customData) : {};
-  } catch (error) {
-    console.error("[payment] customData 파싱 실패", paymentId, error);
-    return { kind: "rejected", reason: "customData를 해석하지 못했어요." };
-  }
-
-  const uid = customData.uid;
-  if (typeof uid !== "string" || !uid) {
-    return { kind: "rejected", reason: "customData에 uid가 없어요." };
-  }
-  if (expectedUid && uid !== expectedUid) {
-    // 다른 사람의 결제 건을 자신의 것인 양 완료 처리시키려는 시도 — 절대 지급하지 않는다.
-    console.error("[payment] uid 불일치", { paymentId, expectedUid, actual: uid });
-    return { kind: "rejected", reason: "본인의 결제 건이 아니에요." };
-  }
-
-  const product = resolvePaidProduct(customData.productId, payment.amount.total);
-  if (!product) {
-    console.error("[payment] 알 수 없는 productId", paymentId, customData.productId);
-    return { kind: "rejected", reason: "알 수 없는 상품이에요." };
-  }
-
-  // 횟수제 이용권은 구매 시점에 고른 조합(타로전용/+사주/+자미두수/+사주자미두수)으로 완전히
-  // 고정된다(2026-09-18) — prepare 단계에서 이미 검증했지만, customData는 결국 클라이언트가
-  // 왕복시키는 값이라 여기서도 다시 검증한다.
-  if (product.type === "countPass" && !isComboKey(customData.combo)) {
-    console.error("[payment] countPass 결제에 유효한 combo가 없음", paymentId, customData.combo);
-    return { kind: "rejected", reason: "이용권 옵션 정보가 없어요." };
-  }
-  const combo = isComboKey(customData.combo) ? customData.combo : null;
-
-  if (product.type === "coin") {
-    const cutoff = Date.parse(process.env.LEGACY_COIN_PAID_BEFORE ?? "");
-    const paidAt = Date.parse(payment.paidAt ?? "");
-    if (!Number.isFinite(cutoff) || !Number.isFinite(paidAt) || paidAt >= cutoff) {
-      return { kind: "rejected", reason: "코인 상품은 판매가 종료됐어요. 결제 내역을 고객센터로 문의해주세요." };
-    }
-  }
-
-  if (payment.amount.total !== product.priceWon || payment.currency !== "KRW") {
-    // 실제 승인 금액이 상품 가격표와 다르면 위/변조 시도로 간주하고 지급하지 않는다.
-    console.error("[payment] 금액 불일치", {
-      paymentId,
-      paid: payment.amount.total,
-      currency: payment.currency,
-      expected: product.priceWon,
-    });
-    return { kind: "rejected", reason: "결제 금액이 상품 가격과 일치하지 않아요." };
-  }
+  const { uid, product, combo } = checked;
 
   const userRef = adminDb.collection(USERS).doc(uid);
   const paymentRef = userRef.collection(PAYMENTS).doc(paymentId);

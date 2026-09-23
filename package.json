@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --import ./scripts/test-alias.mjs --test \"src/**/*.test.mjs\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -32,4 +33,4 @@
     "typescript": "^5"
   },
   "types": ".design-sync/types/index.d.ts"
-}
+}
