@@ -56,6 +56,19 @@ const PREFIX: Record<AlertLevel, string> = { info: "🔔", warn: "⚠️", urgen
 /** 디스코드 메시지 안에서 줄을 바꾸는 문자. 소스의 줄바꿈과 헷갈리지 않게 상수로 둔다. */
 const nlEsc = "\n";
 
+/**
+ * 알림 키를 Firestore 문서 id 로 바꾼다.
+ *
+ * 우리 키는 `refund-requested/{paymentId}` 처럼 슬래시로 종류와 대상을 나눈다. 그런데
+ * Firestore 는 문서 id 안의 `/` 를 **경로 구분자로 읽고 예외를 던진다**. 그 예외를 notifyOwner
+ * 의 try/catch 가 삼키는 바람에, 알림이 한 건도 나가지 않는데 에러도 안 보이는 상태였다
+ * (2026-09-24). `__foo__` 형태도 Firestore 예약이라 같이 피한다.
+ */
+export function alertDocId(key: string): string {
+  const safe = key.replace(/\//g, "~").replace(/^\.+$/, "_");
+  return /^__.*__$/.test(safe) ? `k.${safe}` : safe;
+}
+
 function todayKey(now: Date): string {
   // 발송 예산은 한국 기준 하루로 센다(운영자가 보는 시간대).
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(now);
@@ -138,7 +151,7 @@ async function sendEmail(alert: OwnerAlert): Promise<boolean> {
  * 트랜잭션으로 잡아서 두 인스턴스가 동시에 보내는 것도 막는다.
  */
 async function claim(alert: OwnerAlert, now: Date): Promise<{ send: boolean; emailAllowed: boolean }> {
-  const ref = adminDb.collection(OWNER_ALERTS).doc(alert.key);
+  const ref = adminDb.collection(OWNER_ALERTS).doc(alertDocId(alert.key));
   const budgetRef = adminDb.collection(OWNER_ALERTS).doc(`quota-${todayKey(now)}`);
   return adminDb.runTransaction(async (tx) => {
     const [snap, budgetSnap] = await Promise.all([tx.get(ref), tx.get(budgetRef)]);

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SUPPORT_EMAIL } from "@/lib/company";
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
   // 메일은 실제 업무용이다 — 첨부와 회신 주소가 붙어 있어 여기서 바로 답장한다. 디스코드는
   // "문의가 왔다"를 바로 알기 위한 것이라 내용 일부만 싣는다. level:"info" 라 메일은 다시
   // 나가지 않는다(환불 알림과 달리 이 경로는 위 sendAdminEmail 이 이미 보냈다).
-  void notifyOwner({
+  after(() => notifyOwner({
     key: `support-inquiry/${inquiryRef.id}`,
     level: "info",
     channel: "support",
@@ -155,6 +155,6 @@ export async function POST(req: NextRequest) {
       ["첨부", attachments.length ? `${attachments.length}개 (메일 확인)` : "없음"],
       ["내용", content.length > 900 ? `${content.slice(0, 900)}…(메일에 전문)` : content],
     ],
-  });
+  }));
   return NextResponse.json({ ok: true, inquiryId: inquiryRef.id }, { status: 201 });
 }

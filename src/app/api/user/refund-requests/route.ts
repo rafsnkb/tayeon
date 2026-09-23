@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { USERS, PAYMENTS, COUNT_PASSES, TIME_PASSES, REFUND_REQUESTS } from "@/lib/firestore/collections";
@@ -72,7 +72,9 @@ export async function POST(req: NextRequest) {
   }
   // 접수 사실을 운영자에게 알린다. 자동 승인(2영업일)이 사람 확인 없이 실제 결제를 취소하므로,
   // 그 전에 알림이 반드시 가야 한다. 실패해도 접수 자체는 이미 끝났으므로 응답을 막지 않는다.
-  void notifyRefundRequested({ uid, paymentId, payment, reason: reason.trim(), requestedAt });
+  // `void` 로 띄우면 응답이 나간 뒤 남은 작업이 잘릴 수 있다(실제로 알림이 한 건도 안 나갔다,
+  // 2026-09-24). next/server 의 after() 는 응답을 막지 않으면서 실행을 보장한다.
+  after(() => notifyRefundRequested({ uid, paymentId, payment, reason: reason.trim(), requestedAt }));
   return NextResponse.json({ ok: true }, { status: 201 });
 }
 
