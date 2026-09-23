@@ -38,6 +38,29 @@ type PassItem = {
   paymentId: string | null;
 };
 
+/** 이용권·결제 상태를 운영자가 읽는 말로 바꾼다. 사용자 화면(purchase-history 의 badgeLabel)과
+ *  같은 낱말을 쓴다 — 운영자와 사용자가 다른 이름으로 같은 상태를 부르면 문의 응대가 어긋난다.
+ *
+ *  표에 없는 값은 **원문 그대로** 보여준다. 새 상태가 생겼을 때 "알 수 없음"으로 뭉뚱그리면
+ *  화면에서는 멀쩡해 보이고 원인만 숨는다. */
+const PASS_STATUS_LABEL: Record<string, string> = {
+  unused: "미사용",
+  active: "사용중",
+  exhausted: "사용완료",
+  expired: "기간만료",
+  refunded: "환불완료",
+  revoked: "회수됨",
+  refund_pending: "환불 대기중",
+  unknown: "상태 없음",
+};
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  fulfilled: "지급완료",
+  refunded: "환불완료",
+  duplicate_cancelled: "중복 취소",
+};
+const passStatusLabel = (status: string) => PASS_STATUS_LABEL[status] ?? status;
+const paymentStatusLabel = (status: string) => PAYMENT_STATUS_LABEL[status] ?? status;
+
 type ReviewReading = {
   roomId: string;
   readingId: string;
@@ -215,7 +238,7 @@ function HeldPassesPanel({
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-[#4B3D56]">{SOURCE_LABEL[pass.source] ?? pass.source}</span>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{pass.status}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{passStatusLabel(pass.status)}</span>
                     {refundable && (
                       <button
                         onClick={() => refund(pass)}
@@ -528,7 +551,7 @@ function UserOverviewPanel({
           <h3 className="text-sm font-semibold text-[#45394F]">LIVE 결제 내역</h3>
           {overview.livePayments.length === 0 ? <p className="mt-3 text-xs text-[#A299AA]">LIVE 결제가 없습니다.</p> : (
             <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto text-xs">
-              {overview.livePayments.map((payment) => <li key={payment.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#FAF8FB] px-3 py-2"><span className="truncate text-[#665A70]">{payment.orderName ?? payment.id}</span><span className="shrink-0 font-medium text-[#4B3D56]">{won(payment.priceWon)} · {payment.status}</span></li>)}
+              {overview.livePayments.map((payment) => <li key={payment.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#FAF8FB] px-3 py-2"><span className="truncate text-[#665A70]">{payment.orderName ?? payment.id}</span><span className="shrink-0 font-medium text-[#4B3D56]">{won(payment.priceWon)} · {paymentStatusLabel(payment.status)}</span></li>)}
             </ul>
           )}
         </section>

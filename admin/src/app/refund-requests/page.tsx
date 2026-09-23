@@ -23,7 +23,20 @@ const date = (value: string | null | undefined) => {
   if (!value || Number.isNaN(Date.parse(value))) return "-";
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value));
 };
-const statusLabel = { pending: "검토 대기", approved: "환불 완료", rejected: "거절됨" };
+const statusLabel = { pending: "검토 대기", approved: "환불 완료", rejected: "거절됨" };
+
+// 상태 낱말은 사용자 화면·사용자 상세와 같은 걸 쓴다. 표에 없는 값은 원문을 그대로 보여
+// 새 상태가 "알 수 없음"에 묻히지 않게 한다(admin/src/app/users/page.tsx 와 같은 규칙).
+const PASS_STATUS_LABEL: Record<string, string> = {
+  unused: "미사용", active: "사용중", exhausted: "사용완료", expired: "기간만료",
+  refunded: "환불완료", revoked: "회수됨", refund_pending: "환불 대기중", unknown: "상태 없음",
+  deleted: "삭제됨",
+};
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  fulfilled: "지급완료", refunded: "환불완료", duplicate_cancelled: "중복 취소",
+};
+const passStatusLabel = (status: string) => PASS_STATUS_LABEL[status] ?? status;
+const paymentStatusLabel = (status: string) => PAYMENT_STATUS_LABEL[status] ?? status;
 
 /** 승인 건이 실제로 정리됐는지 — 결제가 refunded 이고 이용권이 회수됐는지까지 본 결과.
  *  어긋나 있으면(포트원에서만 취소됐거나 이용권이 남아 있거나) 그 자리에서 드러나야 한다. */
@@ -33,9 +46,9 @@ function SettlementBadge({ settlement }: { settlement: Settlement | null | undef
     return <span className="rounded-full bg-[#EAF6EF] px-2.5 py-1 text-xs text-[#23754B]">이용권 회수 확인</span>;
   }
   const detail = [
-    settlement.paymentStatus !== "refunded" ? `결제 ${settlement.paymentStatus ?? "확인불가"}` : null,
+    settlement.paymentStatus !== "refunded" ? `결제 ${settlement.paymentStatus ? paymentStatusLabel(settlement.paymentStatus) : "확인불가"}` : null,
     settlement.passStatus && settlement.passStatus !== "refunded" && settlement.passStatus !== "deleted"
-      ? `이용권 ${settlement.passStatus}`
+      ? `이용권 ${passStatusLabel(settlement.passStatus)}`
       : null,
   ].filter(Boolean).join(" · ");
   return (
