@@ -13,7 +13,8 @@ import { CloseIcon } from "@/app/(app)/tarot/icons";
  * 알아서 한 칸에 멈추고, 선택값은 `scrollTop / 칸높이` 를 반올림해 읽으면 된다 — 직접
  * 드래그를 구현하면 터치/마우스/트랙패드 관성을 전부 흉내 내야 한다.
  *
- * 실측: 카드 380 폭, 칸 높이 32, 가운데 강조 띠 28(--chip-soft), 5 칸이 보인다.
+ * 실측(2026-09-25 개정판): 카드 380×382, 칸 높이 32, 가운데 강조 띠 28(--chip-soft), 5 칸.
+ * 세로로 16 + 제목 46 + 24 + 이름 24 + 12 + 휠 160 + 28 + 버튼 48 + 24 = 382.
  */
 const ROW = 32;
 const VISIBLE = 5;
@@ -49,6 +50,43 @@ function Column({
     setActive(index);
   }, [index]);
 
+  /** PC 에서 끌어서 굴리기. 스크롤 휠만으로는 굴림판인 줄 모르고 지나친다(사용자 지적).
+   *  터치는 건드리지 않는다 — 모바일은 이미 관성 스크롤이 자연스럽고, 여기서 가로채면 그걸
+   *  흉내 내야 한다. 끄는 동안에는 스냅을 꺼 둔다: 켜 둔 채로 scrollTop 을 직접 넣으면 매 프레임
+   *  가장 가까운 칸으로 튕겨서 끌리지 않는다. */
+  const drag = useRef<{ startY: number; startTop: number } | null>(null);
+
+  const snapToNearest = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const i = Math.max(0, Math.min(column.items.length - 1, Math.round(el.scrollTop / ROW)));
+    el.scrollTo({ top: i * ROW, behavior: "smooth" });
+  }, [column.items.length]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el || e.pointerType !== "mouse") return;
+    e.preventDefault(); // 끌 때 글자가 선택되지 않게
+    drag.current = { startY: e.clientY, startTop: el.scrollTop };
+    el.style.scrollSnapType = "none";
+    el.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el || !drag.current) return;
+    el.scrollTop = drag.current.startTop - (e.clientY - drag.current.startY);
+  };
+
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el || !drag.current) return;
+    drag.current = null;
+    el.style.scrollSnapType = ""; // 클래스(snap-mandatory)로 되돌린다
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    snapToNearest();
+  };
+
   const handleScroll = useCallback(() => {
     const el = ref.current;
     if (!el) return;
@@ -73,8 +111,12 @@ function Column({
       <div
         ref={ref}
         onScroll={handleScroll}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
         // 스크롤바는 숨긴다(globals.css 의 .no-scrollbar) — 휠 칸에 막대가 보이면 목록처럼 읽힌다.
-        className="no-scrollbar w-full snap-y snap-mandatory overflow-y-auto overscroll-contain"
+        className="no-scrollbar w-full cursor-grab select-none snap-y snap-mandatory overflow-y-auto overscroll-contain active:cursor-grabbing"
         // scroll-padding 을 주면 안 된다. 스냅 기준선이 그만큼 밀려서 `scrollTop / 칸높이` 와
         // 어긋나고, 항목이 두 개뿐인 칸(오전/오후)에서는 둘이 **같은 지점에 스냅**돼 아래 것을
         // 고를 수가 없었다(2026-09-25 실측: 오후로 굴려도 scrollTop 이 0 으로 돌아왔다).
@@ -143,7 +185,7 @@ export default function WheelPicker({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[380px] rounded-[28px] border border-border bg-topbar px-4 pb-5 pt-4"
+        className="w-full max-w-[380px] rounded-[28px] border border-border bg-topbar px-4 pb-6 pt-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-[46px] items-center justify-between">
@@ -156,7 +198,7 @@ export default function WheelPicker({
 
         {/* 칸 이름은 굴림판 **밖**에 둔다. 안에 넣으면 강조 띠의 "가운데"가 라벨 높이만큼
             어긋나서 선택된 줄에 안 맞는다. */}
-        <div className="mt-3 flex h-6 gap-2">
+        <div className="mt-6 flex h-6 gap-2">
           {columns.map((col) => (
             <span key={col.key} className="min-w-0 flex-1 text-center text-base font-bold text-bold-text">
               {col.label || " "}
@@ -164,7 +206,7 @@ export default function WheelPicker({
           ))}
         </div>
 
-        <div className="relative mt-8 flex gap-2">
+        <div className="relative mt-3 flex gap-2">
           {/* 가운데 강조 띠. 칸마다 그리지 않고 뒤에 한 줄로 깔아야 칸 사이 간격까지 이어진다. */}
           <div
             className="pointer-events-none absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 rounded-xl bg-chip-soft"
@@ -183,7 +225,7 @@ export default function WheelPicker({
         <button
           type="button"
           onClick={() => onConfirm(draft)}
-          className="mt-3 h-12 w-full rounded-full bg-point text-base font-bold text-white"
+          className="mt-7 h-12 w-full rounded-full bg-point text-base font-bold text-white"
         >
           설정하기
         </button>
