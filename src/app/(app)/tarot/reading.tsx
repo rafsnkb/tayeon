@@ -101,7 +101,9 @@ export function CardImage({
     <img
       src={`/api/tarot/cards/${card.id}`}
       alt={card.nameKo}
-      className={`aspect-[43/64] rounded-md border border-border object-cover ${className}`}
+      // 원본 카드 그림의 비율이다(asset/resource/*.png). 2026-09-25 에 430×640 → 360×640 으로
+      // 다시 그려져서 9:16 이 됐다 — 비율이 어긋나면 object-cover 가 그림을 잘라 낸다.
+      className={`aspect-[9/16] rounded-md border border-border object-cover ${className}`}
       style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
       onError={(e) => {
         e.currentTarget.style.display = "none";
