@@ -35,9 +35,12 @@ export function ComboAllowanceCard({
         {/* 라디오 점과 폭을 맞춰 제목이 가운데 오게 하는 빈 칸. */}
         {onSelect && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
         <p className="flex-1 text-center text-sm font-semibold text-chip-soft-text">{COMBOS[combo].label}</p>
+        {/* 목업(MyPass_Send) 실측: 바깥 원 24px / 테두리 2px, 안쪽 점 16px — **둘 다 핑크**이고
+            미선택은 **속이 빈 원**이다. 한동안 미선택을 회색으로 채워 놨었는데, 그러면 선택·미선택이
+            둘 다 "채워진 원"이라 라이트에서 미선택이 선택된 것처럼 읽혔다(2026-09-25). */}
         {onSelect && (
-          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${selected ? "bg-point" : "bg-chip-fill"}`}>
-            <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-white" : "bg-icon-muted"}`} />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-point">
+            {selected && <span className="h-4 w-4 rounded-full bg-point" />}
           </span>
         )}
       </div>

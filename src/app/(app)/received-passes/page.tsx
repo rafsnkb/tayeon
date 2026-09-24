@@ -228,7 +228,7 @@ export default function ReceivedPassesPage() {
         )}
       </div>
       <MyPassTabs />
-      {noBirthTimeOpen && <NoBirthTimePopup onClose={() => setNoBirthTimeOpen(false)} />}
+      {noBirthTimeOpen && <NoBirthTimePopup title="이용권 수령 불가" onClose={() => setNoBirthTimeOpen(false)} />}
       {suspension && <SuspensionModal info={suspension} onClose={() => setSuspension(null)} />}
     </div>
   );

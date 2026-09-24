@@ -5,8 +5,17 @@ import { CloseIcon } from "@/app/(app)/tarot/icons";
 
 /** 피그마 "Buy - CountPurchase_NoBirthTimePopup" — 자미두수가 포함된 조합(구매/수령)을 골랐는데
  * 태어난 시간이 없거나 "모름"인 경우. `/charge`(횟수제·시간제 조합 선택)와
- * `/received-passes`(리워드 조합 선택) 양쪽에서 공용으로 쓴다. */
-export default function NoBirthTimePopup({ onClose }: { onClose: () => void }) {
+ * `/received-passes`(리워드 조합 선택) 양쪽에서 공용으로 쓴다.
+ *
+ * 제목은 부르는 쪽이 정한다. 한동안 "상품 구매 불가"로 박혀 있었는데, 리워드 수령은 돈을 내는
+ * 일이 아니라 이미 받은 것을 꺼내는 일이라 그 문장이 사실과 달랐다(2026-09-25). */
+export default function NoBirthTimePopup({
+  onClose,
+  title = "상품 구매 불가",
+}: {
+  onClose: () => void;
+  title?: string;
+}) {
   const router = useRouter();
   return (
     <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -16,7 +25,7 @@ export default function NoBirthTimePopup({ onClose }: { onClose: () => void }) {
       >
         <div className="mb-5 flex items-center justify-between">
           <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-bold-text">상품 구매 불가</p>
+          <p className="flex-1 text-center text-lg font-bold text-bold-text">{title}</p>
           <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
             <CloseIcon className="h-5 w-5" />
           </button>

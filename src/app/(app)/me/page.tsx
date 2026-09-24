@@ -304,11 +304,15 @@ export default function MyPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setRewardInfoOpen(false)}
         >
+          {/* 높이를 고정한다(목업 실측 516px). 목업은 두 탭이 **정확히 같은 높이**이고, 비율 탭은
+              행 간격을 넓혀 그 높이를 채운다 — 내용에 맡기면 토글을 누를 때마다 모달이 늘었다
+              줄었다 한다(2026-09-25 사용자 지적). 그래서 세로를 flex 로 나눠 갖고 표가 남는
+              공간을 먹는다. 카드 폭 380 / 헤더 72 / 토글 56 / 바닥 문구 33 도 같은 실측값. */}
           <div
-            className="w-full max-w-sm rounded-[32px] border border-border bg-topbar p-4"
+            className="flex h-[516px] w-full max-w-sm flex-col rounded-[32px] border border-border bg-topbar px-4 pb-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-0 flex items-center justify-between pt-3">
+            <div className="flex h-[72px] shrink-0 items-center justify-between">
               <div className="w-5" />
               <p className="flex-1 text-center text-lg font-bold text-bold-text">보너스 리워드 안내</p>
               <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-icon-muted">
@@ -318,13 +322,13 @@ export default function MyPage() {
             {/* 두 탭 — 예상 리워드(내 결제액 기준 실제 지급 예정 횟수) / 리워드 비율(요율표).
                 예전엔 한 화면에 둘을 쌓아 뒀는데, 예상 쪽이 조합 4종 × 스프레드 4종 표로 커지면서
                 한 모달에 다 들어가지 않는다(목업 2026-09-24). */}
-            <div className="mb-4 flex rounded-full bg-chip-soft p-1">
+            <div className="flex h-14 shrink-0 rounded-full bg-chip-soft p-1">
               {([["expected", "예상 리워드"], ["rate", "리워드 비율"]] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setRewardTab(key)}
-                  className={`flex-1 rounded-full py-2.5 text-base font-bold ${
+                  className={`h-12 flex-1 rounded-full text-base font-bold ${
                     rewardTab === key ? "point-pill text-white" : "text-placeholder dark:text-chip-soft-text"
                   }`}
                 >
@@ -332,33 +336,35 @@ export default function MyPage() {
                 </button>
               ))}
             </div>
-            <p className="mb-4 text-center text-sm font-semibold text-placeholder">
+            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-base font-semibold leading-6 text-placeholder">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
             </p>
             {rewardTab === "expected" ? (
               <>
-                <div className="mb-4 flex items-center justify-between rounded-2xl bg-chip-soft p-4 text-sm">
+                <div className="flex h-12 shrink-0 items-center justify-between rounded-2xl bg-chip-soft px-4 text-base">
                   <span className="text-placeholder">
                     {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
                   </span>
                   {/* 요율이 걸리는 금액(VAT 제외)을 보여준다 — 총액을 띄우면 옆의 요율과 곱해도
                       아래 횟수가 안 나와서 사용자가 검산할 수 없다. */}
-                  <span className="font-semibold text-chip-soft-text">
+                  <span className="font-bold text-chip-soft-text">
                     {(bonusReward?.supplyWon ?? 0).toLocaleString("ko-KR")}원
                   </span>
                 </div>
                 {bonusReward && bonusReward.projectedPasses > 0 ? (
-                  <>
-                    <p className="mb-2 text-center text-sm font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <p className="shrink-0 pt-3 text-center text-sm font-semibold text-placeholder">
+                      예상 보너스 리워드 이용권
+                    </p>
                     {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다. */}
-                    <div className="mb-3 flex items-center justify-center gap-3">
+                    <div className="flex shrink-0 items-center justify-center gap-3 py-2">
                       <button
                         type="button"
                         aria-label="이전 조합"
                         onClick={() => setRewardCombo((i) => (i + COMBO_ORDER.length - 1) % COMBO_ORDER.length)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
+                        className="flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
                       >
                         <ChevronLeftIcon className="h-4 w-2" />
                       </button>
@@ -369,15 +375,15 @@ export default function MyPage() {
                         type="button"
                         aria-label="다음 조합"
                         onClick={() => setRewardCombo((i) => (i + 1) % COMBO_ORDER.length)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
+                        className="flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
                       >
                         <ChevronRightIcon className="h-4 w-2" />
                       </button>
                     </div>
-                    <div className="mb-3 rounded-3xl bg-chip-soft p-3">
-                      <div className="grid grid-cols-2 rounded-xl bg-bg px-4 py-2 text-xs font-semibold text-placeholder dark:bg-topbar">
+                    <div className="flex min-h-0 flex-1 flex-col rounded-3xl bg-chip-soft p-3">
+                      <div className="flex h-8 shrink-0 items-center justify-between gap-2 rounded-xl bg-bg px-3 text-base font-semibold text-placeholder dark:bg-topbar">
                         <span>옵션 이름</span>
-                        <span className="text-right">질문 횟수</span>
+                        <span className="shrink-0">질문 횟수</span>
                       </div>
                       {(() => {
                         const combo = COMBO_ORDER[rewardCombo];
@@ -389,47 +395,53 @@ export default function MyPage() {
                           combo
                         );
                         return SPREAD_ORDER.map((spread) => (
-                          <div key={spread} className="grid grid-cols-2 px-4 py-3 text-sm">
-                            <span className="font-semibold text-placeholder">
+                          <div key={spread} className="flex flex-1 items-center justify-between gap-2 px-3 text-base">
+                            <span className="truncate font-semibold text-placeholder">
                               {SPREADS[spread].label}
                               {suffix}
                             </span>
-                            <span className="text-right font-bold text-chip-soft-text">{allowances[spread]}회</span>
+                            <span className="shrink-0 font-bold text-chip-soft-text">{allowances[spread]}회</span>
                           </div>
                         ));
                       })()}
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <p className="mb-3 rounded-2xl bg-chip-soft p-4 text-center text-sm font-semibold text-placeholder">
-                    {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
-                    <br />
-                    리워드 이용권을 지급해 드려요.
-                  </p>
+                  <div className="mt-3 flex flex-1 items-center justify-center rounded-2xl bg-chip-soft p-4">
+                    <p className="text-center text-base font-semibold text-placeholder">
+                      {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
+                      <br />
+                      리워드 이용권을 지급해 드려요.
+                    </p>
+                  </div>
                 )}
               </>
             ) : (
               <>
-                <p className="mb-2 text-center text-sm font-bold text-chip-soft-text">리워드 지급 비율</p>
+                <p className="flex h-10 shrink-0 items-center justify-center text-center text-base font-bold text-chip-soft-text">
+                  리워드 지급 비율
+                </p>
                 {/* 표의 색은 새 목업(RewardInfoModal_Percent, 2026-09-24)을 sharp 로 픽셀 샘플해서
                     맞췄다 — 박스 bg=--chip-soft(라이트 #e7e2e1 정확 일치), 헤더 칩은 그보다 한 톤
                     "패인" 면(라이트 --bg / 다크 --topbar), 라벨은 --placeholder(양쪽 정확 일치).
                     2026-09-20 에 --border/--chip-fill 로 맞춰 둔 값은 그때 목업 기준이라 폐기. */}
-                <div className="mb-3 rounded-3xl bg-chip-soft p-3">
-                  <div className="grid grid-cols-2 rounded-xl bg-bg px-4 py-2 text-xs font-semibold text-placeholder dark:bg-topbar">
+                <div className="flex min-h-0 flex-1 flex-col rounded-3xl bg-chip-soft p-3">
+                  <div className="flex h-8 shrink-0 items-center justify-between gap-2 rounded-xl bg-bg px-3 text-base font-semibold text-placeholder dark:bg-topbar">
                     <span>당월 결제금액</span>
-                    <span className="text-right">리워드 비율</span>
+                    <span className="shrink-0">리워드 비율</span>
                   </div>
                   {REWARD_TIER_ROWS.map((row) => (
-                    <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
+                    <div key={row.label} className="flex flex-1 items-center justify-between gap-2 px-3 text-base">
                       <span className="font-semibold text-placeholder">{row.label}</span>
-                      <span className="text-right font-bold text-point-text">{formatRate(row.rate)}</span>
+                      <span className="shrink-0 font-bold text-point-text">{formatRate(row.rate)}</span>
                     </div>
                   ))}
                 </div>
               </>
             )}
-            <p className="text-center text-xs text-icon-muted">보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.</p>
+            <p className="flex h-[33px] shrink-0 items-center justify-center text-center text-xs text-icon-muted">
+              보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.
+            </p>
           </div>
         </div>
       )}
