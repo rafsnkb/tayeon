@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { constantTimeEquals } from "@/lib/auth/constantTime";
 import { notifyOwner, type OwnerAlert } from "@/lib/notify/owner";
 
 /**
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     console.error("[internal/notify] INTERNAL_API_SECRET 미설정 — 호출을 거부한다");
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
-  if (req.headers.get("x-internal-secret") !== secret) {
+  if (!constantTimeEquals(req.headers.get("x-internal-secret"), secret)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

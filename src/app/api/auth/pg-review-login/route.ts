@@ -1,4 +1,5 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
+import { constantTimeEquals } from "@/lib/auth/constantTime";
 import { NextRequest, NextResponse } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
@@ -25,15 +26,6 @@ function attemptKey(req: NextRequest): string {
   const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip = forwarded || req.headers.get("x-real-ip")?.trim() || "unknown";
   return createHash("sha256").update(ip).digest("hex").slice(0, 32);
-}
-
-/** 길이가 다르면 timingSafeEqual 이 던지기 때문에, 양쪽을 먼저 고정 길이로 해시한 뒤 비교한다.
- *  === 는 첫 불일치 문자에서 빠져나와 비교 시간이 정답 접두사 길이에 비례한다. */
-function constantTimeEquals(a: string, b: string): boolean {
-  return timingSafeEqual(
-    createHash("sha256").update(a).digest(),
-    createHash("sha256").update(b).digest()
-  );
 }
 
 type AttemptVerdict = { blocked: true; retryAfterSeconds: number } | { blocked: false };
@@ -83,12 +75,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { id, password } = (await req.json().catch(() => ({}))) as { id?: string; password?: string };
-  const matched =
-    typeof id === "string" &&
-    typeof password === "string" &&
-    constantTimeEquals(id, testId) &&
-    constantTimeEquals(password, testPassword);
-  if (!matched) {
+  // 두 비교를 **둘 다** 수행한 뒤에 판정한다. `&&` 로 짧게 끊으면 아이디가 틀렸을 때 비밀번호
+  // 비교를 건너뛰어 응답이 눈에 띄게 빨라진다 — 위에서 메시지로 감춘 "뭐가 틀렸는지"가 응답
+  // 시간으로 도로 새는 셈이다.
+  const idMatched = constantTimeEquals(typeof id === "string" ? id : "", testId);
+  const passwordMatched = constantTimeEquals(typeof password === "string" ? password : "", testPassword);
+  if (!idMatched || !passwordMatched) {
     return NextResponse.json({ error: "아이디 또는 비밀번호가 일치하지 않아요." }, { status: 401 });
   }
 
