@@ -220,10 +220,7 @@ export default function MyPage() {
           <Section title="이용권">
             <ListRow icon={<CartIcon className="h-5 w-5" />} label="횟수제 · 시간제 이용권 구입" onClick={() => router.push(withReturnTo("/charge", "/me"))} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
-            {/* "받은 이용권 내역"을 흡수해 구매분까지 함께 보여주는 화면으로 개편 중이다(목업 대기).
-                그때까지는 기존 수령 창구(/received-passes)를 가리킨다 — 라벨만 먼저 바꾸면 미수령
-                리워드를 받을 길이 사라진다. */}
-            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="내 보유 이용권" onClick={() => router.push("/received-passes")} />
+            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="내 보유 이용권" onClick={() => router.push("/my-passes")} />
           </Section>
 
           <Section title="프로필">

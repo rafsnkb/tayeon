@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/util/formatDate";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import MyPassTabs from "@/components/MyPassTabs";
 import { BackIcon } from "@/app/(app)/tarot/icons";
 import {
   COMBOS,
@@ -124,8 +125,9 @@ export default function ReceivedPassesPage() {
 
   return (
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
-      <SubPageTopBar title="받은 이용권 내역" />
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
+      {/* 제목은 두 탭이 공유한다 — "보유 이용권"과 "받은 이용권 내역"이 한 화면의 두 면이다. */}
+      <SubPageTopBar title="내 보유 이용권" />
+      <div className="flex-1 overflow-visible p-4 pb-28 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         {entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (
@@ -223,6 +225,7 @@ export default function ReceivedPassesPage() {
           </div>
         )}
       </div>
+      <MyPassTabs />
       {noBirthTimeOpen && <NoBirthTimePopup onClose={() => setNoBirthTimeOpen(false)} />}
       {suspension && <SuspensionModal info={suspension} onClose={() => setSuspension(null)} />}
     </div>
