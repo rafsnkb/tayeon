@@ -8,6 +8,38 @@ const SPREAD_SHORT: Record<SpreadKey, string> = {
   one: "원 카드", three: "쓰리 카드", dual: "양자택일", celtic: "켈틱 크로스",
 };
 
+/** 카드 제목은 목업에서 "…전용"이다. `tarot` 의 라벨에는 이미 붙어 있어 두 번 붙지 않게 한다. */
+const comboTitle = (combo: ComboKey) =>
+  COMBOS[combo].label.endsWith("전용") ? COMBOS[combo].label : `${COMBOS[combo].label} 전용`;
+
+/**
+ * 스프레드 4종을 가로로 늘어놓은 패널. 조합 카드 안에도 들어가고, 보너스 리워드 모달의
+ * "예상 리워드" 탭에도 **똑같은 표**가 들어간다(목업 RewardInfoModal_Expect).
+ *
+ * 실측(2026-09-25): 안쪽 여백 8, 줄 간격 ~17, 옵션 줄 14px, 횟수 16px 볼드.
+ * 옵션은 "원 카드 / +사주 / +자미두수" 처럼 줄을 나눠 쌓는다 — 한 줄로 붙이면 4열에 안 들어간다.
+ */
+export function ComboAllowancePanel({
+  combo,
+  allowanceFor,
+}: {
+  combo: ComboKey;
+  allowanceFor: (combo: ComboKey, spread: SpreadKey) => number;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-1 rounded-2xl bg-chip-soft p-2">
+      {SPREAD_ORDER.map((spread) => (
+        <div key={spread} className="flex flex-col items-center text-center leading-tight">
+          <span className="text-sm font-semibold text-placeholder">{SPREAD_SHORT[spread]}</span>
+          {COMBOS[combo].saju && <span className="text-sm font-semibold text-placeholder">+사주</span>}
+          {COMBOS[combo].ziwei && <span className="text-sm font-semibold text-placeholder">+자미두수</span>}
+          <strong className="text-base text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * 조합 하나의 "스프레드별 질문 가능 횟수" 카드.
  *
@@ -35,10 +67,10 @@ export function ComboAllowanceCard({
 }) {
   const inner = (
     <>
-      <div className="mb-4 flex items-center justify-center gap-2">
+      <div className="mb-2 flex items-center justify-center gap-2">
         {/* 라디오 점과 폭을 맞춰 제목이 가운데 오게 하는 빈 칸. */}
         {onSelect && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
-        <p className="flex-1 text-center text-sm font-semibold text-chip-soft-text">{COMBOS[combo].label}</p>
+        <p className="flex-1 text-center text-base font-bold text-chip-soft-text">{comboTitle(combo)}</p>
         {/* 목업(MyPass_Send) 실측: 바깥 원 24px / 테두리 2px, 안쪽 점 16px — **둘 다 핑크**이고
             미선택은 **속이 빈 원**이다. 한동안 미선택을 회색으로 채워 놨었는데, 그러면 선택·미선택이
             둘 다 "채워진 원"이라 라이트에서 미선택이 선택된 것처럼 읽혔다(2026-09-25). */}
@@ -55,16 +87,7 @@ export function ComboAllowanceCard({
       {layout === "columns" ? (
         /* 네 스프레드를 가로로 늘어놓는다(목업 Buy_*_Purchase). 옵션은 줄을 나눠 쌓는다 —
            "원 카드 / +사주 / +자미두수" 처럼. 헤더 줄은 없다. */
-        <div className="grid grid-cols-4 gap-1 rounded-2xl bg-chip-soft px-2 py-3">
-          {SPREAD_ORDER.map((spread) => (
-            <div key={spread} className="flex flex-col items-center gap-0.5 text-center">
-              <span className="text-sm font-semibold leading-tight text-placeholder">{SPREAD_SHORT[spread]}</span>
-              {COMBOS[combo].saju && <span className="text-sm font-semibold leading-tight text-placeholder">+사주</span>}
-              {COMBOS[combo].ziwei && <span className="text-sm font-semibold leading-tight text-placeholder">+자미두수</span>}
-              <strong className="mt-1 text-base text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
-            </div>
-          ))}
-        </div>
+        <ComboAllowancePanel combo={combo} allowanceFor={allowanceFor} />
       ) : (
         <div className="rounded-xl bg-chip-soft p-3 text-sm">
           {/* 헤더는 목업에서 본문 행과 **같은 크기**다. text-xs 로 줄이면 표가 한 단계 작아 보인다. */}

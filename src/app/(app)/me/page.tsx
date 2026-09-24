@@ -9,13 +9,13 @@ import { auth } from "@/lib/firebase/client";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { ComboAllowancePanel } from "@/components/ComboAllowanceCard";
 import {
   COMBOS,
   COMBO_ORDER,
   PAYMENT_BONUS_REWARD_TIERS,
   REWARD_PAYOUT_DAY_OF_MONTH,
   SPREADS,
-  SPREAD_ORDER,
   rewardAllowancesForCombo,
 } from "@/lib/tarot/pricing";
 import {
@@ -190,29 +190,33 @@ export default function MyPage() {
               <button
                 type="button"
                 onClick={openAccountInfo}
-                className="flex shrink-0 items-center gap-1.5 rounded-full bg-cta-fill px-3 py-1.5 text-sm font-semibold text-cta-text"
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-chip-soft px-3 py-1.5 text-sm font-semibold text-chip-soft-text"
               >
                 <SearchIcon className="h-3.5 w-3.5" />
                 계정정보
               </button>
             </div>
             <div className="flex items-center justify-between py-3">
+              {/* 목업(MyPage_*)은 돋보기를 **값 오른쪽 끝**에 둔다 — 라벨에 붙여 두면 "리워드"라는
+                  말을 누르는 것처럼 보이고, 실제로 여는 건 옆의 숫자에 대한 설명이다. */}
+              <span className="text-sm font-semibold text-icon-muted">
+                {bonusReward ? `예상 ${bonusReward.month}월 보너스 리워드` : "예상 이번 달 보너스 리워드"}
+              </span>
               <button
                 type="button"
                 onClick={() => setRewardInfoOpen(true)}
-                className="flex items-center gap-1.5 text-sm font-semibold text-icon-muted"
+                className="flex items-center gap-2"
               >
-                {bonusReward ? `${bonusReward.month}월 보너스 리워드` : "이번 달 보너스 리워드"}
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cta-fill text-cta-text">
-                  <SearchIcon className="h-2.5 w-2.5" />
+                {/* 회수가 아니라 **요율**을 보여준다(목업 MyPage_Dark, 2026-09-24). 회수는 조합마다
+                    달라서 한 줄에 담을 수 없고, 요율은 하나뿐이다. 기준 미달이면 요율이 0 인데
+                    "0%"는 "리워드가 있는데 0"처럼 읽혀서 미지급임을 그대로 쓴다. */}
+                <span className="text-lg font-bold text-bold-text">
+                  {!bonusReward ? "-" : bonusReward.rate > 0 ? formatRate(bonusReward.rate) : "미지급"}
+                </span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text">
+                  <SearchIcon className="h-3 w-3" />
                 </span>
               </button>
-              {/* 회수가 아니라 **요율**을 보여준다(목업 MyPage_Dark, 2026-09-24). 회수는 조합마다
-                  달라서 한 줄에 담을 수 없고, 요율은 하나뿐이다. 기준 미달이면 요율이 0 인데
-                  "0%"는 "리워드가 있는데 0"처럼 읽혀서 미지급임을 그대로 쓴다. */}
-              <span className="text-lg font-bold text-bold-text">
-                {!bonusReward ? "-" : bonusReward.rate > 0 ? formatRate(bonusReward.rate) : "미지급"}
-              </span>
             </div>
             <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={() => router.push("/invite")} />
           </Section>
@@ -304,31 +308,33 @@ export default function MyPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setRewardInfoOpen(false)}
         >
-          {/* 높이를 고정한다(목업 실측 516px). 목업은 두 탭이 **정확히 같은 높이**이고, 비율 탭은
-              행 간격을 넓혀 그 높이를 채운다 — 내용에 맡기면 토글을 누를 때마다 모달이 늘었다
-              줄었다 한다(2026-09-25 사용자 지적). 그래서 세로를 flex 로 나눠 갖고 표가 남는
-              공간을 먹는다. 카드 폭 380 / 헤더 72 / 토글 56 / 바닥 문구 33 도 같은 실측값. */}
+          {/* 목업(RewardInfoModal_Expect / _Percent) 실측, 2026-09-25. 브라우저에서 Pretendard 의
+              글자당 가로폭을 재서 목업의 잉크 폭과 맞춰 크기를 역산했다 — 잉크 높이는
+              안티에일리어싱 때문에 2~3px 부풀어서 쓸 수 없었다.
+
+              세로: 카드 516, 헤더 72, 토글 56, 설명 50, 바닥 문구 33. 두 탭의 카드 높이가
+              **정확히 같고** 비율 탭은 행 간격을 넓혀 그 높이를 채운다 — 내용에 맡기면 토글할
+              때마다 모달이 늘었다 줄었다 한다(사용자 지적). 그래서 flex 로 나눠 갖는다. */}
           <div
-            className="flex h-[516px] w-full max-w-sm flex-col rounded-[32px] border border-border bg-topbar px-4 pb-4"
+            className="flex h-[516px] w-full max-w-[380px] flex-col rounded-[32px] border border-border bg-topbar p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex h-[72px] shrink-0 items-center justify-between">
+            <div className="flex h-14 shrink-0 items-center justify-between">
               <div className="w-5" />
-              <p className="flex-1 text-center text-lg font-bold text-bold-text">보너스 리워드 안내</p>
+              <p className="flex-1 text-center text-base font-bold text-bold-text">보너스 리워드 안내</p>
               <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-icon-muted">
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
-            {/* 두 탭 — 예상 리워드(내 결제액 기준 실제 지급 예정 횟수) / 리워드 비율(요율표).
-                예전엔 한 화면에 둘을 쌓아 뒀는데, 예상 쪽이 조합 4종 × 스프레드 4종 표로 커지면서
-                한 모달에 다 들어가지 않는다(목업 2026-09-24). */}
-            <div className="flex h-14 shrink-0 rounded-full bg-chip-soft p-1">
+
+            {/* 트랙 56 / 알약 40 — 사방 8 안쪽이다(내 보유 이용권 탭바와 같은 규칙). */}
+            <div className="flex h-14 shrink-0 rounded-full bg-chip-soft p-2">
               {([["expected", "예상 리워드"], ["rate", "리워드 비율"]] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setRewardTab(key)}
-                  className={`h-12 flex-1 rounded-full text-base font-bold ${
+                  className={`h-10 flex-1 rounded-full text-sm font-bold ${
                     rewardTab === key ? "point-pill text-white" : "text-placeholder dark:text-chip-soft-text"
                   }`}
                 >
@@ -336,95 +342,84 @@ export default function MyPage() {
                 </button>
               ))}
             </div>
-            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-base font-semibold leading-6 text-placeholder">
+
+            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-sm font-semibold leading-tight text-placeholder">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
             </p>
+
             {rewardTab === "expected" ? (
-              <>
-                <div className="flex h-12 shrink-0 items-center justify-between rounded-2xl bg-chip-soft px-4 text-base">
-                  <span className="text-placeholder">
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* 금액은 가로 한 줄이 아니라 **가운데 쌓기**다(목업). 요율이 걸리는 금액
+                    (VAT 제외)을 보여준다 — 총액을 띄우면 옆의 요율과 곱해도 아래 횟수가 나오지
+                    않아 사용자가 검산할 수 없다. */}
+                <div className="flex h-[88px] shrink-0 flex-col items-center justify-center gap-4 rounded-2xl bg-chip-soft">
+                  <span className="text-base font-semibold leading-none text-placeholder">
                     {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
                   </span>
-                  {/* 요율이 걸리는 금액(VAT 제외)을 보여준다 — 총액을 띄우면 옆의 요율과 곱해도
-                      아래 횟수가 안 나와서 사용자가 검산할 수 없다. */}
-                  <span className="font-bold text-chip-soft-text">
+                  <span className="text-2xl font-bold leading-none text-chip-soft-text">
                     {(bonusReward?.supplyWon ?? 0).toLocaleString("ko-KR")}원
                   </span>
                 </div>
                 {bonusReward && bonusReward.projectedPasses > 0 ? (
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <p className="shrink-0 pt-3 text-center text-sm font-semibold text-placeholder">
-                      예상 보너스 리워드 이용권
-                    </p>
-                    {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다. */}
-                    <div className="flex shrink-0 items-center justify-center gap-3 py-2">
+                  /* 금액 상자와 아래 표 사이는 목업에서도 그냥 빈 곳이다(실측 72) — mt-auto 로
+                     아래쪽 세 덩어리를 바닥에 붙이면 그 여백이 자연히 남는다. */
+                  <div className="mt-auto">
+                    <p className="text-center text-sm font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
+                    {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다.
+                        알약은 48×32, 가운데 이름은 폭을 고정해 화살표가 춤추지 않게 한다. */}
+                    <div className="mt-1 flex h-8 items-center justify-center gap-2.5">
                       <button
                         type="button"
                         aria-label="이전 조합"
                         onClick={() => setRewardCombo((i) => (i + COMBO_ORDER.length - 1) % COMBO_ORDER.length)}
-                        className="flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
+                        className="flex h-8 w-12 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
                       >
                         <ChevronLeftIcon className="h-4 w-2" />
                       </button>
-                      <span className="flex-1 text-center text-lg font-bold text-chip-soft-text">
+                      <span className="w-[152px] text-center text-base font-bold text-chip-soft-text">
                         {COMBOS[COMBO_ORDER[rewardCombo]].label}
                       </span>
                       <button
                         type="button"
                         aria-label="다음 조합"
                         onClick={() => setRewardCombo((i) => (i + 1) % COMBO_ORDER.length)}
-                        className="flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
+                        className="flex h-8 w-12 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
                       >
                         <ChevronRightIcon className="h-4 w-2" />
                       </button>
                     </div>
-                    <div className="flex min-h-0 flex-1 flex-col rounded-3xl bg-chip-soft p-3">
-                      <div className="flex h-8 shrink-0 items-center justify-between gap-2 rounded-xl bg-bg px-3 text-base font-semibold text-placeholder dark:bg-topbar">
-                        <span>옵션 이름</span>
-                        <span className="shrink-0">질문 횟수</span>
-                      </div>
-                      {(() => {
-                        const combo = COMBO_ORDER[rewardCombo];
-                        const { saju, ziwei } = COMBOS[combo];
-                        const suffix = `${saju ? "+사주" : ""}${ziwei ? "+자미두수" : ""}`;
-                        // 지급 규칙은 무상 지급 쪽(버림 + 조합·스프레드별 단조 감소)이다.
-                        const allowances = rewardAllowancesForCombo(
-                          bonusReward.projectedPasses * SPREADS.one.cost,
-                          combo
-                        );
-                        return SPREAD_ORDER.map((spread) => (
-                          <div key={spread} className="flex flex-1 items-center justify-between gap-2 px-3 text-base">
-                            <span className="truncate font-semibold text-placeholder">
-                              {SPREADS[spread].label}
-                              {suffix}
-                            </span>
-                            <span className="shrink-0 font-bold text-chip-soft-text">{allowances[spread]}회</span>
-                          </div>
-                        ));
-                      })()}
+                    <div className="mt-2">
+                      {/* 지급 규칙은 무상 지급 쪽(버림 + 조합·스프레드별 단조 감소)이다. */}
+                      <ComboAllowancePanel
+                        combo={COMBO_ORDER[rewardCombo]}
+                        allowanceFor={(combo, spread) =>
+                          rewardAllowancesForCombo(bonusReward.projectedPasses * SPREADS.one.cost, combo)[spread]
+                        }
+                      />
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 flex flex-1 items-center justify-center rounded-2xl bg-chip-soft p-4">
-                    <p className="text-center text-base font-semibold text-placeholder">
+                  <div className="mt-auto flex items-center justify-center rounded-2xl bg-chip-soft p-4">
+                    <p className="text-center text-sm font-semibold text-placeholder">
                       {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
                       <br />
                       리워드 이용권을 지급해 드려요.
                     </p>
                   </div>
                 )}
-              </>
+              </div>
             ) : (
-              <>
-                <p className="flex h-10 shrink-0 items-center justify-center text-center text-base font-bold text-chip-soft-text">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <p className="flex h-[42px] shrink-0 items-center justify-center text-sm font-bold text-chip-soft-text">
                   리워드 지급 비율
                 </p>
-                {/* 표의 색은 새 목업(RewardInfoModal_Percent, 2026-09-24)을 sharp 로 픽셀 샘플해서
-                    맞췄다 — 박스 bg=--chip-soft(라이트 #e7e2e1 정확 일치), 헤더 칩은 그보다 한 톤
-                    "패인" 면(라이트 --bg / 다크 --topbar), 라벨은 --placeholder(양쪽 정확 일치).
-                    2026-09-20 에 --border/--chip-fill 로 맞춰 둔 값은 그때 목업 기준이라 폐기. */}
+                {/* 표의 색은 목업(RewardInfoModal_Percent)을 sharp 로 픽셀 샘플해서 맞췄다 —
+                    박스 bg=--chip-soft(라이트 #e7e2e1 정확 일치), 헤더 칩은 그보다 한 톤 "패인"
+                    면(라이트 --bg / 다크 --topbar), 라벨은 --placeholder(양쪽 정확 일치).
+                    행은 여섯 칸(헤더+5구간)이 같은 높이로 남는 공간을 나눠 갖는다 — 목업의 행
+                    간격 40 이 그렇게 나온 값이다. */}
                 <div className="flex min-h-0 flex-1 flex-col rounded-3xl bg-chip-soft p-3">
                   <div className="flex h-8 shrink-0 items-center justify-between gap-2 rounded-xl bg-bg px-3 text-base font-semibold text-placeholder dark:bg-topbar">
                     <span>당월 결제금액</span>
@@ -437,9 +432,10 @@ export default function MyPage() {
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
             )}
-            <p className="flex h-[33px] shrink-0 items-center justify-center text-center text-xs text-icon-muted">
+
+            <p className="flex h-[33px] shrink-0 items-center justify-center text-center text-sm text-icon-muted">
               보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.
             </p>
           </div>

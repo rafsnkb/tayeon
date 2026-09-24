@@ -851,11 +851,11 @@ function TarotChat() {
             대화를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
           </div>
         )}
-        {/* 메인의 중앙 카피(피그마 New/Main_*, 실측 2줄 top 300.7·329.7 줄간격 29, 잉크 21.7).
-            대화방에는 없다 — 방을 열면 그 자리를 대화가 채운다. */}
+        {/* 메인의 중앙 카피. 원래 목업 실측값은 24px/줄간격 29 였는데, 사용자 지시로 1.5배
+            키웠다(2026-09-25) — 36px/줄간격 44. 대화방에는 없다: 방을 열면 그 자리를 대화가 채운다. */}
         {isMain && (
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-center text-2xl font-bold leading-[29px] text-bold-text">
+            <p className="text-center text-[36px] font-bold leading-[44px] text-bold-text">
               고민이 있거나 힘들땐
               <br />
               <span className="text-point">타연</span> 하세요

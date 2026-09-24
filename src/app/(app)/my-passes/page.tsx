@@ -6,6 +6,7 @@ import { auth } from "@/lib/firebase/client";
 import { formatDateTime } from "@/lib/util/formatDate";
 import { COMBOS, SPREADS, SPREAD_ORDER, type ComboKey } from "@/lib/tarot/pricing";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { ComboAllowanceCard } from "@/components/ComboAllowanceCard";
 import MyPassTabs from "@/components/MyPassTabs";
 import InfoModal from "@/components/InfoModal";
 import { BackIcon } from "../tarot/icons";
@@ -26,6 +27,11 @@ type HeldPass = {
 
 /** 목업(MyPass_Held)의 표 제목 — 구매분은 "구입 옵션", 무상 지급분은 고를 수 있었으니 "선택 옵션". */
 const tableTitle = (label: "구입" | "수령") => (label === "구입" ? "구입한 옵션" : "선택한 옵션");
+
+/** 조합이 확정된 이용권만 조합 카드로 그릴 수 있다. 운영자 지급분은 "모든 옵션"일 수 있다. */
+function isComboKey(combo: ComboKey | "any" | null): combo is ComboKey {
+  return combo !== null && combo !== "any";
+}
 
 function comboLabel(combo: ComboKey | "any" | null): string | null {
   if (!combo) return null;
@@ -152,22 +158,30 @@ export default function MyPassesPage() {
                     )}
 
                     {open && pass.allowances && (
-                      <div className="mt-3 rounded-[24px] bg-chip-soft p-3">
-                        <p className="mb-2 text-center text-sm font-bold text-chip-soft-text">
+                      <div className="mt-3">
+                        {/* 목업(MyPass_Held, 2026-09-25 개정)이 세로 표에서 **조합 카드 + 가로 4열**로
+                            바뀌었다 — 구입 화면·리워드 모달과 같은 표다. 제목은 18px(실측). */}
+                        <p className="mb-2 text-center text-lg font-bold text-placeholder">
                           {tableTitle(pass.acquiredLabel)}
                         </p>
-                        <div className="grid grid-cols-[1fr_auto] gap-2 rounded-xl bg-bg px-4 py-1.5 text-base font-semibold text-placeholder dark:bg-topbar">
-                          <span>옵션 이름</span>
-                          <span className="text-right">질문 횟수</span>
-                        </div>
-                        {SPREAD_ORDER.map((spread) => (
-                          <div key={spread} className="grid grid-cols-[1fr_auto] gap-2 px-4 py-1.5 text-sm">
-                            <span className="text-placeholder">{spreadLabel(spread, pass.combo)}</span>
-                            <span className="text-right font-bold text-chip-soft-text">
-                              {pass.allowances?.[spread] ?? 0}회
-                            </span>
+                        {isComboKey(pass.combo) ? (
+                          <ComboAllowanceCard
+                            layout="columns"
+                            combo={pass.combo}
+                            allowanceFor={(_combo, spread) => pass.allowances?.[spread] ?? 0}
+                          />
+                        ) : (
+                          /* 운영자가 조합 없이("모든 옵션") 지급한 옛 이용권은 조합 카드로 그릴 수
+                             없다 — 스프레드 이름만 세로로 보여준다. */
+                          <div className="rounded-2xl bg-chip-soft p-2">
+                            {SPREAD_ORDER.map((spread) => (
+                              <div key={spread} className="flex justify-between gap-2 px-3 py-1.5 text-sm">
+                                <span className="text-placeholder">{spreadLabel(spread, pass.combo)}</span>
+                                <span className="font-bold text-chip-soft-text">{pass.allowances?.[spread] ?? 0}회</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </section>
