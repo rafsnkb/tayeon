@@ -159,24 +159,39 @@ export default function WheelPicker({
   value,
   onConfirm,
   onClose,
+  emptyMessage,
 }: {
   title: string;
-  columns: WheelColumn[];
+  /** 지금 굴려 놓은 값을 받아 칸을 만든다. **함수여야 한다** — 2월로 옮기면 일 칸이 그 자리에서
+   *  28 일까지로 줄어야 하는데, 칸을 밖에서 미리 만들어 넘기면 모달을 닫기 전까지 옛 달 기준의
+   *  목록이 그대로 남는다(2026-09-25: 1월 31일에서 2월로 옮겨도 31 일이 계속 보였고, 확정할 때
+   *  조용히 28 일로 바뀌었다). */
+  columns: (draft: Record<string, string>) => WheelColumn[];
   value: Record<string, string>;
   onConfirm: (next: Record<string, string>) => void;
   onClose: () => void;
+  /** 고를 것이 없는 칸이 생겼을 때 그 자리에 대신 보여 줄 한 줄. 없으면 버튼만 잠긴다. */
+  emptyMessage?: string;
 }) {
   const [draft, setDraft] = useState(value);
+  const cols = columns(draft);
 
   /** 앞 칸이 바뀌어 뒤 칸의 목록이 짧아졌을 때(2월인데 31일이 남아 있는 등) 마지막 값으로
    *  당겨 읽는다. 상태를 고쳐 쓰지 않고 **읽을 때** 보정한다 — effect 로 되돌리면 렌더가 한 번
-   *  더 돌고, 그 사이 한 프레임 동안 없는 값이 화면에 남는다. 확정값은 onConfirm 쪽에서 같은
-   *  규칙으로 한 번 더 자른다. */
+   *  더 돌고, 그 사이 한 프레임 동안 없는 값이 화면에 남는다. */
   const valueFor = (col: WheelColumn) => {
     const current = draft[col.key];
     if (col.items.some((it) => it.value === current)) return current;
     return col.items[col.items.length - 1]?.value ?? "";
   };
+
+  /** 화면에 보이는 그대로를 내보낸다 — 보정한 값이 아니라 draft 를 넘기면 사용자가 "28 일"을
+   *  보고 눌렀는데 "31 일"이 나간다. */
+  const confirmed = () => Object.fromEntries(cols.map((col) => [col.key, valueFor(col)]));
+
+  /** 고를 것이 하나도 없는 칸이 있으면 만들 수 있는 값이 없다 — 윤달이 없는 해를 "음력(윤달)"로
+   *  고른 경우다. 연 칸은 살아 있으니 윤달이 있는 해로 굴리면 월 칸이 다시 채워진다. */
+  const empty = cols.some((col) => col.items.length === 0);
 
   return (
     <div
@@ -203,7 +218,7 @@ export default function WheelPicker({
         {/* 칸 이름은 굴림판 **밖**에 둔다. 안에 넣으면 강조 띠의 "가운데"가 라벨 높이만큼
             어긋나서 선택된 줄에 안 맞는다. */}
         <div className="mt-6 flex h-6 gap-2">
-          {columns.map((col) => (
+          {cols.map((col) => (
             <span key={col.key} className="min-w-0 flex-1 text-center text-base font-bold text-bold-text">
               {col.label || " "}
             </span>
@@ -216,7 +231,7 @@ export default function WheelPicker({
             className="pointer-events-none absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 rounded-xl bg-chip-soft"
             aria-hidden="true"
           />
-          {columns.map((col) => (
+          {cols.map((col) => (
             <Column
               key={col.key}
               column={col}
@@ -226,10 +241,15 @@ export default function WheelPicker({
           ))}
         </div>
 
+        {empty && emptyMessage && (
+          <p className="mt-3 text-center text-sm font-semibold text-urgent">{emptyMessage}</p>
+        )}
+
         <button
           type="button"
-          onClick={() => onConfirm(draft)}
-          className="mt-7 h-12 w-full rounded-full bg-point text-base font-bold text-white"
+          onClick={() => onConfirm(confirmed())}
+          disabled={empty}
+          className="mt-7 h-12 w-full rounded-full bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-chip-muted-text disabled:opacity-60"
         >
           설정하기
         </button>

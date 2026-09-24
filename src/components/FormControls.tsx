@@ -3,7 +3,7 @@
 import { useState } from "react";
 import WheelPicker, { type WheelColumn } from "@/components/WheelPicker";
 import { QuestionCircleIcon } from "@/app/(app)/tarot/icons";
-import { leapMonthsOf, lunarMonthDays } from "@/lib/tarot/lunarCalendar";
+import { BIRTH_YEAR_MIN, dayCount, monthChoices, toBirthDate } from "@/lib/tarot/birthWheel";
 import type { CalendarMode } from "@/lib/tarot/birthInfo";
 
 /* 생년월일시 입력 폼이 쓰는 작은 컨트롤들. 가입(`/signup`)·내 정보(`/me/profile`)·
@@ -93,11 +93,7 @@ export function BirthTimeNotice() {
 const pad = (n: number) => String(n).padStart(2, "0");
 const range = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, i) => from + i);
-
-/** 그 해 그 달의 날 수. 31일이 없는 달로 옮겼을 때 31일이 남아 있으면 안 된다. */
-function daysInMonth(year: number, month: number) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
+const numbered = (values: number[]) => values.map((n) => ({ value: pad(n), label: pad(n) }));
 
 /**
  * 생년월일 휠. 값은 `YYYY-MM-DD` 문자열 그대로 주고받는다 — 서버(`BirthInfo`)와 사주·자미두수
@@ -113,7 +109,7 @@ export function BirthDateField({
   onChange: (v: string) => void;
   required?: boolean;
   /** 음력이면 달마다 29/30일이고, 윤달은 있는 달이 정해져 있다. 양력 일수를 쓰면 없는 날짜가
-   *  저장된다(`manseryeok` 이 이미 음력 표를 들고 있다 — src/lib/tarot/lunarCalendar.ts). */
+   *  저장된다(계산은 src/lib/tarot/birthWheel.ts, 음력 표는 manseryeok 이 들고 있다). */
   calendarMode?: CalendarMode;
 }) {
   const [open, setOpen] = useState(false);
@@ -124,21 +120,18 @@ export function BirthDateField({
     month: m || "01",
     day: d || "01",
   };
-  const year = Number(draft.year);
-  const month = Number(draft.month);
-  const isLeap = calendarMode === "lunarLeap";
-  const lunar = calendarMode !== "solar";
-  // "음력(윤달)" 이면 그 해에 윤달이 붙는 달만 고를 수 있다 — 대부분의 해엔 아예 없고,
-  // 있는 해라도 한 달뿐이다.
-  const monthChoices = isLeap ? leapMonthsOf(year) : range(1, 12);
-  const dayCount = lunar
-    ? lunarMonthDays(year, month, isLeap) || daysInMonth(year, month)
-    : daysInMonth(year, month);
-  const columns: WheelColumn[] = [
-    { key: "year", label: "년", items: range(1930, thisYear).map((n) => ({ value: String(n), label: String(n) })) },
-    { key: "month", label: "월", items: monthChoices.map((n) => ({ value: pad(n), label: pad(n) })) },
-    { key: "day", label: "일", items: range(1, dayCount).map((n) => ({ value: pad(n), label: pad(n) })) },
-  ];
+
+  /** 칸은 **굴려 놓은 값 기준**으로 만든다. 모달을 연 시점의 값으로 미리 만들면 모달 안에서
+   *  달을 옮겨도 일 칸이 따라오지 않는다(1월 31일 → 2월인데 31일이 그대로 남는다). */
+  const columns = (current: Record<string, string>): WheelColumn[] => {
+    const year = Number(current.year);
+    const month = Number(current.month);
+    return [
+      { key: "year", label: "년", items: range(BIRTH_YEAR_MIN, thisYear).map((n) => ({ value: String(n), label: String(n) })) },
+      { key: "month", label: "월", items: numbered(monthChoices(year, calendarMode)) },
+      { key: "day", label: "일", items: numbered(range(1, dayCount(year, month, calendarMode))) },
+    ];
+  };
 
   return (
     <>
@@ -149,16 +142,11 @@ export function BirthDateField({
           title="생년월일 입력"
           columns={columns}
           value={draft}
+          emptyMessage="그 해에는 윤달이 없어요. 연도를 바꾸거나 '음력'을 선택해주세요."
           onClose={() => setOpen(false)}
           onConfirm={(next) => {
-            // 고른 달의 날 수를 넘으면 마지막 날로 당긴다(2월 31일, 음력 30일 같은 값 방지).
-            const nextYear = Number(next.year);
-            const nextMonth = Number(next.month);
-            const last = lunar
-              ? lunarMonthDays(nextYear, nextMonth, isLeap) || daysInMonth(nextYear, nextMonth)
-              : daysInMonth(nextYear, nextMonth);
-            const day = Math.min(Number(next.day), last);
-            onChange(`${next.year}-${next.month}-${pad(day)}`);
+            const date = toBirthDate(Number(next.year), Number(next.month), Number(next.day), calendarMode);
+            if (date) onChange(date);
             setOpen(false);
           }}
         />
@@ -192,10 +180,12 @@ export function BirthTimeField({
     hour: pad(hour24 % 12 === 0 ? 12 : hour24 % 12),
     minute: value ? mm : "00",
   };
-  const columns: WheelColumn[] = [
+  // 시간 칸은 서로 영향을 주지 않는다(몇 시든 분은 0~59). 그래도 WheelPicker 가 칸을 값에서
+  // 만들기 때문에 모양은 함수로 맞춘다.
+  const columns = (): WheelColumn[] => [
     { key: "meridiem", label: "", items: [{ value: "am", label: "오전" }, { value: "pm", label: "오후" }] },
-    { key: "hour", label: "시", items: range(1, 12).map((n) => ({ value: pad(n), label: pad(n) })) },
-    { key: "minute", label: "분", items: range(0, 59).map((n) => ({ value: pad(n), label: pad(n) })) },
+    { key: "hour", label: "시", items: numbered(range(1, 12)) },
+    { key: "minute", label: "분", items: numbered(range(0, 59)) },
   ];
 
   return (
