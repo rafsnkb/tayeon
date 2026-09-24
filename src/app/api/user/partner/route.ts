@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
+import { isBirthDateString, isBirthTimeString } from "@/lib/tarot/birthInfo";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -48,8 +49,9 @@ export async function POST(req: NextRequest) {
     {
       partner: {
         nickname: trimmedNickname,
-        birthDate: birthDate || null,
-        birthTime: birthTime || null,
+        // 형식이 어긋난 값은 저장하지 않는다 — 상대 정보도 사주·자미두수 계산에 그대로 들어간다.
+        birthDate: isBirthDateString(birthDate) ? birthDate : null,
+        birthTime: isBirthTimeString(birthTime) ? birthTime : null,
         gender: gender ?? "unspecified",
         calendarType: calendarType === "lunar" ? "lunar" : "solar",
         isLeapMonth: calendarType === "lunar" && Boolean(isLeapMonth),

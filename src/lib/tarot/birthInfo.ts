@@ -73,6 +73,25 @@ export function toCalendarMode(
   return isLeapMonth ? "lunarLeap" : "lunar";
 }
 
+/** 저장 형식(`YYYY-MM-DD`)이면서 **실재하는 날짜**인지. 양력 달력으로 확인한다 — 음력이어도
+ *  일수는 29/30 이라 양력 기준을 넘지 않는다.
+ *
+ *  라우트마다 `if (!body.birthDate)` 로 빈 값만 막고 형식은 보지 않았다. 화면이 보내는 값만
+ *  믿는 구조라, 실제로 입력 휠이 `"1996--NaN"` 을 만들면(윤달이 없는 해를 "음력(윤달)"로
+ *  고른 경우) 그대로 저장됐다 — 그 값은 사주 계산과 생일 쿠폰(`birthdayMMDD`)까지 흘러간다.
+ *  휠은 고쳤지만(2026-09-25) 형식 검사는 서버에 있어야 한다. */
+export function isBirthDateString(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** 저장 형식(`HH:mm`, 24시간)인지. */
+export function isBirthTimeString(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 /** 계산 라이브러리에 넘기기 전 필수 필드가 유효한 형태인지 확인 (구버전 스키마로 저장된 데이터 방어) */
 export function isValidBirthInfo(info: unknown): info is BirthInfo {
   if (!info || typeof info !== "object") return false;

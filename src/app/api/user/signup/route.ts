@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { isJasiRule, type BirthInfo } from "@/lib/tarot/birthInfo";
+import { isBirthDateString, isBirthTimeString, isJasiRule, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { normalizeBirthdayMMDD } from "@/lib/user/birthday";
 
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   // 생년월일ㆍ성별은 2026-09-19부터 가입 시 필수(목업 "Screen / Join" — 닉네임과 동일하게 빨간 *
   // 표시). 태어난 시간만 선택 입력으로 유지(자시법 등은 기본값으로 채워서 저장).
-  if (!birthInfo?.birthDate) {
+  if (!isBirthDateString(birthInfo?.birthDate)) {
     return NextResponse.json({ error: "생년월일을 입력해주세요." }, { status: 400 });
   }
   if (birthInfo.gender !== "male" && birthInfo.gender !== "female" && birthInfo.gender !== "unspecified") {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       calendarType: birthInfo.calendarType === "lunar" ? "lunar" : "solar",
       isLeapMonth: birthInfo.calendarType === "lunar" && Boolean(birthInfo.isLeapMonth),
       birthDate: birthInfo.birthDate,
-      birthTime: birthInfo.timeUnknown ? null : birthInfo.birthTime || null,
+      birthTime: birthInfo.timeUnknown || !isBirthTimeString(birthInfo.birthTime) ? null : birthInfo.birthTime,
       timeUnknown: Boolean(birthInfo.timeUnknown),
       jasiRule: isJasiRule(birthInfo.jasiRule)
         ? birthInfo.jasiRule
