@@ -5,6 +5,9 @@ import { getFirestore } from "firebase-admin/firestore";
 
 initializeApp();
 
+// 타워(관제센터) 일일 리포트. 설정은 tawerReport.ts 에 있고 집계 로직은 tawer/ 에 있다.
+export { tawerDailyReport } from "./tawerReport.ts";
+
 export const ping = onRequest((req, res) => {
   res.json({ ok: true });
 });
