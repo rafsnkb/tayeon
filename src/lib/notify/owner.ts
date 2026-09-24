@@ -175,8 +175,25 @@ export async function notifyOwner(alert: OwnerAlert): Promise<void> {
     const discordOk = await sendDiscord(alert).catch(() => false);
     // Discord 가 실패했으면 등급과 무관하게 메일로라도 알린다 — 채널이 죽은 걸 모르는 게
     // 제일 위험하다. 예산을 이미 쓴 경우에도 이때만은 보낸다.
+    let emailOk = false;
     if (!discordOk || emailAllowed) {
-      await sendEmail(alert).catch(() => false);
+      emailOk = await sendEmail(alert).catch(() => false);
+    }
+
+    // 모든 채널이 실패했으면 중복 방지 키를 놓아 준다.
+    //
+    // claim() 은 보내기 **전에** 키를 커밋한다(두 인스턴스가 동시에 보내는 걸 막아야 하므로).
+    // 그래서 발송이 다 실패하면 아무도 알림을 못 받았는데 키는 이미 타 버려서, 매시 도는
+    // 스케줄러가 다시 불러도 영영 침묵했다 — 환불 보류 같은 건이 통보 없이 법정 기한을 넘길
+    // 수 있었다(2026-09-24). 키를 지워 다음 호출이 다시 시도하게 한다. 지우는 데 실패하면
+    // 예전과 같은 상태(한 번 유실)가 되므로 더 나빠지지는 않는다.
+    if (!discordOk && !emailOk) {
+      console.error("[notify] 모든 채널 발송 실패 — 중복 방지 키를 해제해 재시도 가능하게 한다", alert.key);
+      await adminDb
+        .collection(OWNER_ALERTS)
+        .doc(alertDocId(alert.key))
+        .delete()
+        .catch((error) => console.error("[notify] 중복 방지 키 해제 실패", alert.key, error));
     }
   } catch (error) {
     console.error("[notify] 알림 처리 실패", alert.key, error);

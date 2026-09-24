@@ -32,9 +32,14 @@ export async function POST(req: NextRequest) {
   const dryRun = process.env.REFUND_AUTO_APPROVE !== "on";
   const now = new Date();
 
+  // 오래된 것부터 본다. 정렬이 없으면 Firestore 가 문서 id(= randomUUID 인 paymentId) 순으로
+  // 주는데, 그건 매 시간 **같은** 20건이라는 뜻이다. 처리되지 않고 남는 건(드라이런이면 전부)이
+  // 20개만 쌓여도 그 뒤로 들어온 요청은 영원히 읽히지도 않아 알림 한 번 없이 법정 기한을
+  // 넘긴다(2026-09-24). 오름차순이면 최소한 기한이 임박한 것부터 처리·통보된다.
   const pending = await adminDb
     .collection("refundRequests")
     .where("status", "==", "pending")
+    .orderBy("requestedAt", "asc")
     .limit(BATCH_LIMIT)
     .get();
 

@@ -19,6 +19,7 @@ import {
   REFERRAL_GRANTS,
   REFERRAL_GRANT_FRIENDS,
   SIGNUP_GRANTS,
+  REFERRAL_SIGNUP_GRANTS,
   COUNT_PASSES,
   PENDING_REWARDS,
 } from "@/lib/firestore/collections";
@@ -108,20 +109,34 @@ export async function grantSignupFreePass(uid: string): Promise<void> {
  * 지급 이력(친구별 멱등 키 + 추천 인원수 카운터)은 users/{referrerUid} 서브트리가 아니라
  * 최상위 referralGrants/{referrerUid} 문서(+ friends 서브컬렉션)에 둔다. uid는 카카오ID로
  * 결정적이라, 탈퇴 후 재가입으로 추천인/친구 문서를 새로 만들어도 이 최상위 문서는 그대로 남아
- * 같은 추천인-친구 조합에 다시 지급되거나 인원수 상한이 리셋되는 것을 막는다. */
+ * 같은 추천인-친구 조합에 다시 지급되거나 인원수 상한이 리셋되는 것을 막는다.
+ *
+ * 다만 그 키는 추천인-친구 **쌍**이라, 추천인만 바꾸면 같은 사람이 계속 새로 받을 수 있었다 —
+ * 초대 링크는 공개적으로 뿌리는 것이라 남의 코드를 모으는 건 어렵지 않다. 코드 20개를 모아
+ * "가입 → 보상 수령 → 탈퇴 → 다른 코드로 재가입"을 돌리면 5회씩 계속 쌓였고, 매 회차마다
+ * 추천인 쪽에도 똑같이 5회가 나가서 서비스는 두 배로 물었다(2026-09-24 발견). 그래서 받는
+ * 사람 기준의 최상위 마커(referralSignupGrants/{uid})를 하나 더 둔다 — grantSignupFreePass 가
+ * signupGrants 로 탈퇴→재가입을 막는 것과 똑같은 방식이다. */
 export async function grantSignupReferralReward(referrerUid: string, newUid: string): Promise<void> {
   if (referrerUid === newUid) return;
   const referrerRef = adminDb.collection(USERS).doc(referrerUid);
   const grantParentRef = adminDb.collection(REFERRAL_GRANTS).doc(referrerUid);
   const grantRef = grantParentRef.collection(REFERRAL_GRANT_FRIENDS).doc(newUid);
+  const recipientMarkerRef = adminDb.collection(REFERRAL_SIGNUP_GRANTS).doc(newUid);
 
   await adminDb.runTransaction(async (tx) => {
-    const [referrerSnap, grantParentSnap, grantSnap] = await Promise.all([
+    const [referrerSnap, grantParentSnap, grantSnap, recipientSnap] = await Promise.all([
       tx.get(referrerRef),
       tx.get(grantParentRef),
       tx.get(grantRef),
+      tx.get(recipientMarkerRef),
     ]);
     if (grantSnap.exists || !referrerSnap.exists) return;
+    // 이 사람이 가입 보상을 이미 받은 적이 있으면 추천인이 누구든 다시 주지 않는다.
+    if (recipientSnap.exists) {
+      console.warn("[referral] 이미 가입 보상을 받은 계정 — 재지급하지 않는다", { referrerUid, newUid });
+      return;
+    }
 
     const invitedFriends = Number(grantParentSnap.data()?.friendsInvited ?? 0);
     if (invitedFriends >= REFERRAL_SIGNUP_FRIEND_CAP) return;
@@ -146,6 +161,9 @@ export async function grantSignupReferralReward(referrerUid: string, newUid: str
     // grantParentRef(friendsInvited 누적 카운터)에는 expiresAt을 두지 않는다 — 친구마다
     // 만료 시점이 다른데 부모 문서까지 TTL로 지워지면 누적 카운터가 의도치 않게 리셋된다.
     tx.set(grantRef, { freePasses: REFERRAL_SIGNUP_FREE_PASSES, createdAt: now, expiresAt: markerExpiresAt(now) });
+    // 받는 사람 기준 마커에는 expiresAt 을 두지 않는다 — TTL 로 지워지면 그 순간부터 같은
+    // 계정이 또 받을 수 있게 되므로, 막으려던 것이 그대로 되돌아온다.
+    tx.set(recipientMarkerRef, { uid: newUid, referrerUid, createdAt: now });
     tx.set(referrerRewardRef, pendingReward("referrer"));
     tx.set(friendRewardRef, pendingReward("friend"));
     tx.set(grantParentRef, { referrerUid, friendsInvited: FieldValue.increment(1) }, { merge: true });

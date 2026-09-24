@@ -1,6 +1,8 @@
-// cost 는 "금액 ↔ 횟수" 환산 단가다(코인 차감가가 아니다 — 코인 경로는 리딩 API 안에 따로
-// 박혀 있다). 2026-09-24 사용자 가격표 개정으로 네 스프레드 모두 1.5배: 200/300/400/500 →
-// 300/450/600/750. 같은 금액으로 살 수 있는 횟수가 그만큼 줄어든다.
+// cost 는 "금액 ↔ 횟수" 환산 단가다. 2026-09-24 사용자 가격표 개정으로 네 스프레드 모두
+// 1.5배: 200/300/400/500 → 300/450/600/750. 같은 금액으로 살 수 있는 횟수가 그만큼 줄어든다.
+//
+// 이 값을 바꾸면 리워드 표기까지 같이 움직인다 — 개정 때 200을 손으로 박아둔 네 곳(배치·수령·
+// 받은내역·어드민 지급)이 따라오지 않아서 광고 횟수와 실제 지급이 어긋났었다(2026-09-24 수정).
 export const SPREADS = {
   one: { label: "원카드", cardCount: 1, cost: 300 },
   three: { label: "쓰리카드", cardCount: 3, cost: 450 },
@@ -15,7 +17,7 @@ export function isSpreadKey(value: unknown): value is SpreadKey {
 }
 
 // 횟수제 이용권 조합 — 구매/수령 시점에 넷 중 하나로 완전히 고정된다(2026-09-18 개편).
-// 궁합은 넷 모두에 기본 포함(별도 조합 차원 아님, COMPATIBILITY_ADD_ON_COST=0으로 이미 반영).
+// 궁합은 넷 모두에 기본 포함(별도 조합 차원이 아니라 추가 차감 없음).
 export type ComboKey = "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei";
 
 export const COMBOS: Record<ComboKey, { saju: boolean; ziwei: boolean; label: string }> = {
@@ -34,6 +36,16 @@ export function isComboKey(value: unknown): value is ComboKey {
 export function comboKeyFor(saju: boolean, ziwei: boolean): ComboKey {
   return saju && ziwei ? "tarot-saju-ziwei" : saju ? "tarot-saju" : ziwei ? "tarot-ziwei" : "tarot";
 }
+
+/** 월간 리워드(친구 결제 5% + 본인 결제 캐시백) 지급일. functions/src/index.ts의
+ *  monthlyReferralPayout·monthlyBonusRewardPayout 크론(`0 3 10 * *`)과 **반드시 같아야 한다** —
+ *  functions는 별도 패키지라 import할 수 없어서 값을 손으로 맞춘다.
+ *
+ *  5일이 아니라 10일인 이유: 정산은 아직 환불되지 않은(status=="fulfilled") 결제만 세는데,
+ *  환불 가능 기간이 결제 후 REFUND_WINDOW_DAYS(7)일이라 5일에 정산하면 "말일 결제 → 5일 리워드
+ *  수령 → 6일 환불"로 공짜 이용권을 만들 수 있었다(2026-09-24). 이 값을 앞당기려면 그 계산부터
+ *  다시 할 것. */
+export const REWARD_PAYOUT_DAY_OF_MONTH = 10;
 
 // 친구 초대는 가입한 친구와 추천인 모두에게 원카드 기준 무료 이용권 5회를 준다.
 // 추천 가능한 친구 수는 5명이며, 월간 결제 리워드에는 횟수 제한이 없다.
@@ -58,8 +70,9 @@ export function signupFreePassAllowances(): Record<string, number> {
   );
 }
 
-// 보너스 리워드 — "내가" 이번 달에 결제한 코인ㆍ이용권 금액(VAT 제외)에 따라 다음달 5일에
-// 원카드 기준 무료 이용권으로 페이백해주는 자체 캐시백(친구 결제 리워드와는 별개). asset/Screen/RewardInfoModal.png
+// 보너스 리워드 — "내가" 이번 달에 결제한 이용권 금액(VAT 제외)에 따라 다음달
+// REWARD_PAYOUT_DAY_OF_MONTH일에 원카드 기준 무료 이용권으로 페이백해주는 자체 캐시백(친구
+// 결제 리워드와는 별개). asset/Screen/RewardInfoModal.png
 // 기획표 그대로: 결제금액이 해당 구간(minWon) 이상이면 전체 금액에 그 구간 요율을 적용한다
 // (누진세처럼 구간별로 쪼개 계산하지 않는 단일 구간 조회 — 내림차순으로 첫 매치).
 // 2026-09-18: 하위 2단계(1%/0.5%) 제거 — 5만원 미만 결제는 리워드 미지급으로 정리.
@@ -84,15 +97,10 @@ export function rewardPassesForWon(totalWon: number, rate: number): number {
   return Math.round((totalWon * rate) / SPREADS.one.cost);
 }
 
-// 코인 경로(이용권 없이 리딩할 때)의 옵션 추가금. 원카드(200) 기준 타로/타로+사주/
-// 타로+사주+자미두수 = 200/250/400 이었던 기존 기획 가격표에서 유도한 값이라, 위 SPREADS.cost
-// 개정(2026-09-24)과 무관하게 코인 가격표 그대로 둔다 — 코인 차감 단가는 리딩 API 안에 따로
-// 박혀 있다(src/app/api/tarot/reading/route.ts의 { one: 200, three: 250, ... }).
-export const SAJU_ADD_ON_COST = 50;
-export const ZIWEI_ADD_ON_COST = 150;
-
-// 궁합은 횟수제 상품에 기본 포함. 기존 코인으로 이용하는 경우도 추가 차감하지 않는다.
-export const COMPATIBILITY_ADD_ON_COST = 0;
+// 코인 경로(SAJU_ADD_ON_COST / ZIWEI_ADD_ON_COST / COMPATIBILITY_ADD_ON_COST)는 2026-09-24
+// 삭제했다. 코인 상품은 판매가 끝났고(resolveProduct가 prepare에서 거부, validatePayment가
+// 지급에서 거부) 코인을 차감하는 코드는 이미 어디에도 없어서, 이 세 상수를 유일하게 읽던
+// 리딩 API의 chargedCost 식이 어떤 입력에도 0만 내는 죽은 코드가 돼 있었다.
 
 // 코인 충전 상품. 1코인=1원 기준 + 대량 구매일수록 커지는 보너스 코인(사용자가 직접 확정).
 // id는 결제 productId(src/lib/payment/products.ts)의 기반이 되는 고정 식별자 — 나중에 가격을
@@ -220,6 +228,40 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
   );
 }
 
+/** 조합별 배율. countAllowance 안에 인라인으로 있던 것을 아래 역산이 같은 값을 써야 해서 뺐다. */
+function comboMultiplier(combo: ComboKey): number {
+  const { saju, ziwei } = COMBOS[combo];
+  return saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
+}
+
+/**
+ * "이 조합으로 정확히 N회"를 약속한 리워드(생일 쿠폰, 어드민 커스텀 지급)가 실제로 N회를
+ * 주도록 basis를 되돌려 준다.
+ *
+ * basis는 원 단위 가치라 `freePasses * SPREADS.one.cost`로 잡고 싶어지는데, 그러면
+ * countAllowance가 조합 배율을 **한 번 더** 곱한다. "타로+사주 8회"를 약속하고 basis를
+ * 8×300=2400으로 주면 실제로는 round(8 × 0.85) = 7회만 나온다. 배율을 역산해야 약속한 수가
+ * 그대로 나온다(2026-09-24 — 생일 쿠폰이 광고의 절반만 주고 있던 걸 고치면서 추가. 단가가
+ * 200이던 시절에도 이미 틀렸던 계산이라 가격 개정과 무관한 별개의 버그였다).
+ *
+ * 반올림 때문에 역산 공식 한 방으로는 어긋나는 값이 생길 수 있어, 후보를 옆으로 훑어서
+ * countAllowanceForCombo가 실제로 약속한 수를 돌려주는 basis를 고른다.
+ */
+export function basisForOneCardCount(freePasses: number, combo: ComboKey): number {
+  const target = Math.round(freePasses);
+  if (!Number.isFinite(target) || target <= 0) return 0;
+  const mult = comboMultiplier(combo);
+  const start = Math.max(1, Math.round(target / mult));
+  for (let delta = 0; delta <= 4; delta++) {
+    for (const base of delta === 0 ? [start] : [start - delta, start + delta]) {
+      if (base < 1) continue;
+      const basis = base * SPREADS.one.cost;
+      if (countAllowanceForCombo(basis, "one", combo) === target) return basis;
+    }
+  }
+  return start * SPREADS.one.cost;
+}
+
 /** `refund_pending` 은 환불을 신청해 두고 아직 승인/거절이 안 난 상태다(2026-09-24).
  *  "쓸 수 있는가"를 묻는 모든 검사가 unused/active 만 보기 때문에, 이 값이 되는 순간
  *  자동으로 사용 불가가 된다 — 신청 후에도 쓸 수 있으면 "신청 → 사용 → 환불"로 공짜가 된다.
@@ -230,6 +272,35 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
  *
  *  **"쓸 수 있는가"를 묻는 검사에는 이걸 쓰면 안 된다.** 그쪽은 unused/active 만 봐야 한다. */
 export const HELD_PASS_STATUSES: readonly string[] = ["unused", "active", "refund_pending"];
+
+/**
+ * 재구매를 막아야 하는 "아직 들고 있는" 이용권인가. 상태뿐 아니라 **유효기간까지** 본다.
+ *
+ * 상태만 보면 안 되는 이유: 만료된 이용권에 `status:"expired"` 를 써 주는 코드가 아무 데도
+ * 없다. 유효기간이 지나면 availableCount 가 0 이 되고 목록에서도 사라지지만 문서의 status 는
+ * 계속 "unused"/"active" 다. 그래서 만료된 이용권 하나가 재구매를 **영구히** 막고 있었다 —
+ * 화면은 "보유 이용권 없음"인데 구매하면 "보유 이용권을 소진한 후 구매해주세요"가 뜨고,
+ * 소진할 수도(만료됨) 환불할 수도(7일 지남) 없는 막다른 길이었다(2026-09-24 발견).
+ * 이용약관 제N조도 만료 후 재구매가 된다고 써 두고 있다.
+ *
+ * @param pass 이용권 문서. 횟수제는 `expiresAt`, 시간제는 `usableUntil` 로 기간을 갖는다.
+ * @param now  기준 시각(ms).
+ */
+export function isHeldPass(
+  pass: { status?: unknown; expiresAt?: unknown; usableUntil?: unknown },
+  now: number = Date.now()
+): boolean {
+  if (typeof pass.status !== "string" || !HELD_PASS_STATUSES.includes(pass.status)) return false;
+  // 환불 대기 중인 건은 기간이 지났더라도 계속 "보유"로 본다 — 거절되면 되살아나는 데다,
+  // 무엇보다 그 건의 돈이 아직 정리되지 않았다.
+  if (pass.status === "refund_pending") return true;
+  for (const limit of [pass.expiresAt, pass.usableUntil]) {
+    if (typeof limit !== "string") continue;
+    const at = Date.parse(limit);
+    if (Number.isFinite(at) && at <= now) return false;
+  }
+  return true;
+}
 
 export type CountPassStatus =
   | "unused" | "active" | "exhausted" | "expired" | "refunded" | "revoked" | "refund_pending";

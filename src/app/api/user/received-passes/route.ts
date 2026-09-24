@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { COMBOS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
+import {
+  COMBOS,
+  SPREADS,
+  countAllowancesForCombo,
+  countAllowanceForCombo,
+  type ComboKey,
+} from "@/lib/tarot/pricing";
 import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
 
 type ReceivedPass = {
@@ -80,13 +86,16 @@ export async function GET(req: NextRequest) {
     // 그 행만 펼치기 화살표가 사라져 보인다. 기본값으로 채워서 모든 운영자 지급 행이 똑같이
     // 펼쳐볼 수 있게 한다.
     const combo = (data.combo as ComboKey | undefined) ?? "tarot";
-    const basis = typeof data.basis === "number" ? data.basis : 200;
+    const basis = typeof data.basis === "number" ? data.basis : SPREADS.one.cost;
     return {
       id: doc.id,
       label: sourceLabel("admin-grant") + (data.reason ? ` · ${data.reason}` : ""),
       source: "admin-grant",
       status: "claimed",
-      freePasses: Math.round(basis / 200),
+      // 예전엔 basis/200 이라 원카드 단가가 300 이 된 뒤로 실제보다 많은 횟수를 표기했고,
+      // 조합 배율도 반영되지 않았다(타로+사주 지급인데 타로 기준 횟수를 보여줌). 아래 표
+      // (comboAllowances)와 같은 함수로 뽑아서 두 값이 어긋날 수 없게 한다(2026-09-24).
+      freePasses: countAllowanceForCombo(basis, "one", combo),
       basis,
       createdAt: data.createdAt,
       claimWindowExpiresAt: null,

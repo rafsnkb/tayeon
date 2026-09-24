@@ -8,7 +8,7 @@ import { auth } from "@/lib/firebase/client";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
-import { PAYMENT_BONUS_REWARD_TIERS, countPassDisplayName } from "@/lib/tarot/pricing";
+import { PAYMENT_BONUS_REWARD_TIERS, REWARD_PAYOUT_DAY_OF_MONTH, countPassDisplayName } from "@/lib/tarot/pricing";
 import {
   SearchIcon,
   InvitePersonIcon,
@@ -347,7 +347,7 @@ export default function MyPage() {
                 </div>
               ))}
             </div>
-            <p className="text-center text-xs text-icon-muted">보너스 리워드 이용권은 매월 5일에 지급됩니다.</p>
+            <p className="text-center text-xs text-icon-muted">보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.</p>
           </div>
         </div>
       )}

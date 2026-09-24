@@ -16,8 +16,11 @@ import {
   COUNT_PASS_VALIDITY_MONTHS,
   TIME_PASS_VALIDITY_MONTHS,
   countAllowancesForCombo,
+  HELD_PASS_STATUSES,
+  isHeldPass,
 } from "@/lib/tarot/pricing";
 import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
+import { notifyOwner } from "@/lib/notify/owner";
 
 /** 운영자가 환불을 검토할 때 필요한 결제수단만 보관한다. 카드 전체 번호·계좌번호는 저장하지 않는다. */
 function paymentMethodSummary(method: unknown): { type: string; label: string } | null {
@@ -32,6 +35,61 @@ function paymentMethodSummary(method: unknown): { type: string; label: string } 
   if (type === "PaymentMethodEasyPay") return { type, label: typeof value.provider === "string" ? value.provider : "간편결제" };
   const labels: Record<string, string> = { PaymentMethodTransfer: "계좌이체", PaymentMethodVirtualAccount: "가상계좌", PaymentMethodMobile: "휴대폰 결제", PaymentMethodGiftCertificate: "상품권", PaymentMethodConvenienceStore: "편의점 결제" };
   return { type, label: labels[type] ?? "기타 결제수단" };
+}
+
+/** 포트원이 "이미 취소된 결제"라고 답했는지. 웹훅 재시도로 같은 건을 두 번 취소하려 할 때
+ *  실패로 보지 않기 위한 판정 — admin/src/lib/refundExecute.ts 의 같은 이름 함수와 쌍이다. */
+function isAlreadyCancelled(error: unknown): boolean {
+  const data = (error as { data?: { type?: unknown } })?.data;
+  if (data?.type === "PAYMENT_ALREADY_CANCELLED") return true;
+  return /already cancelled/i.test(error instanceof Error ? error.message : String(error));
+}
+
+/**
+ * 지급할 수 없다고 판정된 결제의 돈을 돌려준다.
+ *
+ * 예전에는 검증에 걸린 결제를 그냥 거부만 하고 끝냈다 — 승인된 돈은 그대로 우리 쪽에 남고,
+ * users/{uid}/payments 문서도 안 생기고, 알림도 없었다. 그래서 "돈은 빠져나갔는데 아무것도
+ * 못 받았고 어디에도 기록이 없는" 상태가 만들어질 수 있었다(2026-09-24).
+ *
+ * 가장 현실적인 방아쇠는 공격이 아니라 **결제창을 열어둔 사이의 가격 변경**이다. 사용자가
+ * 옛 가격으로 결제를 마치면 금액 대조에서 걸린다. 보유 제한(duplicate) 경로가 이미 같은 일을
+ * 하고 있었으므로, 같은 원칙을 나머지 거부 사유에도 적용한다.
+ *
+ * uid 불일치는 여기 오지 않는다(validatePayment.ts 의 autoCancel:false) — 그 결제는 진짜
+ * 주인에게 지급돼야 하고, 취소해 버리면 남의 결제를 취소시키는 통로가 된다.
+ */
+async function cancelUnfulfillable(
+  paymentId: string,
+  payment: { orderName?: string; amount?: { total?: number } | null },
+  reason: string,
+  via: "complete" | "webhook"
+): Promise<void> {
+  let cancelled = true;
+  await portone.cancelPayment({ paymentId, reason: `지급 불가(${reason}) — 자동 취소` }).catch((error) => {
+    if (isAlreadyCancelled(error)) return;
+    cancelled = false;
+    console.error("[payment] 지급 불가 건 자동 취소 실패 — 수동 환불 필요", paymentId, error);
+  });
+  await notifyOwner({
+    key: `payment-unfulfillable/${paymentId}`,
+    level: cancelled ? "warn" : "urgent",
+    title: cancelled ? `지급 불가 결제 자동 취소 · ${wonLabel(payment)}` : `🚨 지급 불가 결제 취소 실패 · ${wonLabel(payment)}`,
+    fields: [
+      ["결제", paymentId],
+      ["상품", String(payment.orderName ?? "-")],
+      ["사유", reason],
+      ["경로", via],
+    ],
+    note: cancelled
+      ? "지급 조건을 통과하지 못해 결제를 자동 취소했습니다. 정상 구매를 막은 것이라면 원인을 확인해 주세요."
+      : "**결제 취소에 실패했습니다. 돈은 받았는데 아무것도 지급되지 않은 상태입니다 — 포트원 콘솔에서 직접 취소해 주세요.**",
+  }).catch((error) => console.error("[payment] 지급 불가 알림 실패", paymentId, error));
+}
+
+function wonLabel(payment: { amount?: { total?: number } | null }): string {
+  const total = payment.amount?.total;
+  return typeof total === "number" ? `${total.toLocaleString("ko-KR")}원` : "금액 불명";
 }
 
 export type FulfillOutcome =
@@ -77,6 +135,9 @@ export async function fulfillPayment(
   if (!checked.ok) {
     // 로그는 순수 함수 밖에서 찍는다 — 판정 자체는 validatePayment.ts 가, 관측은 여기가 맡는다.
     if (checked.log) console.error(`[payment] ${checked.log.message}`, paymentId, checked.log.detail ?? "");
+    if (checked.outcome.kind === "rejected" && checked.outcome.autoCancel) {
+      await cancelUnfulfillable(paymentId, payment, checked.outcome.reason, via);
+    }
     return checked.outcome;
   }
   const { uid, product, combo } = checked;
@@ -99,11 +160,15 @@ export async function fulfillPayment(
     const heldCollection =
       product.type === "countPass" ? COUNT_PASSES : product.type === "timePass" ? TIME_PASSES : null;
     if (heldCollection) {
+      // 상태로 1차 추린 뒤 유효기간은 코드에서 본다 — Firestore 쿼리로는 "status 는 unused
+      // 인데 expiresAt 은 지났다"를 표현할 수 없고, 만료된 이용권에 status:"expired" 를 써 주는
+      // 코드가 없어서 상태만 보면 만료분이 영구히 재구매를 막는다(prepare 쪽 isHeldPass 주석 참고).
       const heldSnap = await tx.get(
-        userRef.collection(heldCollection).where("status", "in", ["unused", "active", "refund_pending"])
+        userRef.collection(heldCollection).where("status", "in", HELD_PASS_STATUSES)
       );
       const conflict = heldSnap.docs.some((doc) => {
         const data = doc.data();
+        if (!isHeldPass(data)) return false;
         // 리워드로 받은 횟수제 이용권은 여러 개 보유가 정상이라 구매분만 본다(시간제는 구매분뿐).
         return product.type === "countPass" ? data.source === "purchase" : true;
       });
@@ -114,7 +179,10 @@ export async function fulfillPayment(
           productId: product.productId,
           productType: product.type,
           priceWon: product.priceWon,
-          orderName: payment.orderName,
+          // 서버가 정한 주문명을 쓴다. payment.orderName 은 결제창을 띄울 때 브라우저가 넘긴
+          // 값이라 사용자가 바꿀 수 있고, 그게 어드민 화면과 알림에 "상품"으로 그대로 표시된다
+          // (2026-09-24). 금액·상품은 이미 productId 로 검증했으므로 이름도 그쪽을 따른다.
+          orderName: product.orderName,
           channelType: payment.channel?.type ?? null,
           isTest: payment.channel?.type === "TEST",
           paymentMethod: paymentMethodSummary(payment.method),
@@ -138,7 +206,7 @@ export async function fulfillPayment(
       productId: product.productId,
       productType: product.type,
       priceWon: product.priceWon,
-      orderName: payment.orderName,
+      orderName: product.orderName,
       coins: product.type === "coin" ? product.coins : null,
       countPassId: countPassRef?.id ?? null,
       countBasis: product.type === "countPass" ? product.basis : null,
@@ -188,14 +256,34 @@ export async function fulfillPayment(
 
   if (outcome === "duplicate") {
     // 돈은 이미 승인된 상태라 거절만 하면 "결제했는데 아무것도 못 받는" 상태가 된다. 자동으로
-    // 취소해서 환불까지 끝낸다. 취소가 실패하면 로그만 남기고 운영자가 수동 환불하도록 둔다.
+    // 취소해서 환불까지 끝낸다.
     const cancelled = await portone
       .cancelPayment({ paymentId, reason: "이용권 보유 제한(1개)으로 지급 불가 — 자동 취소" })
       .then(() => true)
       .catch((error) => {
+        if (isAlreadyCancelled(error)) return true;
         console.error("[payment] 보유 제한 자동 취소 실패 — 수동 환불 필요", paymentId, error);
         return false;
       });
+    // 취소 실패는 돈이 묶인 상태다. 예전엔 console.error 한 줄이 전부라 아무도 몰랐고, 결제
+    // 내역에도 안 떴다(정렬 필드가 없어서 — purchase-history 주석 참고). 결과를 문서에 남겨
+    // 사용자 화면이 구분해서 보여줄 수 있게 하고, 실패면 운영자를 부른다(2026-09-24).
+    await paymentRef.update({ cancelFailed: !cancelled, cancelledAt: new Date().toISOString() })
+      .catch((error) => console.error("[payment] 취소 결과 기록 실패", paymentId, error));
+    if (!cancelled) {
+      await notifyOwner({
+        key: `duplicate-cancel-failed/${paymentId}`,
+        level: "urgent",
+        title: `🚨 중복 이용권 자동 취소 실패 · ${wonLabel(payment)}`,
+        fields: [
+          ["결제", paymentId],
+          ["사용자", uid],
+          ["상품", String(payment.orderName ?? "-")],
+          ["경로", via],
+        ],
+        note: "**돈은 받았는데 이용권은 지급되지 않은 상태입니다.** 포트원 콘솔에서 직접 취소해 주세요.",
+      }).catch((error) => console.error("[payment] 중복 취소 실패 알림 실패", paymentId, error));
+    }
     return { kind: "duplicate_cancelled", uid, cancelled };
   }
 

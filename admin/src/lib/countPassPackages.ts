@@ -56,3 +56,34 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
     (Object.keys(SPREAD_COSTS) as SpreadKey[]).map((spread) => [spread, allowance(basis, spread, saju, ziwei)])
   ) as Record<SpreadKey, number>;
 }
+
+/** 원카드 1회 단가. src/lib/tarot/pricing.ts의 SPREADS.one.cost와 같은 값. */
+export const ONE_CARD_COST = SPREAD_COSTS.one;
+
+/** 조합별 원카드 환산 횟수 — 운영자가 지급한 횟수를 화면에 그대로 표기할 때 쓴다. */
+export function oneCardCountFor(basis: number, combo: ComboKey): number {
+  const { saju, ziwei } = COMBOS[combo];
+  return allowance(basis, "one", saju, ziwei);
+}
+
+/** src/lib/tarot/pricing.ts의 basisForOneCardCount 복제본 — 본체가 바뀌면 같이 고칠 것.
+ *
+ *  "이 조합으로 정확히 N회"를 약속했을 때 실제로 N회가 나오는 basis 를 되돌려 준다. 그냥
+ *  `N × ONE_CARD_COST` 로 잡으면 allowance 가 조합 배율을 한 번 더 곱해서(타로+사주면 ×0.85)
+ *  약속보다 적게 나간다. 반올림 때문에 역산 공식 한 방으로는 어긋나는 값이 있어 후보를 옆으로
+ *  훑는다. */
+export function basisForOneCardCount(freePasses: number, combo: ComboKey): number {
+  const target = Math.round(freePasses);
+  if (!Number.isFinite(target) || target <= 0) return 0;
+  const { saju, ziwei } = COMBOS[combo];
+  const mult = saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
+  const start = Math.max(1, Math.round(target / mult));
+  for (let delta = 0; delta <= 4; delta++) {
+    for (const base of delta === 0 ? [start] : [start - delta, start + delta]) {
+      if (base < 1) continue;
+      const basis = base * ONE_CARD_COST;
+      if (oneCardCountFor(basis, combo) === target) return basis;
+    }
+  }
+  return start * ONE_CARD_COST;
+}

@@ -7,6 +7,8 @@ import {
   countAllowances,
   countAllowanceForCombo,
   countAllowancesForCombo,
+  basisForOneCardCount,
+  isHeldPass,
   comboKeyFor,
   availableCount,
   remainingAfterUse,
@@ -155,4 +157,77 @@ test("exhausted or expired status blocks availability regardless of remaining", 
   assert.equal(availableCount({ ...base, status: "expired" }, "one", false, false), 0);
   assert.ok(availableCount({ ...base, status: "unused" }, "one", false, false) > 0);
   assert.ok(availableCount({ ...base, status: "active" }, "one", false, false) > 0);
+});
+
+// basisForOneCardCount — "이 조합으로 정확히 N회"라는 약속을 basis 로 되돌리는 역산.
+// 생일 쿠폰(8/6/4회)과 어드민 커스텀 지급이 광고한 횟수를 그대로 주는지가 여기 달려 있다.
+// 예전엔 N × 200(나중엔 N × 300)을 basis 로 썼는데, countAllowance 가 조합 배율을 한 번 더
+// 곱해서 광고의 절반만 나갔다.
+test("a promised count is delivered exactly, whatever the combo", () => {
+  for (const combo of Object.keys(COMBOS)) {
+    for (let promised = 1; promised <= 60; promised++) {
+      const basis = basisForOneCardCount(promised, combo);
+      assert.equal(
+        countAllowanceForCombo(basis, "one", combo),
+        promised,
+        `${combo} ${promised}회 → basis ${basis}`
+      );
+    }
+  }
+});
+
+test("the birthday coupon's advertised counts survive the round trip", () => {
+  // functions/src/index.ts 의 BIRTHDAY_COUPON_OPTIONS 와 같은 표.
+  for (const [combo, freePasses] of [
+    ["tarot-saju", 8],
+    ["tarot-ziwei", 6],
+    ["tarot-saju-ziwei", 4],
+  ]) {
+    const basis = basisForOneCardCount(freePasses, combo);
+    assert.equal(countAllowanceForCombo(basis, "one", combo), freePasses);
+    // 단가를 그대로 곱하던 옛 계산은 약속보다 적게 준다 — 회귀하면 여기서 걸린다.
+    assert.notEqual(countAllowanceForCombo(freePasses * 300, "one", combo), freePasses);
+  }
+});
+
+test("a nonsensical promised count yields no entitlement rather than NaN", () => {
+  for (const bad of [0, -3, NaN, Infinity]) {
+    assert.equal(basisForOneCardCount(bad, "tarot"), 0);
+  }
+});
+
+// isHeldPass — 재구매를 막아야 하는 "아직 들고 있는" 이용권인가.
+// 만료된 이용권에 status:"expired" 를 써 주는 코드가 아무 데도 없어서, 상태만 보면
+// 만료분 하나가 재구매를 영구히 막았다(화면은 "보유 없음"인데 구매는 409).
+const NOW = Date.parse("2026-09-24T00:00:00.000Z");
+const ago = (days) => new Date(NOW - days * 86400000).toISOString();
+const ahead = (days) => new Date(NOW + days * 86400000).toISOString();
+
+test("an unexpired pass in a holding status blocks re-purchase", () => {
+  for (const status of ["unused", "active", "refund_pending"]) {
+    assert.equal(isHeldPass({ status, expiresAt: ahead(30) }, NOW), true, status);
+  }
+  assert.equal(isHeldPass({ status: "unused", expiresAt: null }, NOW), true, "기간 없는 이용권");
+});
+
+test("a finished pass never blocks re-purchase", () => {
+  for (const status of ["exhausted", "expired", "refunded", "revoked"]) {
+    assert.equal(isHeldPass({ status, expiresAt: ahead(30) }, NOW), false, status);
+  }
+});
+
+test("an expired pass stops blocking re-purchase even though its status was never updated", () => {
+  assert.equal(isHeldPass({ status: "unused", expiresAt: ago(1) }, NOW), false, "횟수제 expiresAt");
+  assert.equal(isHeldPass({ status: "active", usableUntil: ago(1) }, NOW), false, "시간제 usableUntil");
+  assert.equal(isHeldPass({ status: "unused", expiresAt: NOW ? ago(0) : null }, NOW), false, "정확히 만료 시점");
+});
+
+test("a refund still in flight keeps blocking even past its expiry", () => {
+  // 돈이 아직 정리되지 않았고, 거절되면 되살아난다.
+  assert.equal(isHeldPass({ status: "refund_pending", expiresAt: ago(1) }, NOW), true);
+});
+
+test("a garbled expiry is treated as no expiry rather than as expired", () => {
+  assert.equal(isHeldPass({ status: "unused", expiresAt: "언젠가" }, NOW), true);
+  assert.equal(isHeldPass({ status: undefined }, NOW), false);
 });

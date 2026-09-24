@@ -22,7 +22,17 @@ export type PaymentRecord = {
 
 export type PaymentRejection =
   | { kind: "not_paid"; status: string }
-  | { kind: "rejected"; reason: string };
+  | {
+      kind: "rejected";
+      reason: string;
+      /** 이 결제는 **누가 다시 시도해도** 지급되지 않는다는 뜻. 승인된 돈이 우리 쪽에 남아
+       *  있으면 안 되므로 호출부(fulfill.ts)가 자동으로 취소한다.
+       *
+       *  유일한 예외가 uid 불일치다. 그건 "이 결제가 잘못됐다"가 아니라 "네 결제가 아니다"라서,
+       *  결제 자체는 진짜 주인에게 정상 지급돼야 한다. 여기서 취소해 버리면 아무나 남의
+       *  paymentId 로 /complete 를 때려서 그 사람 결제를 취소시킬 수 있다. */
+      autoCancel: boolean;
+    };
 
 /** 거부 사유를 운영 로그에 남기기 위한 부속 정보. 순수하게 유지하려고 여기서 직접 찍지 않고
  *  호출부(fulfillPayment)가 paymentId 와 함께 출력한다. */
@@ -57,7 +67,7 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
   if (opts.isProduction && payment.channel?.type !== "LIVE") {
     return {
       ok: false,
-      outcome: { kind: "rejected", reason: "테스트 채널 결제는 프로덕션에서 지급되지 않아요." },
+      outcome: { kind: "rejected", reason: "테스트 채널 결제는 프로덕션에서 지급되지 않아요.", autoCancel: true },
       log: { message: "프로덕션에서 LIVE 채널이 아닌 결제", detail: { channelType: payment.channel?.type } },
     };
   }
@@ -68,20 +78,21 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
   } catch {
     return {
       ok: false,
-      outcome: { kind: "rejected", reason: "customData를 해석하지 못했어요." },
+      outcome: { kind: "rejected", reason: "customData를 해석하지 못했어요.", autoCancel: true },
       log: { message: "customData 파싱 실패" },
     };
   }
 
   const uid = customData.uid;
   if (typeof uid !== "string" || !uid) {
-    return { ok: false, outcome: { kind: "rejected", reason: "customData에 uid가 없어요." } };
+    return { ok: false, outcome: { kind: "rejected", reason: "customData에 uid가 없어요.", autoCancel: true } };
   }
   if (opts.expectedUid && uid !== opts.expectedUid) {
     // 다른 사람의 결제 건을 자신의 것인 양 완료 처리시키려는 시도 — 절대 지급하지 않는다.
     return {
       ok: false,
-      outcome: { kind: "rejected", reason: "본인의 결제 건이 아니에요." },
+      // autoCancel:false — 위 타입 주석 참고. 남의 결제를 취소시키는 통로가 되면 안 된다.
+      outcome: { kind: "rejected", reason: "본인의 결제 건이 아니에요.", autoCancel: false },
       log: { message: "uid 불일치", detail: { expectedUid: opts.expectedUid, actual: uid } },
     };
   }
@@ -93,7 +104,7 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
   if (!product) {
     return {
       ok: false,
-      outcome: { kind: "rejected", reason: "알 수 없는 상품이에요." },
+      outcome: { kind: "rejected", reason: "알 수 없는 상품이에요.", autoCancel: true },
       log: { message: "알 수 없는 productId", detail: { productId: customData.productId } },
     };
   }
@@ -103,7 +114,7 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
   if (product.type === "countPass" && !isComboKey(customData.combo)) {
     return {
       ok: false,
-      outcome: { kind: "rejected", reason: "이용권 옵션 정보가 없어요." },
+      outcome: { kind: "rejected", reason: "이용권 옵션 정보가 없어요.", autoCancel: true },
       log: { message: "countPass 결제에 유효한 combo가 없음", detail: { combo: customData.combo } },
     };
   }
@@ -118,6 +129,7 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
         outcome: {
           kind: "rejected",
           reason: "코인 상품은 판매가 종료됐어요. 결제 내역을 고객센터로 문의해주세요.",
+          autoCancel: true,
         },
       };
     }
@@ -127,7 +139,7 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
     // 실제 승인 금액이 상품 가격표와 다르면 위/변조 시도로 간주하고 지급하지 않는다.
     return {
       ok: false,
-      outcome: { kind: "rejected", reason: "결제 금액이 상품 가격과 일치하지 않아요." },
+      outcome: { kind: "rejected", reason: "결제 금액이 상품 가격과 일치하지 않아요.", autoCancel: true },
       log: {
         message: "금액 불일치",
         detail: { paid: payment.amount?.total, currency: payment.currency, expected: product.priceWon },

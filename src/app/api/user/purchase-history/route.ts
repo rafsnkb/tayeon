@@ -61,9 +61,14 @@ export async function GET(req: NextRequest) {
   }
 
   const userRef = adminDb.collection(USERS).doc(uid);
+  // paidAt 으로 정렬한다. 예전엔 fulfilledAt 이었는데, 그 필드는 지급에 성공한 문서에만 있다 —
+  // 보유 제한에 걸려 자동 취소된 건(status:"duplicate_cancelled", src/lib/payment/fulfill.ts)은
+  // 그 필드가 없고, **Firestore 는 정렬 필드가 없는 문서를 결과에서 통째로 제외한다.** 그래서
+  // 자동 취소가 실패해 돈이 묶인 건까지 결제 내역에서 아예 보이지 않았다(2026-09-24).
+  // paidAt 은 fulfill.ts 의 두 분기가 모두 쓰므로 어느 쪽도 빠지지 않는다.
   const paymentsSnap = await userRef
     .collection(PAYMENTS)
-    .orderBy("fulfilledAt", "desc")
+    .orderBy("paidAt", "desc")
     .limit(ENTRY_LIMIT)
     .get();
 
@@ -106,6 +111,23 @@ export async function GET(req: NextRequest) {
           refundable: false,
           combo,
           rejectionReason: null,
+        };
+      }
+      // 이미 같은 종류의 이용권을 보유 중이어서 지급하지 않고 결제를 되돌린 건. 자동 취소가
+      // 성공했으면 "결제 취소됨"이고, 실패했으면 돈이 묶여 있는 상태라 고객센터로 보내야 한다.
+      if (data.status === "duplicate_cancelled") {
+        return {
+          paymentId: doc.id,
+          productName: productName(data.productId, data.productType),
+          priceWon: data.priceWon,
+          paidAt: data.paidAt ?? data.blockedAt,
+          refunded: true,
+          badge: data.cancelFailed ? "취소 확인 필요" : "결제 취소됨",
+          refundable: false,
+          combo,
+          rejectionReason: data.cancelFailed
+            ? "이미 보유 중인 이용권이 있어 지급되지 않았어요. 결제 취소가 지연되고 있으니 고객센터로 문의해주세요."
+            : "이미 보유 중인 이용권이 있어 지급되지 않아 결제가 자동으로 취소됐어요.",
         };
       }
       if (passData) {

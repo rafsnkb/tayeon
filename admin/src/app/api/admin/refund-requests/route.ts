@@ -33,9 +33,20 @@ async function settlementOf(uid: string, paymentId: string): Promise<Settlement>
   return { paymentStatus, passStatus, settled };
 }
 
+/** 상태별로 따로 읽는 이유: 예전엔 전체에서 최근 100건을 가져와 브라우저에서 탭별로 걸렀다.
+ *  환불 요청 문서는 3년 보존이고 지워지지 않아서, 승인·거절 건이 100건을 채우는 순간 **가장
+ *  오래된 대기 건** — 즉 법정 기한이 가장 임박한 건 — 이 목록에서 조용히 사라졌다(2026-09-24).
+ *  대기 건은 밀릴수록 위에 와야 하므로 오름차순으로, 처리된 건은 최근 것부터 본다. */
+const LIST_LIMIT = 100;
+
 export async function GET(req: NextRequest) {
   if (!(await getAdminUidFromRequest(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  const snapshot = await adminDb.collection("refundRequests").orderBy("requestedAt", "desc").limit(100).get();
+  const [pending, approved, rejected] = await Promise.all([
+    adminDb.collection("refundRequests").where("status", "==", "pending").orderBy("requestedAt", "asc").limit(LIST_LIMIT).get(),
+    adminDb.collection("refundRequests").where("status", "==", "approved").orderBy("requestedAt", "desc").limit(LIST_LIMIT).get(),
+    adminDb.collection("refundRequests").where("status", "==", "rejected").orderBy("requestedAt", "desc").limit(LIST_LIMIT).get(),
+  ]);
+  const snapshot = { docs: [...pending.docs, ...approved.docs, ...rejected.docs] };
   const refs = snapshot.docs.map((doc) => adminDb.collection("users").doc(doc.data().uid ?? ""));
   const users = refs.length ? await adminDb.getAll(...refs) : [];
   const nicknames = new Map(users.map((user) => [user.id, user.data()?.nickname ?? null]));

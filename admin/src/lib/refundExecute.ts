@@ -1,9 +1,9 @@
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { portone } from "@/lib/payment/portone";
+import { notifyOwner } from "@/lib/notifyOwner";
+import { isWithinRefundWindow } from "@/lib/refundWindow";
 
-/** 환불 가능 기간(결제일로부터). 본체 `src/lib/payment/refundPolicy.ts` 의 값과 손으로 맞춘다 —
- *  admin 은 별도 앱이라 그 파일을 import 할 수 없다. */
-export const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export { REFUND_WINDOW_MS } from "@/lib/refundWindow";
 
 export type RefundExecuteResult =
   /** `alreadyCancelled` 면 포트원에서는 이미 취소돼 있었고 여기서는 앱 상태만 맞춘 것이다. */
@@ -38,7 +38,8 @@ export async function executeRefund(input: {
   const { uid, paymentId, reason } = input;
   const userRef = adminDb.collection("users").doc(uid);
   const paymentRef = userRef.collection("payments").doc(paymentId);
-  const paymentSnap = await paymentRef.get();
+  const refundRequestRef = adminDb.collection("refundRequests").doc(paymentId);
+  const [paymentSnap, requestSnap] = await Promise.all([paymentRef.get(), refundRequestRef.get()]);
   if (!paymentSnap.exists) return { ok: false, status: 404, error: "존재하지 않는 결제 건이에요." };
 
   const payment = paymentSnap.data() as {
@@ -48,11 +49,43 @@ export async function executeRefund(input: {
     timePassId: string | null;
     paidAt: string;
   };
+  const request = requestSnap.data();
+  const pendingRequest = requestSnap.exists && request?.status === "pending" ? request : null;
+
   if (payment.status !== "fulfilled") {
+    // 이미 환불된 결제인데 요청만 대기로 남아 있는 경우가 있다 — 포트원 콘솔에서 직접 취소하면
+    // 취소 웹훅이 결제를 refunded 로 바꾸지만 refundRequests 문서는 건드리지 않기 때문이다.
+    // 여기서 그냥 409 를 내면 그 요청은 영영 pending 에 갇히고, 사용자 화면에도 "환불 대기 중"
+    // 으로 남는다. 돈은 이미 돌아갔으니 요청만 완료로 맞춰 준다(2026-09-24).
+    if (payment.status === "refunded" && pendingRequest) {
+      await refundRequestRef.update({
+        status: "approved",
+        approvedAt: new Date().toISOString(),
+        approvedByUid: input.approvedBy,
+        approvedVia: input.approvedBy ? "admin" : "auto",
+        // 우리가 취소한 게 아니라 이미 취소돼 있던 것을 맞춘 것 — 정산 대조 때 구분된다.
+        refundReconciled: true,
+      });
+      return { ok: true, cancellation: null, alreadyCancelled: true };
+    }
     return { ok: false, status: 409, error: `이미 처리된 결제예요(status=${payment.status}).` };
   }
-  const paidAt = Date.parse(payment.paidAt);
-  if (!Number.isFinite(paidAt) || Date.now() - paidAt > REFUND_WINDOW_MS || paidAt > Date.now()) {
+
+  // 7일 기산점은 **사용자가 청약철회를 행사한 시각**이지 운영자가 버튼을 누른 시각이 아니다.
+  //
+  // 예전엔 여기서도 Date.now() 로 쟀는데, 그러면 신청은 받아 놓고 승인은 거부하는 구간이
+  // 생긴다 — 신청 접수는 결제 후 7일까지 열려 있고(src/app/api/user/refund-requests/route.ts:27)
+  // 자동 승인은 접수로부터 2영업일 뒤에 돈다. 금요일(4일차)에 신청하면 화요일(8일차)에 승인이
+  // 시도되고 이 검사가 409 를 낸다. 그러면 이용권은 refund_pending 에 영구히 갇혀 쓰지도,
+  // 다시 사지도, 다시 신청하지도 못하는 상태가 된다(2026-09-24 발견).
+  //
+  // 전자상거래법도 같은 구조다 — 제17조①의 7일은 청약철회를 "할 수 있는" 기간이고,
+  // 제18조②2호의 3영업일은 "청약철회한 날"부터 사업자가 환급해야 하는 기간이다. 신청이
+  // 기간 안에 들어왔다면 처리가 늦어졌다는 이유로 거절할 근거가 없다.
+  const exercisedAt = pendingRequest && typeof pendingRequest.requestedAt === "string"
+    ? Date.parse(pendingRequest.requestedAt)
+    : Date.now();
+  if (!isWithinRefundWindow(payment.paidAt, exercisedAt)) {
     return { ok: false, status: 409, error: "결제 후 7일 이내의 이용권만 환불할 수 있어요." };
   }
 
@@ -90,10 +123,28 @@ export async function executeRefund(input: {
     ? await adminAuth.getUser(input.approvedBy).then((u) => u.email ?? null).catch(() => null)
     : null;
   const now = new Date().toISOString();
-  const refundRequestRef = adminDb.collection("refundRequests").doc(paymentId);
+
+  // 돈이 이미 돌아간 뒤에 이용권 상태가 바뀌어 있었다면 그 사실을 운영자가 알아야 한다.
+  let touchedStatus: string | null = null;
 
   await adminDb.runTransaction(async (tx) => {
-    const refundRequestSnap = await tx.get(refundRequestRef);
+    // Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다 먼저 와야 한다 — 읽기를 여기서 끝낸다.
+    const [refundRequestSnap, userSnap, txPassSnap] = await Promise.all([
+      tx.get(refundRequestRef),
+      tx.get(userRef),
+      tx.get(passRef),
+    ]);
+    // 위 상태 검사와 여기 사이에는 포트원 취소(네트워크)와 Auth 조회가 끼어 있어서 수백
+    // 밀리초가 지난다. 그 사이에 사용자가 시간제 이용권을 활성화하면 "돈은 돌려받고 이용권도
+    // 쓰는" 상태가 만들어진다(2026-09-24).
+    //
+    // 여기서 중단하지는 않는다 — 결제는 이미 취소됐고, 되돌릴 방법이 없다. 중단하면 돈만
+    // 나가고 이용권은 살아 있는, 정확히 막으려던 그 상태가 된다. revoke.ts 와 같은 원칙으로
+    // 상태와 무관하게 회수하고 이상 징후로 남긴다.
+    const txPassStatus = txPassSnap.data()?.status;
+    if (txPassStatus !== "unused" && txPassStatus !== "refund_pending") {
+      touchedStatus = typeof txPassStatus === "string" ? txPassStatus : "없음";
+    }
     tx.update(paymentRef, {
       status: "refunded",
       refundedAt: now,
@@ -104,8 +155,21 @@ export async function executeRefund(input: {
       // 포트원에서 이미 취소돼 있던 건은 우리가 취소한 게 아니라 맞춘 것이다 — 나중에
       // 정산을 대조할 때 구분이 된다.
       refundReconciled: alreadyCancelled,
+      // 회수 직전에 이용권이 이미 다른 상태였다면 남긴다(정상이면 null).
+      passStatusAtRefund: touchedStatus,
     });
     tx.update(passRef, { status: "refunded" });
+
+    // 사용자 문서의 활성 포인터가 방금 회수한 이용권을 가리키고 있으면 같이 끊는다.
+    // 안 끊으면 시간제는 activeTimePass.expiresAt 이 남아 있는 동안 계속 무제한으로 쓸 수
+    // 있다 — 취소 웹훅 경로(src/lib/payment/revoke.ts)는 같은 이유로 이미 끊고 있었고,
+    // 돈이 돌아간 뒤에도 쓸 수 있는 상태만은 어떤 경로로도 만들지 않는다(2026-09-24).
+    const userData = userSnap.data() as
+      | { activeCountPass?: { passId?: string } | null; activeTimePass?: { passId?: string } | null }
+      | undefined;
+    if (userData?.activeCountPass?.passId === passId) tx.update(userRef, { activeCountPass: null });
+    if (userData?.activeTimePass?.passId === passId) tx.update(userRef, { activeTimePass: null });
+
     // 사용자 요청에서 시작한 건은 PG 취소와 동일한 트랜잭션에서 완료 처리한다. 취소는 됐는데
     // 요청만 대기 상태로 남는 운영상 혼선을 방지한다.
     if (refundRequestSnap.exists && refundRequestSnap.data()?.status === "pending") {
@@ -117,6 +181,21 @@ export async function executeRefund(input: {
       });
     }
   });
+
+  if (touchedStatus) {
+    console.error("[refund] 취소 직전에 이용권 상태가 바뀌어 있었다 — 경위 확인 필요", paymentId, touchedStatus);
+    await notifyOwner({
+      key: `refund-pass-touched/${paymentId}`,
+      level: "urgent",
+      title: "환불 중 이용권 상태가 바뀜 — 확인 필요",
+      fields: [
+        ["결제", paymentId],
+        ["사용자", uid],
+        ["회수 직전 상태", touchedStatus],
+      ],
+      note: "**결제는 취소됐고 이용권도 회수했습니다.** 다만 취소와 회수 사이에 이용권이 활성화/사용된 흔적이 있습니다 — 실제로 쓰였는지 확인해 주세요.",
+    }).catch((error) => console.error("[refund] 이상 징후 알림 실패", paymentId, error));
+  }
 
   return { ok: true, cancellation, alreadyCancelled };
 }
