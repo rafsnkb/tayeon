@@ -22,7 +22,7 @@ const thisMonth = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(
 async function wipe() {
   const users = await db.collection("users").get();
   for (const u of users.docs) {
-    for (const sub of ["payments", "pendingRewards", "bonusRewardPayouts", "referralPayouts"]) {
+    for (const sub of ["payments", "pendingRewards", "bonusRewardPayouts", "referralPayouts", "birthdayCouponGrants"]) {
       const snap = await u.ref.collection(sub).get();
       await Promise.all(snap.docs.map((d) => d.ref.delete()));
     }
@@ -124,6 +124,46 @@ for (const [uid, sum] of [["ref_A", 120_000], ["ref_B", 99_999], ["ref_C", 110_0
 }
 await fns.monthlyReferralPayout.run({});
 check("친구결제 멱등성 (재실행해도 1건)", (await rewardsOf("ref_A")).length, 1);
+
+// ── 생일 쿠폰 ──────────────────────────────────────────────────────────
+// 다른 둘과 달리 "지난달 결제"가 아니라 **오늘이 생일인가**로 고른다. 쿼리가
+// `birthdayMMDD == "MMDD"` 동등 비교라, 유저 문서의 그 필드가 오늘 날짜(KST)와
+// 글자까지 같아야 걸린다 — 생년월일을 저장할 때 정규화해 둔 값이다
+// (src/lib/user/birthday.ts). 여기서 확인하는 건 세 가지다:
+//   ① 오늘이 생일인 사람만 받는가
+//   ② 하루에 한 번만 받는가(birthdayCouponGrants/{yyyy-MMdd} 가 멱등성 키)
+//   ③ 조합 4종이 아니라 `options` 3종을 그대로 심는가 — 수령 화면이 이 모양을 전제한다
+await wipe();
+
+const kstParts = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+}).formatToParts(new Date());
+const kst = (type) => kstParts.find((part) => part.type === type)?.value ?? "";
+const todayMMDD = `${kst("month")}${kst("day")}`;
+const otherMMDD = todayMMDD === "0101" ? "0202" : "0101";
+
+await db.collection("users").doc("bday_today").set({ birthdayMMDD: todayMMDD });
+await db.collection("users").doc("bday_other").set({ birthdayMMDD: otherMMDD });
+await db.collection("users").doc("bday_none").set({});
+
+await fns.dailyBirthdayCouponPayout.run({});
+
+check("생일 오늘인 사람만 지급", (await rewardsOf("bday_today")).length, 1, `오늘(KST) = ${todayMMDD}`);
+check("생일 다른 날인 사람은 미지급", (await rewardsOf("bday_other")).length, 0);
+check("생일 정보 없는 사람은 미지급", (await rewardsOf("bday_none")).length, 0);
+
+const bday = (await rewardsOf("bday_today"))[0];
+check("생일 쿠폰 source/status", [bday?.source, bday?.status], ["birthday", "pending"]);
+check(
+  "생일 쿠폰은 freePasses 가 아니라 options 를 심는다",
+  [Array.isArray(bday?.options), bday?.options?.length, bday?.freePasses ?? null],
+  [true, 3, null],
+  "수령 화면이 options 를 그대로 읽는다 — 월간 정산 두 개와 스키마가 다르다"
+);
+check("생일 쿠폰 claimWindowExpiresAt 존재", typeof bday?.claimWindowExpiresAt, "string");
+
+await fns.dailyBirthdayCouponPayout.run({});
+check("생일 쿠폰 멱등성 (같은 날 재실행해도 1건)", (await rewardsOf("bday_today")).length, 1);
 
 const failed = results.filter((x) => !x.ok);
 console.log(`\n=== ${results.length - failed.length}/${results.length} 통과 ===`);
