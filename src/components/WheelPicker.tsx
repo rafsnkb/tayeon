@@ -188,11 +188,15 @@ export default function WheelPicker({
         className="w-full max-w-[380px] rounded-[28px] border border-border bg-topbar px-4 pb-6 pt-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex h-[46px] items-center justify-between">
-          <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-bold-text">{title}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-icon-muted">
-            <CloseIcon className="h-5 w-5" />
+        <div className="relative flex h-[46px] items-center justify-center">
+          <p className="text-center text-lg font-bold text-bold-text">{title}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            className="absolute right-[11px] text-icon-muted"
+          >
+            <CloseIcon className="h-[22px] w-[22px]" />
           </button>
         </div>
 

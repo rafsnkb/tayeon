@@ -319,11 +319,17 @@ export default function MyPage() {
             className="flex h-[516px] w-full max-w-[380px] flex-col rounded-[32px] border border-border bg-topbar px-4 pt-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex h-14 shrink-0 items-center justify-between">
-              <div className="w-5" />
-              <p className="flex-1 text-center text-base font-bold text-bold-text">보너스 리워드 안내</p>
-              <button type="button" onClick={() => setRewardInfoOpen(false)} aria-label="닫기" className="text-icon-muted">
-                <CloseIcon className="h-5 w-5" />
+            {/* X 는 목업 실측대로 22×22 이고 오른끝이 카드 바깥선에서 27 이다(= 컨텐츠
+                오른끝에서 11 더 안쪽). 제목은 X 와 무관하게 카드 전체 폭의 가운데다. */}
+            <div className="relative flex h-14 shrink-0 items-center justify-center">
+              <p className="text-center text-base font-bold text-bold-text">보너스 리워드 안내</p>
+              <button
+                type="button"
+                onClick={() => setRewardInfoOpen(false)}
+                aria-label="닫기"
+                className="absolute right-[11px] text-icon-muted"
+              >
+                <CloseIcon className="h-[22px] w-[22px]" />
               </button>
             </div>
 
