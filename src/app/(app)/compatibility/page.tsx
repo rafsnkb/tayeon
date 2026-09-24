@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FieldLabel, ToggleGroup } from "@/components/FormControls";
+import { BirthDateField, BirthTimeField, FieldLabel, ToggleGroup } from "@/components/FormControls";
 import { toCalendarMode, type CalendarMode } from "@/lib/tarot/birthInfo";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
@@ -145,13 +145,7 @@ export default function CompatibilityPage() {
           </label>
 
           <div className="flex flex-col gap-1">
-            <FieldLabel>생년월일</FieldLabel>
-            <input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none"
-            />
+            <BirthDateField value={birthDate} onChange={setBirthDate} />
             <ToggleGroup
               options={[
                 { value: "solar" as const, label: "양력" },
@@ -164,14 +158,7 @@ export default function CompatibilityPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <FieldLabel>태어난 시간</FieldLabel>
-            <input
-              type="time"
-              value={birthTime}
-              onChange={(e) => setBirthTime(e.target.value)}
-              disabled={timeUnknown}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none disabled:opacity-40"
-            />
+            <BirthTimeField value={birthTime} onChange={setBirthTime} disabled={timeUnknown} />
             <label className="flex items-center gap-2 pt-2 text-sm text-icon-muted">
               <input
                 type="checkbox"
@@ -219,7 +206,7 @@ export default function CompatibilityPage() {
           type="submit"
           disabled={!nickname.trim() || submitting || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            nickname.trim() && isDirty ? "bg-point text-white" : "bg-chip-fill text-chip-muted-text"
+            nickname.trim() && isDirty ? "bg-point text-white" : "bg-chip-soft text-icon-muted"
           } disabled:opacity-60`}
         >
           저장하기

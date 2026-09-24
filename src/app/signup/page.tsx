@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FieldLabel, ToggleGroup } from "@/components/FormControls";
+import { BirthDateField, BirthTimeField, FieldLabel, ToggleGroup } from "@/components/FormControls";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
@@ -174,13 +174,7 @@ export default function SignupPage() {
           </label>
 
           <div className="flex flex-col gap-1">
-            <FieldLabel required>생년월일</FieldLabel>
-            <input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none"
-            />
+            <BirthDateField required value={birthDate} onChange={setBirthDate} />
             <ToggleGroup
               options={[
                 { value: "solar" as const, label: "양력" },
@@ -193,14 +187,7 @@ export default function SignupPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <FieldLabel>태어난 시간 (선택)</FieldLabel>
-            <input
-              type="time"
-              value={birthTime}
-              onChange={(e) => setBirthTime(e.target.value)}
-              disabled={timeUnknown}
-              className="h-12 rounded-2xl border border-border bg-bg px-3 text-lg font-semibold text-bold-text outline-none disabled:opacity-40"
-            />
+            <BirthTimeField label="태어난 시간 (선택)" value={birthTime} onChange={setBirthTime} disabled={timeUnknown} />
             <label className="flex items-center gap-2 pt-2 text-sm text-icon-muted">
               <input
                 type="checkbox"

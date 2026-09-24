@@ -294,7 +294,7 @@ export default function SettingsPage() {
           onClick={handleSave}
           disabled={saving || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-fill text-chip-muted-text"
+            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-soft text-icon-muted"
           } disabled:opacity-60`}
         >
           저장하기

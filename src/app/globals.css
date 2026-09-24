@@ -453,6 +453,15 @@ button.bg-point:disabled {
   scrollbar-gutter: stable both-edges;
 }
 
+/* 휠 입력(WheelPicker)처럼 "스크롤되는 것"으로 보이면 안 되는 칸. 막대가 보이면 굴림판이
+   아니라 목록처럼 읽힌다. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
