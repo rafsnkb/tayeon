@@ -155,7 +155,7 @@ export default function ReceivedPassesPage() {
                         끝선에 붙어 있다(2026-09-24 실측). */}
                     <span className="min-w-0 py-4">
                       <span className="flex items-center gap-2">
-                        <span className="truncate text-2xl font-bold text-bold-text">[{entry.label}]</span>
+                        <span className="truncate text-2xl font-bold text-bold-text">{entry.label}</span>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${badge.className}`}>
                           {badge.label}
                         </span>
@@ -186,6 +186,7 @@ export default function ReceivedPassesPage() {
                           </p>
                           {error && <p className="mb-2 text-center text-sm text-urgent">{error}</p>}
                           <ComboAllowanceList
+                            layout="columns"
                             allowanceFor={(combo, spread) => entry.comboAllowances![combo][spread]}
                             selected={selectedCombo}
                             onSelect={selectCombo}
@@ -208,6 +209,7 @@ export default function ReceivedPassesPage() {
                             {COMBOS[entry.claimedCombo].label} 옵션으로 수령했어요.
                           </p>
                           <ComboAllowanceCard
+                            layout="columns"
                             combo={entry.claimedCombo}
                             allowanceFor={(combo, spread) => entry.comboAllowances![combo][spread]}
                           />
