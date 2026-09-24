@@ -5,6 +5,7 @@ import SubPageTopBar from "@/components/SubPageTopBar";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import {
   REFERRAL_MONTHLY_COMMISSION_RATE,
+  REFERRAL_MONTHLY_MIN_WON,
   REFERRAL_SIGNUP_FRIEND_CAP,
   REFERRAL_SIGNUP_FREE_PASSES,
   REWARD_PAYOUT_DAY_OF_MONTH,
@@ -14,7 +15,7 @@ import {
 // 안내 문구의 예시. 예전엔 "25회"가 문자열로 박혀 있었는데, 원카드 단가가 200 → 300으로
 // 오르면서(2026-09-24) 실제 지급은 17회가 돼 광고와 어긋났다. 같은 함수로 계산해서 가격표가
 // 또 바뀌어도 문구가 저절로 따라오게 한다.
-const EXAMPLE_FRIEND_SPEND_WON = 100_000;
+const EXAMPLE_FRIEND_SPEND_WON = 200_000;
 const EXAMPLE_PAYOUT_PASSES = rewardPassesForWon(EXAMPLE_FRIEND_SPEND_WON, REFERRAL_MONTHLY_COMMISSION_RATE);
 
 /** 피그마 "Screen / FriendInvite" — asset/Screen/friendInvite.png. 카카오톡 친구 목록/메시지
@@ -78,6 +79,7 @@ export default function InvitePage() {
               매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 보내드려요.
             </p>
             <p className="mt-5 text-xs font-semibold text-icon-muted">
+              친구들의 이번 달 총 결제액이 {(REFERRAL_MONTHLY_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원 이상일 때 지급돼요.<br />
               (예: 친구들의 이번 달 총 결제액이 {(EXAMPLE_FRIEND_SPEND_WON / 10_000).toLocaleString("ko-KR")}만 원이면<br />
               다음 달 {REWARD_PAYOUT_DAY_OF_MONTH}일에 원카드 기준 {EXAMPLE_PAYOUT_PASSES}회 이용권 지급)
             </p>

@@ -50,6 +50,37 @@ function allowance(basis: number, spread: SpreadKey, saju: boolean, ziwei: boole
   return Math.round(base * (saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1));
 }
 
+/** 조합을 싼 것 → 비싼 것 순으로. src/lib/tarot/pricing.ts의 COMBO_ORDER 복제본. */
+const COMBO_ORDER = ["tarot", "tarot-saju", "tarot-ziwei", "tarot-saju-ziwei"] as const satisfies readonly ComboKey[];
+
+/** src/lib/tarot/pricing.ts의 rewardGrid 복제본 — 본체가 바뀌면 같이 고칠 것.
+ *
+ *  무상 지급(리워드·운영자 커스텀 지급)은 구매분과 규칙이 다르다. 버림을 쓰고, 조합이
+ *  비싸질수록·카드가 많아질수록 최소 1회는 줄인다. 공표표는 타지 않는다. 자세한 근거는 본체
+ *  주석 참고(2026-09-24). */
+function rewardGrid(basis: number): number[][] {
+  const grid: number[][] = [];
+  for (let c = 0; c < COMBO_ORDER.length; c++) {
+    const { saju, ziwei } = COMBOS[COMBO_ORDER[c]];
+    const mult = saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
+    const row: number[] = [];
+    for (let s = 0; s < SPREAD_ORDER.length; s++) {
+      let count = Math.floor(Math.floor(basis / SPREAD_COSTS[SPREAD_ORDER[s]]) * mult);
+      if (s > 0) count = Math.min(count, Math.max(0, row[s - 1] - 1));
+      if (c > 0) count = Math.min(count, Math.max(0, grid[c - 1][s] - 1));
+      row.push(count);
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+/** 무상 지급 이용권의 조합별 횟수. countAllowancesForCombo(구매분)와 짝을 이룬다. */
+export function rewardAllowancesForCombo(basis: number, combo: ComboKey): Record<SpreadKey, number> {
+  const row = rewardGrid(basis)[COMBO_ORDER.indexOf(combo)];
+  return Object.fromEntries(SPREAD_ORDER.map((spread, index) => [spread, row[index]])) as Record<SpreadKey, number>;
+}
+
 export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<SpreadKey, number> {
   const { saju, ziwei } = COMBOS[combo];
   return Object.fromEntries(
@@ -60,8 +91,11 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
 /** 원카드 1회 단가. src/lib/tarot/pricing.ts의 SPREADS.one.cost와 같은 값. */
 export const ONE_CARD_COST = SPREAD_COSTS.one;
 
-/** 조합별 원카드 환산 횟수 — 운영자가 지급한 횟수를 화면에 그대로 표기할 때 쓴다. */
-export function oneCardCountFor(basis: number, combo: ComboKey): number {
+/** 조합별 원카드 환산 횟수 — 운영자가 지급한 횟수를 화면에 그대로 표기할 때 쓴다.
+ *  상점 상품을 그대로 지급한 건(productId 있음)은 구매와 같은 공표표를, 직접 횟수를 입력한
+ *  커스텀 지급은 무상 지급 규칙을 따른다. */
+export function oneCardCountFor(basis: number, combo: ComboKey, granted = false): number {
+  if (granted) return rewardAllowancesForCombo(basis, combo).one;
   const { saju, ziwei } = COMBOS[combo];
   return allowance(basis, "one", saju, ziwei);
 }
@@ -82,7 +116,7 @@ export function basisForOneCardCount(freePasses: number, combo: ComboKey): numbe
     for (const base of delta === 0 ? [start] : [start - delta, start + delta]) {
       if (base < 1) continue;
       const basis = base * ONE_CARD_COST;
-      if (oneCardCountFor(basis, combo) === target) return basis;
+      if (oneCardCountFor(basis, combo, true) === target) return basis;
     }
   }
   return start * ONE_CARD_COST;

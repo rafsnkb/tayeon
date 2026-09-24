@@ -15,6 +15,11 @@ export const ping = onRequest((req, res) => {
 // 친구 초대(리퍼럴) 월간 5% 정산. Functions 패키지는 앱 코드와 분리되어 있어 아래 가격 규칙을
 // 같은 값으로 유지한다.
 const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
+
+// 친구 결제 리워드 최소 기준 — src/lib/tarot/pricing.ts의 REFERRAL_MONTHLY_MIN_WON과 같은 값
+// (패키지 분리로 값만 복사). 추천인의 친구들이 그 달에 합쳐서 이 금액 이상 결제해야 지급하며,
+// 미달분은 다음 달로 이월되지 않는다.
+const REFERRAL_MONTHLY_MIN_WON = 100_000;
 // 원카드 1회 단가 — src/lib/tarot/pricing.ts의 SPREADS.one.cost와 같은 값(패키지 분리로 복사).
 // 2026-09-24 가격표 개정(200 → 300)이 여기 반영되지 않아서, 배치가 표기한 freePasses가 실제
 // 이용권이 주는 횟수보다 1.5배 많았다(110,000원 결제 → 받은 이용권 내역 "17회" / 실제 11회 /
@@ -168,6 +173,9 @@ export const monthlyReferralPayout = onSchedule(
 
     const passesByReferrerUid = new Map<string, number>();
     for (const [referrerUid, totalWon] of totalWonByReferrerUid) {
+      // 합계가 기준 미달이면 그 달은 건너뛴다. 소액일수록 횟수 환산에서 남는 자투리 비중이 커져
+      // 리워드가 제 가치보다 후해지기 때문이다(2026-09-24).
+      if (totalWon < REFERRAL_MONTHLY_MIN_WON) continue;
       const freePasses = rewardPassesForWon(totalWon, REFERRAL_MONTHLY_COMMISSION_RATE);
       if (freePasses > 0) passesByReferrerUid.set(referrerUid, freePasses);
     }
@@ -208,7 +216,6 @@ const PAYMENT_BONUS_REWARD_TIERS: { minWon: number; rate: number }[] = [
   { minWon: 400_000, rate: 0.05 },
   { minWon: 200_000, rate: 0.04 },
   { minWon: 100_000, rate: 0.03 },
-  { minWon: 50_000, rate: 0.015 },
 ];
 
 function bonusRewardRateForWon(totalWon: number): number {
