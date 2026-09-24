@@ -50,7 +50,7 @@ export default function InvitePage() {
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="친구 초대" />
 
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <section className="rounded-[32px] border border-border bg-topbar p-6 text-center">
             <h2 className="text-xl font-bold text-bold-text">친구 초대 리워드 - {REFERRAL_SIGNUP_FREE_PASSES}회</h2>

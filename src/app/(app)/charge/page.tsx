@@ -25,6 +25,7 @@ import { useRooms } from "@/lib/tarot/RoomsContext";
 import NoBirthTimePopup from "@/components/NoBirthTimePopup";
 import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
 import InfoModal from "@/components/InfoModal";
+import { safeReturnTo } from "@/lib/navigation";
 
 type Tab = "count" | "time";
 type TimeDuration = 15 | 30 | 60;
@@ -43,6 +44,9 @@ const TIME_DURATIONS: TimeDuration[] = [15, 30, 60];
 export default function ChargePage() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => (searchParams.get("tab") === "time" ? "time" : "count"));
+  // 결제창이 히스토리를 어지럽히므로 뒤로가기는 history.back() 이 아니라 온 곳으로 직접
+  // 보낸다(src/lib/navigation.ts). from 이 없는 옛 링크는 예전대로 history.back().
+  const returnTo = safeReturnTo(searchParams.get("from"));
   const [selected, setSelected] = useState<(typeof COUNT_PACKAGES)[number] | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<ComboKey | null>(null);
   const [timeDuration, setTimeDuration] = useState<TimeDuration>(15);
@@ -52,9 +56,10 @@ export default function ChargePage() {
   const [suspension, setSuspension] = useState<SuspensionInfo | null>(null);
   const { user, email, nickname, refreshMe, countPasses, timePasses, activeTimePass, hasBirthInfo, myTimeUnknown } = useRooms();
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
-  const hasCountPass = countPasses.some(
+  const heldCountPass = countPasses.find(
     (pass) => pass.source === "purchase" && HELD_PASS_STATUSES.includes(pass.status)
   );
+  const hasCountPass = Boolean(heldCountPass);
   const hasTimePassHeld = timePasses.length > 0 || activeTimePass !== null;
   // 고른 상품의 등급 색. 예전엔 쓰는 자리마다 COUNT_PACKAGES.indexOf(selected) 를 다시 돌렸다.
   const selectedTier = selected ? countPackageTier(selected.id) : null;
@@ -153,8 +158,9 @@ export default function ChargePage() {
       <SubPageTopBar
         title={selected ? "구입하기" : "횟수ㆍ시간제 이용권 구입"}
         onBack={selected ? () => { setSelected(null); setSelectedCombo(null); } : undefined}
+        backHref={returnTo}
       />
-      <div className={`flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto ${!selected && tab === "time" ? "pb-40" : "pb-24"}`}>
+      <div className={`flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable ${!selected && tab === "time" ? "pb-40" : "pb-24"}`}>
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           {selected && selectedTier && (
             <>
@@ -187,7 +193,14 @@ export default function ChargePage() {
                 <div className="mt-2 flex justify-between text-icon-muted"><span>상품금액 (VAT 포함)</span><span>{selected.priceWon.toLocaleString("ko-KR")}원</span></div>
                 <div className="mt-2 flex justify-between border-t border-border pt-2"><span>총 결제금액</span><span>{selected.priceWon.toLocaleString("ko-KR")}원</span></div>
               </div>
-              {hasCountPass && <p className="text-center text-sm text-urgent">보유 이용권을 소진한 후 새 이용권을 구매할 수 있어요.</p>}
+              {hasCountPass && (
+                <p className="text-center text-sm text-urgent">
+                  {/* 환불 신청 중인 건은 소진할 수 없다 — 서버(api/payment/prepare)가 돌려주는 안내와 같은 말을 쓴다. */}
+                  {heldCountPass?.status === "refund_pending"
+                    ? "환불 진행중인 이용권이 있어 구입할 수 없습니다."
+                    : "보유 이용권을 소진한 후 새 이용권을 구매할 수 있어요."}
+                </p>
+              )}
             </>
           )}
           {!selected && tab === "count" && (

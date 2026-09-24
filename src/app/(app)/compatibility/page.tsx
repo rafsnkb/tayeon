@@ -132,7 +132,7 @@ export default function CompatibilityPage() {
     <>
     <form onSubmit={handleSave} className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="궁합 상대 프로필 관리" />
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
             <FieldLabel required>궁합 상대 닉네임 (변경 가능)</FieldLabel>
