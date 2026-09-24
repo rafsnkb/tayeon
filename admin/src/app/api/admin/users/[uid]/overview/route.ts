@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
 import { scanReadings } from "@/lib/moderation";
-import { countAllowancesForCombo, type ComboKey } from "@/lib/countPassPackages";
+import { countAllowancesForCombo, rewardAllowancesForCombo, type ComboKey } from "@/lib/countPassPackages";
 
 const REVIEW_SCAN_LIMIT = 100;
 
@@ -22,10 +22,16 @@ function remainingCount(data: Record<string, unknown>): number | null {
   const combo = typeof data.combo === "string" ? data.combo : null;
   const basis = typeof data.basis === "number" ? data.basis : null;
 
-  const oneCardAllowance =
-    allowances?.one ??
-    allowances?.["one-0-0"] ??
-    (combo && combo !== "any" && basis !== null ? countAllowancesForCombo(basis, combo as ComboKey).one : undefined);
+  // 문서에 박힌 allowances 가 진실이다. 아래 폴백은 그게 없는 옛 문서(2026-09-18 조합 고정 개편
+  // 이전)에만 쓰이는데, 구매분과 무상 지급분은 환산 규칙이 달라서 같은 함수로 읽으면 무상
+  // 지급분의 잔여 횟수가 실제보다 많게 표시된다(2026-09-24).
+  const fallback =
+    combo && combo !== "any" && basis !== null
+      ? data.source === "purchase"
+        ? countAllowancesForCombo(basis, combo as ComboKey).one
+        : rewardAllowancesForCombo(basis, combo as ComboKey).one
+      : undefined;
+  const oneCardAllowance = allowances?.one ?? allowances?.["one-0-0"] ?? fallback;
 
   return typeof oneCardAllowance === "number" ? Math.max(0, Math.round(remaining * oneCardAllowance)) : null;
 }

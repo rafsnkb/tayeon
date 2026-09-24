@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import {
-  COMBOS,
   SPREADS,
   rewardAllowancesForCombo,
   rewardAllowanceForCombo,
   type ComboKey,
-} from "@/lib/tarot/pricing";
+  COMBO_ORDER} from "@/lib/tarot/pricing";
 import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
 
 type ReceivedPass = {
@@ -73,7 +72,7 @@ export async function GET(req: NextRequest) {
       comboAllowances:
         status === "pending" || status === "claimed"
           ? (Object.fromEntries(
-              (Object.keys(COMBOS) as ComboKey[]).map((combo) => [combo, rewardAllowancesForCombo(data.basis, combo)])
+              COMBO_ORDER.map((combo) => [combo, rewardAllowancesForCombo(data.basis, combo)])
             ) as Record<ComboKey, Record<string, number>>)
           : undefined,
     };
@@ -102,7 +101,7 @@ export async function GET(req: NextRequest) {
       claimedAt: data.createdAt,
       claimedCombo: combo,
       comboAllowances: Object.fromEntries(
-        (Object.keys(COMBOS) as ComboKey[]).map((c) => [c, rewardAllowancesForCombo(basis, c)])
+        COMBO_ORDER.map((c) => [c, rewardAllowancesForCombo(basis, c)])
       ) as Record<ComboKey, Record<string, number>>,
     };
   });

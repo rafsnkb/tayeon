@@ -124,13 +124,6 @@ test("a reward is never lost to floating point drift", () => {
   }
 });
 
-test("free rewards do not inherit the published table's hand-tuned cells", () => {
-  // 공표표는 스타터(basis 3000) 켈틱+자미두수를 2회로 깎아뒀지만, 같은 basis 를 우연히 갖게 된
-  // 무료 리워드는 계산식 그대로 3회여야 한다(round(3000/750) = 4 → 4 × 0.75 = 3).
-  assert.equal(countAllowances(3_000, false)["celtic-0-1"], 3);
-  assert.equal(countAllowances(3_000, true)["celtic-0-1"], 2);
-});
-
 // 리워드 basis 는 원카드 단가의 배수라, 상품 basis 중 3,000(스타터)과 135,000(얼티밋) 두 곳에
 // 정확히 겹친다. 그 두 지점만 공표표로 빠지면 리워드를 더 받았는데 쓸 수 있는 횟수가 줄어드는
 // 역전이 생긴다 — 무상 지급은 금액과 무관하게 제 규칙만 쓴다(2026-09-24).

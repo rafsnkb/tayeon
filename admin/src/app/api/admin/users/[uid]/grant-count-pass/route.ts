@@ -59,7 +59,9 @@ export async function POST(
   const basis = selected ? selected.basis : basisForOneCardCount(count!, combo);
   // 문서에 남기는 표기 횟수도 아래 allowances 와 같은 함수로 뽑아서 둘이 어긋날 수 없게 한다
   // (예전엔 basis/200 이라 얼티밋 지급이 675회로 기록됐지만 실제 원카드는 450회였다).
-  const freePasses = oneCardCountFor(basis, combo, !selected);
+  const freePasses = selected
+    ? oneCardCountFor(basis, combo)
+    : rewardAllowancesForCombo(basis, combo).one;
 
   const passRef = userRef.collection("countPasses").doc();
   const createdAt = new Date().toISOString();

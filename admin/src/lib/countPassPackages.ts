@@ -91,11 +91,10 @@ export function countAllowancesForCombo(basis: number, combo: ComboKey): Record<
 /** 원카드 1회 단가. src/lib/tarot/pricing.ts의 SPREADS.one.cost와 같은 값. */
 export const ONE_CARD_COST = SPREAD_COSTS.one;
 
-/** 조합별 원카드 환산 횟수 — 운영자가 지급한 횟수를 화면에 그대로 표기할 때 쓴다.
- *  상점 상품을 그대로 지급한 건(productId 있음)은 구매와 같은 공표표를, 직접 횟수를 입력한
- *  커스텀 지급은 무상 지급 규칙을 따른다. */
-export function oneCardCountFor(basis: number, combo: ComboKey, granted = false): number {
-  if (granted) return rewardAllowancesForCombo(basis, combo).one;
+/** 조합별 원카드 환산 횟수 — **상점 상품을 그대로 지급한 건**(productId 있음)의 표기에 쓴다.
+ *  구매와 같은 횟수여야 하므로 공표표를 본다. 직접 횟수를 입력한 커스텀 지급은 무상 지급
+ *  규칙이라 rewardAllowancesForCombo(basis, combo).one 을 쓸 것. */
+export function oneCardCountFor(basis: number, combo: ComboKey): number {
   const { saju, ziwei } = COMBOS[combo];
   return allowance(basis, "one", saju, ziwei);
 }
@@ -116,7 +115,7 @@ export function basisForOneCardCount(freePasses: number, combo: ComboKey): numbe
     for (const base of delta === 0 ? [start] : [start - delta, start + delta]) {
       if (base < 1) continue;
       const basis = base * ONE_CARD_COST;
-      if (oneCardCountFor(basis, combo, true) === target) return basis;
+      if (rewardAllowancesForCombo(basis, combo).one === target) return basis;
     }
   }
   return start * ONE_CARD_COST;

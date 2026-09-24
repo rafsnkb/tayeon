@@ -1,9 +1,6 @@
 "use client";
 
-import { COMBOS, SPREAD_ORDER, type ComboKey, type SpreadKey } from "@/lib/tarot/pricing";
-
-/** 조합 목록. `COMBOS` 의 선언 순서를 그대로 따른다(타로전용 → +사주 → +자미두수 → 둘 다). */
-export const COMBO_KEYS = Object.keys(COMBOS) as ComboKey[];
+import { COMBOS, COMBO_ORDER, SPREAD_ORDER, type ComboKey, type SpreadKey } from "@/lib/tarot/pricing";
 
 /** 표 안에서 쓰는 짧은 스프레드 이름. `SPREADS[key].label`("원카드")과 달리 띄어쓰기가 있다 —
  *  뒤에 "+사주+자미두수"가 붙어 길어지는 자리라 이쪽이 읽기 편하다. */
@@ -88,7 +85,7 @@ export function ComboAllowanceList({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      {COMBO_KEYS.map((combo) => (
+      {COMBO_ORDER.map((combo) => (
         <ComboAllowanceCard
           key={combo}
           combo={combo}

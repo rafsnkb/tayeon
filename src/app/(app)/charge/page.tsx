@@ -14,9 +14,9 @@ import {
   TIME_PASS_VALIDITY_MONTHS,
   formatMonths,
   HELD_PASS_STATUSES,
-} from "@/lib/tarot/pricing";
+  COMBO_ORDER} from "@/lib/tarot/pricing";
 import { TIME_COMBO_TIER, countPackageTier } from "@/lib/tarot/passTiers";
-import { ComboAllowanceList, COMBO_KEYS } from "@/components/ComboAllowanceCard";
+import { ComboAllowanceList } from "@/components/ComboAllowanceCard";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import { CompanyFooter } from "@/components/CompanyFooter";
@@ -239,7 +239,7 @@ export default function ChargePage() {
 
           {!selected && tab === "time" && (
             <div className="flex flex-col gap-3">
-              {COMBO_KEYS.map((combo) => {
+              {COMBO_ORDER.map((combo) => {
                 const tier = TIME_COMBO_TIER[combo];
                 const pkg = TIME_PASS_PACKAGES.find((p) => p.combo === combo && p.minutes === timeDuration)!;
                 return (

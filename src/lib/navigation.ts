@@ -13,11 +13,15 @@ export function withReturnTo(href: string, from: string): string {
 /**
  * 쿼리로 받은 "돌아갈 곳"을 검증한다.
  *
- * 주소창으로 들어오는 값이라 그대로 router.push 에 넘기면 `?from=https://...` 로 외부 사이트에
- * 보낼 수 있다. 같은 앱 안의 절대 경로만 받는다 — `//evil.com` 은 프로토콜 상대 URL 이라 `/` 로
- * 시작하는지만 봐서는 걸러지지 않는다.
+ * 주소창으로 들어오는 값이라 그대로 router.push 에 넘기면 `?from=https://evil.com` 으로 외부
+ * 사이트에 보낼 수 있다(열린 리다이렉트). 같은 앱 안의 절대 경로만 받는다.
+ *
+ * `/` 로 시작하는지만 보면 부족하다 — **두 번째 글자까지** 봐야 한다:
+ *   `//evil.com`  프로토콜 상대 URL
+ *   `/\evil.com`  브라우저가 역슬래시를 `/` 로 고쳐 읽어 위와 같아진다
  */
 export function safeReturnTo(value: string | null | undefined): string | undefined {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return undefined;
+  if (!value || !value.startsWith("/")) return undefined;
+  if (value[1] === "/" || value[1] === "\\") return undefined;
   return value;
 }

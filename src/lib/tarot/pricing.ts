@@ -20,6 +20,14 @@ export function isSpreadKey(value: unknown): value is SpreadKey {
 // 궁합은 넷 모두에 기본 포함(별도 조합 차원이 아니라 추가 차감 없음).
 export type ComboKey = "tarot" | "tarot-saju" | "tarot-ziwei" | "tarot-saju-ziwei";
 
+/** 조합을 "싼 것 → 비싼 것" 순으로 늘어놓은 것. 배율 내림차순(1 / 0.85 / 0.75 / 0.5)이다.
+ *
+ *  화면에 조합을 늘어놓는 순서이자 무상 지급표(rewardGrid)가 한 칸씩 깎아 내려가는 순서이며,
+ *  공표 가격표(PUBLISHED_COUNT_TABLE) 각 행의 칸 순서이기도 하다. 세 곳이 어긋나면 표를 잘못
+ *  읽게 되므로 한 곳에 둔다 — 예전엔 `Object.keys(COMBOS)` 를 쓰는 자리가 네 군데 있었는데,
+ *  그건 선언 순서를 암묵적으로 믿는 것이었다(2026-09-24 정리). */
+export const COMBO_ORDER = ["tarot", "tarot-saju", "tarot-ziwei", "tarot-saju-ziwei"] as const satisfies readonly ComboKey[];
+
 export const COMBOS: Record<ComboKey, { saju: boolean; ziwei: boolean; label: string }> = {
   tarot: { saju: false, ziwei: false, label: "타로 전용" },
   "tarot-saju": { saju: true, ziwei: false, label: "타로+사주" },
@@ -191,21 +199,17 @@ const PUBLISHED_COUNT_TABLE: Record<number, readonly number[]> = {
   135_000: [450, 300, 225, 180,  383, 255, 191, 153,  338, 225, 169, 135,  225, 150, 113,  90],
 };
 
-/** usePublishedTable=false 는 "구매 상품과 같은 basis 를 우연히 갖게 된 무료 리워드"가 공표표의
- *  손질된 값을 물려받지 않게 하려고 남겨둔 통로다(기존 usePublishedException 과 같은 목적). */
-export function countAllowance(
-  basis: number,
-  spread: SpreadKey,
-  saju: boolean,
-  ziwei: boolean,
-  usePublishedTable = true
-): number {
-  if (usePublishedTable) {
-    const row = PUBLISHED_COUNT_TABLE[basis];
-    if (row) {
-      const comboIndex = saju && ziwei ? 3 : saju ? 1 : ziwei ? 2 : 0;
-      return row[comboIndex * SPREAD_ORDER.length + SPREAD_ORDER.indexOf(spread)];
-    }
+/** **구매분 전용.** 무상 지급(리워드·운영자 커스텀 지급)은 규칙이 달라 rewardAllowanceForCombo 를
+ *  쓴다 — 여기 공식은 반올림이라 작은 금액에서 제 가치보다 후하게 나간다.
+ *
+ *  예전엔 `usePublishedTable=false` 로 "공표표의 손질된 칸을 건너뛰는" 통로가 있었는데, 무상 지급이
+ *  자기 규칙을 갖게 되면서 아무도 쓰지 않는 데다 함정이 됐다 — false 를 넘기면 리워드 규칙이 아니라
+ *  **옛 계산식**(더 후한 쪽)이 나왔다. 지웠다(2026-09-24). */
+export function countAllowance(basis: number, spread: SpreadKey, saju: boolean, ziwei: boolean): number {
+  const row = PUBLISHED_COUNT_TABLE[basis];
+  if (row) {
+    const comboIndex = saju && ziwei ? 3 : saju ? 1 : ziwei ? 2 : 0;
+    return row[comboIndex * SPREAD_ORDER.length + SPREAD_ORDER.indexOf(spread)];
   }
   const base = Math.round(basis / SPREADS[spread].cost);
   return Math.round(base * (saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1));
@@ -216,13 +220,13 @@ export function countKey(spread: SpreadKey, saju: boolean, ziwei: boolean): stri
 }
 
 // combo:"any"(가입 무료체험 전용) 이용권을 위한 16-엔트리(스프레드4 × 사주2 × 자미두수2) 표.
-export function countAllowances(basis: number, usePublishedTable = true): Record<string, number> {
+export function countAllowances(basis: number): Record<string, number> {
   return Object.fromEntries(
     (Object.keys(SPREADS) as SpreadKey[]).flatMap((spread) =>
       [false, true].flatMap((saju) =>
         [false, true].map((ziwei) => [
           countKey(spread, saju, ziwei),
-          countAllowance(basis, spread, saju, ziwei, usePublishedTable),
+          countAllowance(basis, spread, saju, ziwei),
         ])
       )
     )
@@ -246,10 +250,6 @@ function comboMultiplier(combo: ComboKey): number {
   const { saju, ziwei } = COMBOS[combo];
   return saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
 }
-
-/** 조합을 "싼 것 → 비싼 것" 순으로 늘어놓은 것. 배율 내림차순(1 / 0.85 / 0.75 / 0.5)이자 COMBOS
- *  선언 순서다 — 아래 무상 지급표가 이 순서로 한 칸씩 깎아 내려간다. */
-const COMBO_ORDER = ["tarot", "tarot-saju", "tarot-ziwei", "tarot-saju-ziwei"] as const satisfies readonly ComboKey[];
 
 /**
  * 무상 지급(리워드·운영자 커스텀 지급) 이용권의 16칸 표. 구매분과 **규칙이 다르다**.
@@ -287,13 +287,23 @@ function rewardGrid(basis: number): number[][] {
   return grid;
 }
 
+/** 조합 키를 표의 행으로. 키는 Firestore 문서에서도 들어오는데, indexOf 가 -1 이면 grid[-1] 이
+ *  undefined 라서 한참 뒤 엉뚱한 자리에서 터지고 원인을 찾기 어렵다. 여기서 이름을 붙여 던진다. */
+function rewardRow(basis: number, combo: ComboKey): readonly number[] {
+  const index = COMBO_ORDER.indexOf(combo);
+  if (index < 0) throw new Error(`알 수 없는 이용권 조합: ${String(combo)}`);
+  return rewardGrid(basis)[index];
+}
+
 export function rewardAllowanceForCombo(basis: number, spread: SpreadKey, combo: ComboKey): number {
-  return rewardGrid(basis)[COMBO_ORDER.indexOf(combo)][SPREAD_ORDER.indexOf(spread)];
+  const index = SPREAD_ORDER.indexOf(spread);
+  if (index < 0) throw new Error(`알 수 없는 스프레드: ${String(spread)}`);
+  return rewardRow(basis, combo)[index];
 }
 
 /** 조합이 고정된 무상 이용권의 4-엔트리 표 — countAllowancesForCombo 의 무상 지급판. */
 export function rewardAllowancesForCombo(basis: number, combo: ComboKey): Record<string, number> {
-  const row = rewardGrid(basis)[COMBO_ORDER.indexOf(combo)];
+  const row = rewardRow(basis, combo);
   return Object.fromEntries(SPREAD_ORDER.map((spread, index) => [spread, row[index]]));
 }
 
@@ -301,14 +311,16 @@ export function rewardAllowancesForCombo(basis: number, combo: ComboKey): Record
  * "이 조합으로 정확히 N회"를 약속한 리워드(생일 쿠폰, 어드민 커스텀 지급)가 실제로 N회를
  * 주도록 basis를 되돌려 준다.
  *
- * basis는 원 단위 가치라 `freePasses * SPREADS.one.cost`로 잡고 싶어지는데, 그러면
- * countAllowance가 조합 배율을 **한 번 더** 곱한다. "타로+사주 8회"를 약속하고 basis를
- * 8×300=2400으로 주면 실제로는 round(8 × 0.85) = 7회만 나온다. 배율을 역산해야 약속한 수가
- * 그대로 나온다(2026-09-24 — 생일 쿠폰이 광고의 절반만 주고 있던 걸 고치면서 추가. 단가가
- * 200이던 시절에도 이미 틀렸던 계산이라 가격 개정과 무관한 별개의 버그였다).
+ * basis는 원 단위 가치라 `freePasses * SPREADS.one.cost`로 잡고 싶어지는데, 그러면 지급표가 조합
+ * 배율을 **한 번 더** 곱한다. "타로+사주 8회"를 약속하고 basis를 8×300=2400으로 주면 실제로는
+ * 6회만 나온다. 배율을 역산해야 약속한 수가 그대로 나온다(2026-09-24 — 생일 쿠폰이 광고의 절반만
+ * 주고 있던 걸 고치면서 추가. 단가가 200이던 시절에도 이미 틀렸던 계산이라 가격 개정과 무관한
+ * 별개의 버그였다).
  *
- * 반올림 때문에 역산 공식 한 방으로는 어긋나는 값이 생길 수 있어, 후보를 옆으로 훑어서
- * countAllowanceForCombo가 실제로 약속한 수를 돌려주는 basis를 고른다.
+ * 무상 지급이니 **rewardAllowanceForCombo**(버림 + 단조 감소)로 확인한다. 버림·단조 보정 때문에
+ * 역산 공식 한 방으로는 어긋나는 값이 생기므로, 후보를 옆으로 훑어서 실제로 약속한 수를 돌려주는
+ * basis를 고른다. 어드민 커스텀 지급이 허용하는 1~10,000 전 구간에서 성공하는 것을 테스트로
+ * 고정해 뒀다.
  */
 export function basisForOneCardCount(freePasses: number, combo: ComboKey): number {
   const target = Math.round(freePasses);
@@ -322,6 +334,12 @@ export function basisForOneCardCount(freePasses: number, combo: ComboKey): numbe
       if (rewardAllowanceForCombo(basis, "one", combo) === target) return basis;
     }
   }
+  // 후보 창(±4) 안에서 못 찾았다 — 단가나 조합 배율이 바뀌어 규칙이 달라진 것이다. 조용히
+  // 어긋난 basis 를 돌려주면 약속보다 적게 지급되고 아무도 모르므로, 로그를 남긴다.
+  console.error("[pricing] basisForOneCardCount 역산 실패 — 약속한 횟수가 그대로 지급되지 않는다", {
+    freePasses: target,
+    combo,
+  });
   return start * SPREADS.one.cost;
 }
 
