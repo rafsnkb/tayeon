@@ -2,7 +2,7 @@
 
 import type { CountPass, TimePass, ActiveTimePass } from "@/lib/tarot/RoomsContext";
 import { COMBOS, countPassDisplayName, type ComboKey } from "@/lib/tarot/pricing";
-import { TIME_COMBO_TIER } from "@/lib/tarot/passTiers";
+import { TIME_COMBO_TIER, timePassArt } from "@/lib/tarot/passTiers";
 import { CloseIcon, SearchIcon } from "./icons";
 
 /* 이용권(횟수제·시간제)을 보여주는 조각들 — 컴포저 위의 이용권 바, 그 바가 여는 사용량
@@ -198,7 +198,9 @@ export function TimePassCard({ pass, actionLabel, onAction, busy }: {
   return (
     <div
       className="relative flex h-20 items-center gap-2 overflow-hidden rounded-[32px] border bg-cover bg-center px-4"
-      style={{ borderColor: tier.border, backgroundImage: `url(${tier.bg})` }}
+      /* 배경은 그 상품의 그림이다(public/pass/). 예전엔 등급별 성운 텍스처 4장을 12종이 나눠
+         썼는데, 2026-09-25 에 상품마다 그림이 생겨 그 4장은 지웠다(사용자 요청). */
+      style={{ borderColor: tier.border, backgroundImage: `url(${timePassArt(pass.minutes, pass.combo, "card")})` }}
     >
       <div className="absolute inset-0 bg-topbar/70" />
       <div className="relative flex flex-1 flex-col gap-1">

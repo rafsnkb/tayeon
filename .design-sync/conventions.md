@@ -86,9 +86,9 @@ Rounded shapes are large: cards/sheets use `rounded-[28px]`, buttons
 a `max-w-sm` card — so render at most one at a time.
 
 Images are served from the DS root: `/textures/bi_light.png` and
-`/textures/bi_dark.png` (the 타연 wordmark, behind `BrandBi`) and
-`/textures/tier-1..4.jpg` (the nebula backgrounds on pass cards). Reference
-them by those absolute paths.
+`/textures/bi_dark.png` (the 타연 wordmark, behind `BrandBi`). Pass cards
+carry their own artwork under `/pass/` — one image per product. Reference them
+by those absolute paths.
 
 ## Where the truth lives
 
