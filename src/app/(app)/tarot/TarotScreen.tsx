@@ -759,13 +759,20 @@ function TarotChat() {
             아직 한 번도 안 쓴 방("새 대화" 기본 제목 그대로)은 피그마 "Screen / Main"처럼 제목 대신
             타연 워드마크를 중앙에 보여주고, 방 컨트롤(이름변경/삭제/새대화/이용권뱃지)도 감춘다. */}
         {isMain ? (
-          <button
-            type="button"
-            onClick={openMenu}
-            className="flex flex-1 items-center justify-center"
-          >
-            <BrandBi className="h-6 w-12" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={openMenu}
+              className="flex flex-1 items-center justify-center"
+            >
+              <BrandBi className="h-6 w-12" />
+            </button>
+            {/* 워드마크를 **바의 한가운데**에 놓기 위한 빈 칸 — 왼쪽에 있는 것과 같은 폭이어야
+                한다. flex-1 은 "왼쪽 것을 뺀 나머지"의 가운데를 잡으므로, 짝이 없으면 그 폭의
+                절반만큼 오른쪽으로 밀린다(2026-09-25 실측: 모바일 32px, 데스크탑 8px).
+                모바일은 햄버거 64, 데스크탑은 햄버거가 숨고 대신 감싸는 칸의 xl:pl-4(16)이 남는다. */}
+            <div className="w-16 shrink-0 xl:w-4" aria-hidden="true" />
+          </>
         ) : (
           <>
             <button
