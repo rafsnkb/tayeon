@@ -17,6 +17,8 @@ type PurchaseEntry = {
   refunded: boolean;
   badge: string;
   refundable: boolean;
+  /** 접수해 둔 환불 요청을 아직 물릴 수 있는 상태. */
+  refundPending: boolean;
   /** 구입한 옵션("타로 전용" 등). 조합 개념이 없던 시절 이용권은 null. */
   combo: string | null;
   /** 환불이 거절된 경우의 사유. 왜 막혔는지 모르면 같은 사유로 다시 넣게 된다. */
@@ -48,6 +50,34 @@ export default function PurchaseHistoryPage() {
       }
     });
   }, []);
+
+  /** 접수한 환불 요청을 거둬들인다.
+   *
+   *  되돌릴 수 있는 동작이라(조건이 맞으면 바로 다시 신청할 수 있다) 확인 모달을 두지 않는다 —
+   *  신청 쪽은 사유 입력이 필요해서 모달이 있지만, 취소는 누르면 끝이다. */
+  async function cancelRefund(entry: PurchaseEntry) {
+    const user = auth.currentUser;
+    if (!user || submitting) return;
+    setSubmitting(true);
+    const response = await fetch(
+      `/api/user/refund-requests/${encodeURIComponent(entry.paymentId)}/cancel`,
+      { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken()}` } }
+    );
+    setSubmitting(false);
+    if (!response.ok) {
+      setNotice({ message: (await response.json().catch(() => ({}))).error ?? "환불 취소에 실패했어요.", tone: "error" });
+      return;
+    }
+    // 이용권이 그 자리에서 다시 풀리므로(refund_pending → unused) 배지도 같이 되돌린다.
+    setEntries((items) => items?.map((item) => item.paymentId === entry.paymentId
+      ? { ...item, refundPending: false, refundable: true, badge: "미사용" }
+      : item) ?? items);
+    setNotice({
+      message: `환불 요청을 취소했어요.
+이용권을 다시 사용하실 수 있어요.`,
+      tone: "info",
+    });
+  }
 
   async function requestRefund() {
     const user = auth.currentUser;
@@ -99,6 +129,17 @@ ${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`,
                     {e.refundable && (
                       <button onClick={() => setSelected(e)} className="text-sm font-semibold text-point-text underline">
                         환불하기
+                      </button>
+                    )}
+                    {/* 신청해 둔 뒤에는 같은 자리가 "환불 취소"가 된다 — 마음이 바뀌어도 물릴
+                        길이 없어서 2영업일 뒤 자동 승인으로 결제가 취소됐다(2026-09-24). */}
+                    {e.refundPending && (
+                      <button
+                        onClick={() => cancelRefund(e)}
+                        disabled={submitting}
+                        className="text-sm font-semibold text-icon-muted underline disabled:opacity-50"
+                      >
+                        환불 취소
                       </button>
                     )}
                   </div>

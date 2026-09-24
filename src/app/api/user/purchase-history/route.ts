@@ -156,6 +156,8 @@ export async function GET(req: NextRequest) {
       }
       return {
         paymentId: doc.id,
+        // 사용자가 스스로 요청을 물릴 수 있는 상태인지. 승인·거절이 난 뒤에는 되돌릴 게 없다.
+        refundPending: requested === "pending",
         productName: productName(data.productId, data.productType),
         priceWon: data.priceWon,
         paidAt: data.paidAt ?? data.fulfilledAt,

@@ -39,9 +39,12 @@ export async function POST(req: NextRequest) {
       if (passSnap.data()?.status !== "unused") throw new Error("PASS_NOT_UNUSED");
       // 거절된 건은 다시 요청할 수 있다. 청약철회는 소비자의 권리라 한 번 거절됐다고 막으면
       // 권리 행사를 막는 것이 된다(약관 제9조3항 — 제17조②에 해당할 때만 거절 가능).
+      // 사용자가 스스로 취소한 건도 마찬가지다 — 마음이 또 바뀔 수 있고, 한 번 물렀다고 권리가
+      // 사라지지는 않는다(2026-09-24 환불 취소 추가).
       // 이전 시도는 지우지 않고 history 에 쌓는다 — 분쟁처리 기록 3년 보존 대상이다.
       const existing = existingSnap.data();
-      if (existing && existing.status !== "rejected") throw new Error("ALREADY_PENDING");
+      const reopenable = existing?.status === "rejected" || existing?.status === "cancelled";
+      if (existing && !reopenable) throw new Error("ALREADY_PENDING");
       const history = Array.isArray(existing?.history) ? existing.history : [];
       if (existing) {
         history.push({
@@ -50,12 +53,13 @@ export async function POST(req: NextRequest) {
           status: existing.status ?? null,
           rejectedAt: existing.rejectedAt ?? null,
           rejectionReason: existing.rejectionReason ?? null,
+          cancelledAt: existing.cancelledAt ?? null,
         });
       }
       const write = existing ? tx.set.bind(tx) : tx.create.bind(tx);
       write(requestRef, { uid, paymentId, reason: reason.trim().slice(0, 1000), status: "pending", requestedAt,
         history, attempt: history.length + 1,
-        rejectedAt: null, rejectionReason: null, rejectedByUid: null,
+        rejectedAt: null, rejectionReason: null, rejectedByUid: null, cancelledAt: null,
         // 소비자 불만·분쟁처리 기록 3년(개인정보처리방침 제3조).
         expiresAt: retentionExpiresAt(requestedAt, DISPUTE_RECORD_RETENTION_MONTHS), productId: payment.productId ?? null, orderName: payment.orderName ?? null, productType: payment.productType ?? null, priceWon: payment.priceWon ?? 0, paidAt: payment.paidAt ?? null, paymentMethod: payment.paymentMethod ?? null });
       // 승인 전까지 못 쓰게 잠근다. "쓸 수 있는가"를 묻는 검사는 전부 unused/active 만 보므로
