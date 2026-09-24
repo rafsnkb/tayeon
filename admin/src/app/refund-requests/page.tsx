@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { refundDue } from "@/lib/refundDue";
+import { kstDateTime } from "@/lib/datetime";
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 
 /** 승인 건에 대해 서버가 결제·이용권 문서를 직접 읽어 확인한 결과. 요청 문서의 status 만으로는
@@ -19,10 +20,7 @@ const TABS = [
   { key: "rejected", label: "거절" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
-const date = (value: string | null | undefined) => {
-  if (!value || Number.isNaN(Date.parse(value))) return "-";
-  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value));
-};
+const date = (value: string | null | undefined) => kstDateTime(value);
 const statusLabel = { pending: "검토 대기", approved: "환불 완료", rejected: "거절됨" };
 
 // 상태 낱말은 사용자 화면·사용자 상세와 같은 걸 쓴다. 표에 없는 값은 원문을 그대로 보여

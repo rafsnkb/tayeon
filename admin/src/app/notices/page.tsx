@@ -4,10 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { kstDateTime } from "@/lib/datetime";
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 
 type Notice = { id: string; title: string; body: string; createdAt: string };
-const dateTime = (value: string) => value.replace("T", " ").slice(0, 19);
+const dateTime = (value: string) => kstDateTime(value);
 
 export default function NoticesPage() {
   const router = useRouter();
