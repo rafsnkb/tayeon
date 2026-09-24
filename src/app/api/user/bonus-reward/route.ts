@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { bonusRewardRateForWon, rewardPassesForWon } from "@/lib/tarot/pricing";
+import { bonusRewardRateForWon, rewardPassesForWon, supplyWon } from "@/lib/tarot/pricing";
 import { USERS, PAYMENTS } from "@/lib/firestore/collections";
 
 /** 피그마 "Screen / RewardInfoModal", MyPage "n월 보너스 리워드" — 아직 정산 전인 이번 달의
@@ -35,8 +35,12 @@ export async function GET(req: NextRequest) {
     if (Number.isFinite(priceWon) && priceWon > 0) totalWon += priceWon;
   }
 
-  const rate = bonusRewardRateForWon(totalWon);
-  const projectedPasses = totalWon > 0 ? rewardPassesForWon(totalWon, rate) : 0;
+  // 요율 판정과 지급 회수 모두 공급가액(VAT 제외) 기준이다 — 자세한 근거는 supplyWon 주석.
+  const supply = supplyWon(totalWon);
+  const rate = bonusRewardRateForWon(supply);
+  const projectedPasses = rewardPassesForWon(supply, rate);
 
-  return NextResponse.json({ month, totalWon, rate, projectedPasses });
+  // totalWon 은 실제 결제 총액, supplyWon 은 요율이 걸리는 금액. 화면은 후자를 보여준다 —
+  // 요율과 짝이 맞지 않는 숫자를 나란히 두면 계산을 검산할 수 없다.
+  return NextResponse.json({ month, totalWon, supplyWon: supply, rate, projectedPasses });
 }

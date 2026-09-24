@@ -17,7 +17,9 @@ import {
   comboKeyFor,
   availableCount,
   remainingAfterUse,
+  bonusRewardRateForWon,
   rewardPassesForWon,
+  supplyWon,
   SIGNUP_FREE_PASS_BASIS,
   SIGNUP_FREE_PASSES,
   signupFreePassAllowances,
@@ -102,6 +104,24 @@ test("a fractional remainder with no usable question is exhausted (combo:any)", 
   const pass = { basis, remaining: 0.05, expiresAt: "2099-01-01", combo: "any", status: "unused", allowances: countAllowances(basis) };
   assert.equal(availableCount(pass, "celtic", true, true), 0);
   assert.equal(remainingAfterUse(pass, "one", false, false), 0);
+});
+
+// 리워드는 공급가액(VAT 제외) 기준이다. 1.1 로 나누면 110,000 이 99999.99999999999 로 떨어져서
+// 딱 10만원어치를 결제한 사람이 최저 구간에 못 들었다 — 11의 배수가 정확히 떨어지는지 못 박는다.
+test("the taxable base comes out exact on the amounts people actually pay", () => {
+  assert.equal(supplyWon(110_000), 100_000);
+  assert.equal(supplyWon(1_100_000), 1_000_000);
+  assert.equal(supplyWon(594_000), 540_000);
+  assert.equal(supplyWon(3_300), 3_000);
+  // 11의 배수가 아니면 버린다 — 올려서 구간 경계를 넘겨주지 않는다.
+  assert.equal(supplyWon(3_000), 2_727);
+  for (const empty of [0, -1, NaN, Infinity]) assert.equal(supplyWon(empty), 0);
+});
+
+test("a payment of exactly the advertised floor earns the lowest tier", () => {
+  const base = supplyWon(110_000);
+  assert.equal(bonusRewardRateForWon(base), 0.03);
+  assert.ok(rewardPassesForWon(base, bonusRewardRateForWon(base)) > 0);
 });
 
 test("cashback never buys more than the commission behind it", () => {

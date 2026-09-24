@@ -99,6 +99,30 @@ export const PAYMENT_BONUS_REWARD_TIERS = [
   { minWon: 100_000, rate: 0.03 },
 ] as const;
 
+/** 부가세율. */
+export const VAT_RATE = 0.1;
+
+/**
+ * 결제 총액(VAT 포함)에서 공급가액을 뽑는다 — 리워드 계산의 입력은 항상 이 값이다.
+ *
+ * 상품 가격표(`COUNT_PACKAGES.priceWon`)와 결제 기록은 전부 **VAT 포함 표시가**다(구매 화면이
+ * "상품금액 (VAT 포함)"으로 보여주는 그 값). 그걸 그대로 요율에 넣으면 사용자가 낸 세금까지
+ * 리워드로 돌려주는 셈이 된다 — 그 돈은 우리 몫이 아니라 국고로 가므로 환급해 줄 이유가 없다
+ * (2026-09-24 사용자 결정. 안내 문구는 처음부터 "VAT 제외"라고 쓰고 있었는데 계산만 총액이었다).
+ *
+ * 요율 구간 판정에도 같이 쓰인다. 즉 "10만원 이상" 구간에 들려면 공급가액이 10만원이어야 하고,
+ * 총액으로는 110,000원을 결제해야 한다.
+ *
+ * **1.1 로 나누지 않는다.** `110000 / 1.1` 은 이진 부동소수점에서 99999.99999999999 로 떨어져서
+ * 버림과 만나면 99,999원이 된다 — 딱 10만원어치를 결제한 사람이 구간에 못 들고, 110만원 결제가
+ * 10% 가 아니라 7% 가 됐다. `× 10 / 11` 은 정수 분자로 한 번만 나눠서 11의 배수를 정확히 떨어뜨린다.
+ */
+export function supplyWon(grossWon: number): number {
+  if (!Number.isFinite(grossWon) || grossWon <= 0) return 0;
+  // 버림 — 올려서 구간 경계를 넘겨주지 않는다(rewardPassesForWon 과 같은 방향).
+  return Math.floor((grossWon * 10) / 11);
+}
+
 export function bonusRewardRateForWon(totalWon: number): number {
   const tier = PAYMENT_BONUS_REWARD_TIERS.find((t) => totalWon >= t.minWon);
   return tier?.rate ?? 0;

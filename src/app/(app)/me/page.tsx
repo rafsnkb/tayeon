@@ -9,7 +9,15 @@ import { auth } from "@/lib/firebase/client";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import SubPageTopBar from "@/components/SubPageTopBar";
-import { PAYMENT_BONUS_REWARD_TIERS, REWARD_PAYOUT_DAY_OF_MONTH, countPassDisplayName } from "@/lib/tarot/pricing";
+import {
+  COMBOS,
+  COMBO_ORDER,
+  PAYMENT_BONUS_REWARD_TIERS,
+  REWARD_PAYOUT_DAY_OF_MONTH,
+  SPREADS,
+  SPREAD_ORDER,
+  rewardAllowancesForCombo,
+} from "@/lib/tarot/pricing";
 import {
   SearchIcon,
   InvitePersonIcon,
@@ -21,6 +29,7 @@ import {
   CompassIcon,
   GearIcon,
   LogoutDoorIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   CloseIcon,
 } from "../tarot/icons";
@@ -87,6 +96,15 @@ function formatWonShort(won: number): string {
 // 없애면서 최하단이 5만원 구간이 됐는데, 같은 공식을 그대로 쓰면 "5만원 미만은 1.5%"처럼 실제로는
 // 리워드가 아예 없는 구간(5만원 미만)에 요율이 적용되는 것처럼 잘못 표시된다. 그래서 모든 행을
 // 예외 없이 "X 이상"으로 통일한다.
+/** 보너스 리워드 안내 모달의 두 탭(목업 RewardInfoModal_Expect / _Percent, 2026-09-24). */
+type RewardTab = "expected" | "rate";
+
+/** 0.015 → "1.5%", 0.1 → "10%". 소수점이 필요한 구간만 붙는다. */
+const formatRate = (rate: number) => `${Number((rate * 100).toFixed(2))}%`;
+
+/** 리워드가 시작되는 금액(VAT 제외). 요율표의 최하단 구간이 곧 지급 하한이다. */
+const REWARD_MIN_WON = PAYMENT_BONUS_REWARD_TIERS.at(-1)!.minWon;
+
 const REWARD_TIER_ROWS = PAYMENT_BONUS_REWARD_TIERS.map((tier) => ({
   rate: tier.rate,
   label: `${formatWonShort(tier.minWon)} 이상`,
@@ -117,18 +135,22 @@ function describeEnvironment(): string {
  * 가는 허브. 친구초대는 /invite로 연결된다. */
 export default function MyPage() {
   const router = useRouter();
-  const { user, nickname, profileImage, email, activeCountPass } = useRooms();
-  const activeCountPassName = activeCountPass ? countPassDisplayName(activeCountPass) : null;
+  const { user, nickname, profileImage, email } = useRooms();
   const [accountInfoOpen, setAccountInfoOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [termsAgreedAt, setTermsAgreedAt] = useState<string | null>(null);
   const [rewardInfoOpen, setRewardInfoOpen] = useState(false);
   const [bonusReward, setBonusReward] = useState<{
     month: number;
+    /** 실제 결제 총액(VAT 포함). */
     totalWon: number;
+    /** 요율이 걸리는 금액(VAT 제외). 화면에 보여주는 건 이쪽이다. */
+    supplyWon: number;
     rate: number;
     projectedPasses: number;
   } | null>(null);
+  const [rewardTab, setRewardTab] = useState<RewardTab>("expected");
+  const [rewardCombo, setRewardCombo] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -174,21 +196,6 @@ export default function MyPage() {
                 계정정보
               </button>
             </div>
-            <div className="flex items-center justify-between gap-3 py-3">
-              <span className="min-w-0 truncate text-sm font-semibold text-icon-muted">횟수제 이용권</span>
-              <span className="flex min-w-0 shrink-0 items-center gap-3">
-                <span className="max-w-32 truncate text-right text-base font-bold leading-tight text-bold-text dark:text-white">
-                  {activeCountPassName ?? "없음"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => router.push(withReturnTo("/charge", "/me"))}
-                  className="shrink-0 whitespace-nowrap rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
-                >
-                  구입
-                </button>
-              </span>
-            </div>
             <div className="flex items-center justify-between py-3">
               <button
                 type="button"
@@ -200,17 +207,23 @@ export default function MyPage() {
                   <SearchIcon className="h-2.5 w-2.5" />
                 </span>
               </button>
+              {/* 회수가 아니라 **요율**을 보여준다(목업 MyPage_Dark, 2026-09-24). 회수는 조합마다
+                  달라서 한 줄에 담을 수 없고, 요율은 하나뿐이다. 기준 미달이면 요율이 0 인데
+                  "0%"는 "리워드가 있는데 0"처럼 읽혀서 미지급임을 그대로 쓴다. */}
               <span className="text-lg font-bold text-bold-text">
-                {bonusReward ? `${bonusReward.projectedPasses.toLocaleString("ko-KR")}회 예상` : "-"}
+                {!bonusReward ? "-" : bonusReward.rate > 0 ? formatRate(bonusReward.rate) : "미지급"}
               </span>
             </div>
             <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={() => router.push("/invite")} />
           </Section>
 
-          <Section title="이용권 구입">
-            <ListRow icon={<CartIcon className="h-5 w-5" />} label="이용권 구입" onClick={() => router.push(withReturnTo("/charge", "/me"))} />
+          <Section title="이용권">
+            <ListRow icon={<CartIcon className="h-5 w-5" />} label="횟수제 · 시간제 이용권 구입" onClick={() => router.push(withReturnTo("/charge", "/me"))} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
-            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="받은 이용권 내역" onClick={() => router.push("/received-passes")} />
+            {/* "받은 이용권 내역"을 흡수해 구매분까지 함께 보여주는 화면으로 개편 중이다(목업 대기).
+                그때까지는 기존 수령 창구(/received-passes)를 가리킨다 — 라벨만 먼저 바꾸면 미수령
+                리워드를 받을 길이 사라진다. */}
+            <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="내 보유 이용권" onClick={() => router.push("/received-passes")} />
           </Section>
 
           <Section title="프로필">
@@ -305,49 +318,121 @@ export default function MyPage() {
                 <CloseIcon className="h-5 w-5" />
               </button>
             </div>
+            {/* 두 탭 — 예상 리워드(내 결제액 기준 실제 지급 예정 횟수) / 리워드 비율(요율표).
+                예전엔 한 화면에 둘을 쌓아 뒀는데, 예상 쪽이 조합 4종 × 스프레드 4종 표로 커지면서
+                한 모달에 다 들어가지 않는다(목업 2026-09-24). */}
+            <div className="mb-4 flex rounded-full bg-bg p-1 dark:bg-border">
+              {([["expected", "예상 리워드"], ["rate", "리워드 비율"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setRewardTab(key)}
+                  className={`flex-1 rounded-full py-2.5 text-base font-bold ${
+                    rewardTab === key ? "point-pill text-white" : "text-bold-text"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <p className="mb-4 text-center text-sm font-semibold text-icon-muted">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
             </p>
-            <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-bg p-4 text-sm dark:bg-border">
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">
-                  {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
-                </span>
-                <span className="font-semibold text-bold-text">
-                  {(bonusReward?.totalWon ?? 0).toLocaleString("ko-KR")}원
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-icon-muted">
-                  {bonusReward ? <>{bonusReward.month}월 예상 리워드<br /><span className="text-xs">(원카드 스프레드 기준)</span></> : "이번 달 예상 리워드"}
-                </span>
-                <span className="font-bold text-bold-text">
-                  {(bonusReward?.projectedPasses ?? 0).toLocaleString("ko-KR")}회 예상
-                </span>
-              </div>
-            </div>
-            <p className="mb-2 text-center text-sm font-bold text-bold-text">리워드 지급 비율</p>
-            {/* 다크모드 RewardInfoModal.png 실측(sharp 픽셀 샘플, 2026-09-20): 헤더 칩이 바깥 박스
-                가장자리에 딱 붙지 않고 안쪽에 여백을 두고 떠 있는 형태(박스 bg=--border, 헤더 칩
-                bg=--topbar로 안쪽이 더 어둡게 "패인" 느낌). 라이트모드 목업은 헤더가 박스 끝까지
-                꽉 차 있었지만, 사용자 요청(2026-09-20)으로 두 모드 구조를 동일하게 통일함 —
-                라이트도 같은 여백/독립 라운딩을 쓰고, 행 라벨은 톤을 유지한 진한 색(--bold-text)으로. */}
-            <div className="mb-3 rounded-3xl border border-border bg-bg p-3 dark:border-border dark:bg-border">
-              <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
-                <span>당월 결제금액</span>
-                <span className="text-right">리워드 비율</span>
-              </div>
-              {REWARD_TIER_ROWS.map((row) => (
-                <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
-                  <span className="font-semibold text-bold-text dark:text-white">{row.label}</span>
-                  <span className="text-right font-bold text-point-text">
-                    {Number((row.rate * 100).toFixed(2))}%
+            {rewardTab === "expected" ? (
+              <>
+                <div className="mb-4 flex items-center justify-between rounded-2xl bg-bg p-4 text-sm dark:bg-border">
+                  <span className="text-icon-muted">
+                    {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
+                  </span>
+                  {/* 요율이 걸리는 금액(VAT 제외)을 보여준다 — 총액을 띄우면 옆의 요율과 곱해도
+                      아래 횟수가 안 나와서 사용자가 검산할 수 없다. */}
+                  <span className="font-semibold text-bold-text">
+                    {(bonusReward?.supplyWon ?? 0).toLocaleString("ko-KR")}원
                   </span>
                 </div>
-              ))}
-            </div>
+                {bonusReward && bonusReward.projectedPasses > 0 ? (
+                  <>
+                    <p className="mb-2 text-center text-sm font-semibold text-icon-muted">예상 보너스 리워드 이용권</p>
+                    {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다. */}
+                    <div className="mb-3 flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        aria-label="이전 조합"
+                        onClick={() => setRewardCombo((i) => (i + COMBO_ORDER.length - 1) % COMBO_ORDER.length)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg text-bold-text dark:bg-border"
+                      >
+                        <ChevronLeftIcon className="h-4 w-2" />
+                      </button>
+                      <span className="flex-1 text-center text-lg font-bold text-bold-text">
+                        {COMBOS[COMBO_ORDER[rewardCombo]].label}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="다음 조합"
+                        onClick={() => setRewardCombo((i) => (i + 1) % COMBO_ORDER.length)}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg text-bold-text dark:bg-border"
+                      >
+                        <ChevronRightIcon className="h-4 w-2" />
+                      </button>
+                    </div>
+                    <div className="mb-3 rounded-3xl border border-border bg-bg p-3 dark:border-border dark:bg-border">
+                      <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+                        <span>옵션 이름</span>
+                        <span className="text-right">질문 횟수</span>
+                      </div>
+                      {(() => {
+                        const combo = COMBO_ORDER[rewardCombo];
+                        const { saju, ziwei } = COMBOS[combo];
+                        const suffix = `${saju ? "+사주" : ""}${ziwei ? "+자미두수" : ""}`;
+                        // 지급 규칙은 무상 지급 쪽(버림 + 조합·스프레드별 단조 감소)이다.
+                        const allowances = rewardAllowancesForCombo(
+                          bonusReward.projectedPasses * SPREADS.one.cost,
+                          combo
+                        );
+                        return SPREAD_ORDER.map((spread) => (
+                          <div key={spread} className="grid grid-cols-2 px-4 py-3 text-sm">
+                            <span className="font-semibold text-bold-text dark:text-white">
+                              {SPREADS[spread].label}
+                              {suffix}
+                            </span>
+                            <span className="text-right font-bold text-point-text">{allowances[spread]}회</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mb-3 rounded-2xl bg-bg p-4 text-center text-sm font-semibold text-icon-muted dark:bg-border">
+                    {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
+                    <br />
+                    리워드 이용권을 지급해 드려요.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="mb-2 text-center text-sm font-bold text-bold-text">리워드 지급 비율</p>
+                {/* 다크모드 RewardInfoModal.png 실측(sharp 픽셀 샘플, 2026-09-20): 헤더 칩이 바깥 박스
+                    가장자리에 딱 붙지 않고 안쪽에 여백을 두고 떠 있는 형태(박스 bg=--border, 헤더 칩
+                    bg=--topbar로 안쪽이 더 어둡게 "패인" 느낌). 라이트모드 목업은 헤더가 박스 끝까지
+                    꽉 차 있었지만, 사용자 요청(2026-09-20)으로 두 모드 구조를 동일하게 통일함 —
+                    라이트도 같은 여백/독립 라운딩을 쓰고, 행 라벨은 톤을 유지한 진한 색(--bold-text)으로. */}
+                <div className="mb-3 rounded-3xl border border-border bg-bg p-3 dark:border-border dark:bg-border">
+                  <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+                    <span>당월 결제금액</span>
+                    <span className="text-right">리워드 비율</span>
+                  </div>
+                  {REWARD_TIER_ROWS.map((row) => (
+                    <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
+                      <span className="font-semibold text-bold-text dark:text-white">{row.label}</span>
+                      <span className="text-right font-bold text-point-text">{formatRate(row.rate)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             <p className="text-center text-xs text-icon-muted">보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.</p>
           </div>
         </div>
