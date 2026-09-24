@@ -34,23 +34,29 @@ export function ComboAllowanceCard({
       <div className="mb-4 flex items-center justify-center gap-2">
         {/* 라디오 점과 폭을 맞춰 제목이 가운데 오게 하는 빈 칸. */}
         {onSelect && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
-        <p className="flex-1 text-center text-sm font-semibold text-bold-text">{COMBOS[combo].label}</p>
+        <p className="flex-1 text-center text-sm font-semibold text-chip-soft-text">{COMBOS[combo].label}</p>
         {onSelect && (
           <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${selected ? "bg-point" : "bg-chip-fill"}`}>
             <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-white" : "bg-icon-muted"}`} />
           </span>
         )}
       </div>
-      <div className="rounded-2xl bg-border p-3 text-xs">
-        <div className="flex justify-between rounded bg-topbar px-2 py-1 font-semibold text-icon-muted"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+      {/* 색과 반지름은 목업(MyPass_Send, 2026-09-24)을 sharp 로 픽셀 샘플해서 맞췄다 —
+          박스는 --chip-soft, 그 안의 헤더 줄만 한 톤 더 눌린 면(라이트 --bg / 다크 --topbar),
+          글자는 --placeholder. 반지름은 1236px 목업에서 박스 34px ≈ 화면 11px 이라 rounded-xl
+          (16px 였던 rounded-2xl 은 바깥 카드(28px)와 어긋나 보였다). */}
+      <div className="rounded-xl bg-chip-soft p-3 text-xs">
+        <div className="flex justify-between rounded bg-bg px-2 py-1 font-semibold text-placeholder dark:bg-topbar"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
         {SPREAD_ORDER.map((spread) => (
-          <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-icon-muted">
+          <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-placeholder">
             <span>
               {SPREAD_SHORT[spread]}
               {COMBOS[combo].saju ? "+사주" : ""}
               {COMBOS[combo].ziwei ? "+자미두수" : ""}
             </span>
-            <strong className="shrink-0 text-white">{allowanceFor(combo, spread)}회</strong>
+            {/* 예전엔 text-white 였다. 다크에서만 확인하고 넣은 색이라 라이트 모드에서는
+                밝은 박스 위 흰 글자가 되어 횟수가 보이지 않았다(2026-09-24). */}
+            <strong className="shrink-0 text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
           </div>
         ))}
       </div>

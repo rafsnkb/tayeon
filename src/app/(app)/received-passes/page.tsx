@@ -161,7 +161,7 @@ export default function ReceivedPassesPage() {
                           {badge.label}
                         </span>
                       </span>
-                      <span className="mt-1 block text-sm text-icon-muted">{formatDateTime(entry.createdAt)}</span>
+                      <span className="mt-1 block text-sm text-placeholder">{formatDateTime(entry.createdAt)}</span>
                     </span>
                     {canExpand && (
                       <span className="flex aspect-square items-center justify-center">
@@ -170,11 +170,14 @@ export default function ReceivedPassesPage() {
                     )}
                   </button>
 
+                  {/* 펼친 내용에 카드 껍데기를 두르지 않는다. 안의 ComboAllowanceCard 가 이미
+                      28px 카드라 같은 반지름이 두 겹으로 겹쳐서 밖과 안쪽이 어긋나 보였다 —
+                      목업(MyPass_Send)은 안내 문구와 카드들이 페이지 배경 위에 그대로 놓인다. */}
                   {open && canExpand && (
-                    <div className="mt-4 rounded-[28px] border border-border bg-surface p-4">
+                    <div className="mt-4">
                       {entry.status === "pending" && entry.comboAllowances && (
                         <>
-                          <p className="mb-2 text-center text-sm font-semibold text-icon-muted">
+                          <p className="mb-2 text-center text-sm font-semibold text-placeholder">
                             획득하실 {entry.label} 이용권의 옵션을 선택해주세요.
                           </p>
                           <p className="mb-3 text-center text-xs font-semibold text-urgent">
@@ -201,7 +204,7 @@ export default function ReceivedPassesPage() {
 
                       {entry.status === "claimed" && entry.claimedCombo && entry.comboAllowances && (
                         <>
-                          <p className="mb-3 text-center text-sm font-semibold text-icon-muted">
+                          <p className="mb-3 text-center text-sm font-semibold text-placeholder">
                             {entry.claimedAt && `${formatDateTime(entry.claimedAt)}에 `}
                             {COMBOS[entry.claimedCombo].label} 옵션으로 수령했어요.
                           </p>
@@ -213,7 +216,7 @@ export default function ReceivedPassesPage() {
                       )}
 
                       {entry.status === "expired" && (
-                        <p className="text-center text-sm font-semibold text-icon-muted">
+                        <p className="text-center text-sm font-semibold text-placeholder">
                           수령 가능 기간이 지나 소멸된 이용권이에요.
                         </p>
                       )}
