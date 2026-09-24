@@ -3,14 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { resolveProduct } from "@/lib/payment/products";
 import { adminDb } from "@/lib/firebase/admin";
-import { COMBOS, type ComboKey } from "@/lib/tarot/pricing";
+import { COMBOS, isComboKey, isHeldPass } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
 import { blockIfSuspended } from "@/lib/auth/suspension";
-
-function isComboKey(value: unknown): value is ComboKey {
-  return typeof value === "string" && value in COMBOS;
-}
 
 // 결제창(PortOne.requestPayment)을 열기 직전에 프론트가 호출하는 엔드포인트.
 //
@@ -57,9 +53,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "이용권 옵션을 선택해주세요." }, { status: 400 });
     }
     const passes = await userRef.collection(COUNT_PASSES).get();
+    // 리워드로 받은 이용권은 여러 개 보유가 정상이라 구매분만 본다.
     if (passes.docs.some((doc) => {
       const data = doc.data();
-      return data.source === "purchase" && (data.status === "unused" || data.status === "active");
+      return data.source === "purchase" && isHeldPass(data);
     })) {
       return NextResponse.json({ error: "보유 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
     }
@@ -67,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   if (product.type === "timePass") {
     const passes = await userRef.collection(TIME_PASSES).get();
-    if (passes.docs.some((doc) => ["unused", "active"].includes(doc.data().status))) {
+    if (passes.docs.some((doc) => isHeldPass(doc.data()))) {
       return NextResponse.json({ error: "보유 시간제 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
     }
   }

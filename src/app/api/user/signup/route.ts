@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import type { BirthInfo, JasiRule } from "@/lib/tarot/birthInfo";
+import { isJasiRule, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { normalizeBirthdayMMDD } from "@/lib/user/birthday";
 
-const JASI_RULES: JasiRule[] = ["midnight", "jasi", "splitJasi"];
 
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -36,8 +35,8 @@ export async function POST(req: NextRequest) {
       birthDate: birthInfo.birthDate,
       birthTime: birthInfo.timeUnknown ? null : birthInfo.birthTime || null,
       timeUnknown: Boolean(birthInfo.timeUnknown),
-      jasiRule: JASI_RULES.includes(birthInfo.jasiRule as JasiRule)
-        ? (birthInfo.jasiRule as JasiRule)
+      jasiRule: isJasiRule(birthInfo.jasiRule)
+        ? birthInfo.jasiRule
         : "midnight",
       gender: birthInfo.gender,
       useTrueSolarTime: Boolean(birthInfo.useTrueSolarTime),

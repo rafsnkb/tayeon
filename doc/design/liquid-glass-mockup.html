@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>타연 — Liquid Glass · 자홍 → 코랄</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px 20px 64px; background:#141013; color:#f7eeeb;
+    font:400 14px/1.6 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1320px; margin:0 auto; }
+  h1 { font-size:24px; font-weight:700; letter-spacing:-.02em; margin:0 0 6px; }
+  .lede { margin:0 0 8px; color:#bda7a4; max-width:78ch; }
+  .changes { margin:0 0 26px; padding-left:18px; color:#bda7a4; max-width:78ch; }
+  .changes li { margin-bottom:4px; }
+  .changes b { color:#f7eeeb; }
+  code { font-family:ui-monospace, Menlo, monospace; font-size:12px; }
+
+  .frames { display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+  .frame { margin:0; }
+  figcaption { font-size:12px; color:#bda7a4; margin-bottom:8px; }
+
+  .screen { position:relative; width:390px; height:760px; overflow:hidden;
+    background:var(--page); display:flex; border-radius:26px;
+    box-shadow:0 16px 46px rgba(0,0,0,.5); }
+  .frame.desktop .screen { width:820px; }
+  .col { position:relative; display:flex; flex-direction:column; flex:1; min-width:0; }
+
+  /* Liquid Glass 근사. 원본은 OS 머티리얼이라 렌즈 굴절과 주변광 반응을 시스템이 처리한다.
+     웹에서는 (1) 뒤를 흐리고 채도를 올려 "비침", (2) 위쪽에 밝은 테두리로 "유리 모서리",
+     (3) saturate+brightness로 "빛을 모으는 느낌"까지가 한계다. */
+  .material { background:var(--glass);
+    -webkit-backdrop-filter:blur(22px) saturate(180%) brightness(1.04);
+    backdrop-filter:blur(22px) saturate(180%) brightness(1.04);
+    border:1px solid var(--rim);
+    box-shadow:inset 0 1px 0 var(--rim), 0 6px 22px rgba(0,0,0,.10); }
+
+  .rail { width:232px; display:flex; flex-direction:column; padding:20px 14px;
+    background:var(--surface); border-right:1px solid var(--line); }
+  .wordmark { font-size:19px; font-weight:700; color:var(--text); margin-bottom:22px; padding:0 8px; }
+  .rail nav { display:flex; flex-direction:column; gap:3px; flex:1; }
+  .room { display:block; padding:10px 12px; font-size:13px; color:var(--muted); border-radius:12px;
+    transition:background 260ms cubic-bezier(.3,.9,.3,1), color 260ms ease; }
+  .room:hover, .room.active { background:var(--line); color:var(--text); }
+  .room.active { font-weight:600; }
+
+  .topbar { position:relative; z-index:3; display:flex; align-items:center; gap:10px;
+    height:58px; padding:0 16px; border-radius:0 0 20px 20px; border-top:0; }
+  .topbar .ic { color:var(--text); font-size:15px; }
+  .topbar b { flex:1; text-align:center; color:var(--text); font-size:15px; font-weight:600; }
+  .pill { font-size:11px; font-weight:600; color:var(--text); background:var(--rim);
+    border-radius:999px; padding:5px 11px; white-space:nowrap; }
+
+  /* 상단바·컴포저가 이 위를 덮으므로 위아래 여백을 넉넉히 준다 — 유리 밑으로 내용이 지나가야
+     머티리얼이 성립한다. */
+  .stream { position:relative; z-index:1; flex:1; overflow:hidden;
+    margin-top:-58px; padding:74px 16px 190px; display:flex; flex-direction:column; gap:10px; }
+  .bubble { background:var(--surface); border:1px solid var(--line); border-radius:18px;
+    padding:12px 14px; font-size:13px; line-height:1.65; color:var(--text); max-width:88%; }
+  .bubble.me { align-self:flex-end; background:var(--grad); color:var(--on-grad);
+    border:0; font-weight:600; max-width:78%; }
+  .bubble.card { max-width:96%; }
+  .who { margin:0 0 3px; font-size:11px; color:var(--muted); }
+  .card-name { margin:0 0 7px; font-size:21px; font-weight:700; letter-spacing:-.02em; color:var(--text); }
+  .body { margin:0; }
+  .accent-card { background:var(--grad); color:var(--on-grad); border:0; max-width:96%; font-weight:600; }
+
+  .composer { position:absolute; z-index:3; left:12px; right:12px; bottom:32px;
+    border-radius:24px; padding:10px; }
+  .modes { display:flex; gap:5px; margin-bottom:8px; }
+  .seg { flex:1; font:inherit; font-size:11px; font-weight:600; cursor:pointer; border:0;
+    border-radius:999px; padding:7px 0; background:transparent; color:var(--muted);
+    transition:background 260ms cubic-bezier(.3,.9,.3,1), color 260ms ease; }
+  .seg:hover { background:var(--rim); color:var(--text); }
+  .seg.on { background:var(--grad); color:var(--on-grad); }
+  .input-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:4px 4px 4px 12px; }
+  .ph { color:var(--muted); font-size:13px; }
+  .send { width:38px; height:38px; border:0; border-radius:50%; cursor:pointer;
+    background:var(--grad); color:var(--on-grad); font-size:16px;
+    transition:transform 280ms cubic-bezier(.3,.9,.3,1); }
+  .send:hover { transform:scale(1.08); }
+  .send:active { transform:scale(.93); }
+
+  .btn-accent { font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border:0;
+    border-radius:14px; padding:12px; background:var(--grad); color:var(--on-grad); width:100%; }
+
+  .footnote { position:absolute; left:0; right:0; bottom:0; margin:0; padding:6px 0 10px; text-align:center; }
+  .footnote a { font-size:11px; color:var(--muted); text-decoration:underline; }
+
+  /* 스펙의 필수 항목 두 가지. --reduced-transparency-fallback: opaque 가 명시돼 있다. */
+  @media (prefers-reduced-transparency: reduce) {
+    .material { background:var(--surface) !important;
+      -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition-duration:1ms !important; } }
+
+  .facts { margin:12px 0 0; display:grid; gap:5px; width:390px; }
+  .frame.desktop .facts { width:820px; }
+  .facts > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    border-top:1px solid #2f2429; padding-top:5px; }
+  .facts dt { font-size:12px; color:#bda7a4; }
+  .facts dt b { color:#f7eeeb; }
+  .facts dt small { display:block; opacity:.8; font-size:11px; }
+  .facts dd { margin:0; }
+  .ratio { font-variant-numeric:tabular-nums; font-weight:700; font-size:12px;
+    border-radius:999px; padding:2px 8px; }
+  .ratio i { font-style:normal; margin-left:4px; }
+  .ratio.pass { background:#1e4023; color:#b9f0c0; }
+  .ratio.fail { background:#4a1f1c; color:#ffc9c4; }
+
+  footer { margin-top:30px; color:#bda7a4; font-size:12px; max-width:78ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Liquid Glass · 자홍 → 코랄</h1>
+  <p class="lede">
+    스펙이 <b>“콘텐츠 레이어에는 쓰지 말 것”</b>을 명시한다. 그래서 유리는 <b>상단바와 컴포저</b>에만
+    있고, 말풍선과 카드는 전부 불투명하다 — 앞서 만든 글래스모피즘 시안이 말풍선까지 유리로
+    덮은 건 이 기준으로는 금지 사항이었다.
+  </p>
+  <ul class="changes">
+    <li><b>대화가 유리 밑으로 흘러 들어간다.</b> 상단바와 컴포저가 대화 영역을 덮도록 겹쳤다. 유리 밑으로 지나갈 내용이 없으면 머티리얼이 성립하지 않는다.</li>
+    <li><b>밑을 지나는 코랄 카드를 일부러 넣었다.</b> 렌즈 효과가 보이는 지점이자, 유리 위 글자 대비가 가장 나빠지는 지점이다 — 아래 수치의 “최악” 행이 그 상황이다.</li>
+    <li><b>색을 아껴 쓴다.</b> 스펙의 “use color judiciously”. 유리 자체에는 색을 넣지 않고, 뒤에 있는 것이 색을 준다.</li>
+    <li><b>모서리 위쪽에 밝은 테두리</b>를 넣어 유리의 두께를 흉내 냈다(<code>inset 0 1px 0</code>).</li>
+    <li><b><code>prefers-reduced-transparency</code></b>를 존중한다 — 스펙 변수에 <code>--reduced-transparency-fallback: opaque</code>가 박혀 있다. 켜면 유리가 불투명 면으로 바뀐다.</li>
+  </ul>
+
+  <div class="frames">
+    
+  <figure class="frame ">
+    <figcaption>라이트 · 모바일</figcaption>
+    <div class="screen" style="
+      --page:#fbf1ee; --surface:#ffffff; --text:#3b0f1e; --muted:#7c6b6e;
+      --line:#f2d9d2; --rim:rgba(255,255,255,.85);
+      --glass:rgba(255,255,255,0.72);
+      --grad:linear-gradient(30deg in oklab, #c2005f, #d23c21);
+      --on-grad:#ffffff; --accent-text:#ac0053;">
+      
+
+      <div class="col">
+        <!-- 유리 ①: 상단바. 네비게이션이므로 허용 범위. -->
+        <header class="topbar material">
+          <span class="ic">☰</span>
+          <b>새 대화</b>
+          <span class="pill">스탠다드 · 14회</span>
+        </header>
+
+        <!-- 콘텐츠는 불투명하다. 스펙의 "content layers에 쓰지 말 것"을 지킨다. -->
+        <div class="stream">
+          <div class="bubble">안녕하세요. 밝고 순수한 마음으로 당신의 이야기를 들어드릴게요.</div>
+          <div class="bubble me">올해 이직해도 괜찮을까?</div>
+          <div class="bubble card">
+            <p class="who">원 카드</p>
+            <h4 class="card-name">완드 7</h4>
+            <p class="body">지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+              버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.</p>
+          </div>
+          <!-- 유리 밑으로 지나가는 강한 색면 — 렌즈 효과가 보이는 지점이자 대비 최악 지점. -->
+          <div class="bubble accent-card">이번 리딩은 시간제 이용권으로 진행됐어요.</div>
+          <div class="bubble">더 궁금한 게 있으면 편하게 물어보세요.</div>
+        </div>
+
+        <!-- 유리 ②: 컴포저. 컨트롤이므로 허용 범위. -->
+        <div class="composer material">
+          <div class="modes">
+            <button class="seg on">원 카드</button>
+            <button class="seg">쓰리 카드</button>
+            <button class="seg">양자택일</button>
+            <button class="seg">켈틱</button>
+          </div>
+          <div class="input-row">
+            <span class="ph">궁금한 것을 물어보세요</span>
+            <button class="send">↑</button>
+          </div>
+        </div>
+        <p class="footnote"><a>회사 정보</a></p>
+      </div>
+    </div>
+
+    <dl class="facts">
+      <div><dt>본문 <small>불투명 말풍선 <code>#ffffff</code> 위 — 고정</small></dt><dd><span class="ratio pass">16.50<i>✓</i></span></dd></div>
+      <div><dt>보조 글자</dt><dd><span class="ratio pass">5.02<i>✓</i></span></dd></div>
+      <div><dt>유리 위 글자 · 평소<small>페이지가 뒤에 있을 때 <code>#fefbfa</code></small></dt><dd><span class="ratio pass">16.02<i>✓</i></span></dd></div>
+      <div><dt>유리 위 글자 · <b>최악</b><small>코랄 카드가 밑을 지날 때 <code>#f2c8c1</code> — 스크롤 중 실제로 일어난다</small></dt><dd><span class="ratio pass">10.85<i>✓</i></span></dd></div>
+      <div><dt>액센트 면 위 라벨</dt><dd><span class="ratio pass">4.76<i>✓</i></span></dd></div>
+    </dl>
+  </figure>
+    
+  <figure class="frame ">
+    <figcaption>다크 · 모바일</figcaption>
+    <div class="screen" style="
+      --page:#140c10; --surface:#211519; --text:#fdf2ef; --muted:#b8a29f;
+      --line:#38252b; --rim:rgba(255,255,255,.18);
+      --glass:rgba(42,26,32,0.72);
+      --grad:linear-gradient(30deg in oklab, #ff8a6b, #ff5993);
+      --on-grad:#140c10; --accent-text:#ff9d86;">
+      
+
+      <div class="col">
+        <!-- 유리 ①: 상단바. 네비게이션이므로 허용 범위. -->
+        <header class="topbar material">
+          <span class="ic">☰</span>
+          <b>새 대화</b>
+          <span class="pill">스탠다드 · 14회</span>
+        </header>
+
+        <!-- 콘텐츠는 불투명하다. 스펙의 "content layers에 쓰지 말 것"을 지킨다. -->
+        <div class="stream">
+          <div class="bubble">안녕하세요. 밝고 순수한 마음으로 당신의 이야기를 들어드릴게요.</div>
+          <div class="bubble me">올해 이직해도 괜찮을까?</div>
+          <div class="bubble card">
+            <p class="who">원 카드</p>
+            <h4 class="card-name">완드 7</h4>
+            <p class="body">지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+              버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.</p>
+          </div>
+          <!-- 유리 밑으로 지나가는 강한 색면 — 렌즈 효과가 보이는 지점이자 대비 최악 지점. -->
+          <div class="bubble accent-card">이번 리딩은 시간제 이용권으로 진행됐어요.</div>
+          <div class="bubble">더 궁금한 게 있으면 편하게 물어보세요.</div>
+        </div>
+
+        <!-- 유리 ②: 컴포저. 컨트롤이므로 허용 범위. -->
+        <div class="composer material">
+          <div class="modes">
+            <button class="seg on">원 카드</button>
+            <button class="seg">쓰리 카드</button>
+            <button class="seg">양자택일</button>
+            <button class="seg">켈틱</button>
+          </div>
+          <div class="input-row">
+            <span class="ph">궁금한 것을 물어보세요</span>
+            <button class="send">↑</button>
+          </div>
+        </div>
+        <p class="footnote"><a>회사 정보</a></p>
+      </div>
+    </div>
+
+    <dl class="facts">
+      <div><dt>본문 <small>불투명 말풍선 <code>#211519</code> 위 — 고정</small></dt><dd><span class="ratio pass">16.13<i>✓</i></span></dd></div>
+      <div><dt>보조 글자</dt><dd><span class="ratio pass">7.34<i>✓</i></span></dd></div>
+      <div><dt>유리 위 글자 · 평소<small>페이지가 뒤에 있을 때 <code>#24161c</code></small></dt><dd><span class="ratio pass">15.85<i>✓</i></span></dd></div>
+      <div><dt>유리 위 글자 · <b>최악</b><small>코랄 카드가 밑을 지날 때 <code>#662c40</code> — 스크롤 중 실제로 일어난다</small></dt><dd><span class="ratio pass">9.57<i>✓</i></span></dd></div>
+      <div><dt>액센트 면 위 라벨</dt><dd><span class="ratio pass">6.52<i>✓</i></span></dd></div>
+    </dl>
+  </figure>
+    
+  <figure class="frame desktop">
+    <figcaption>다크 · 데스크톱</figcaption>
+    <div class="screen" style="
+      --page:#140c10; --surface:#211519; --text:#fdf2ef; --muted:#b8a29f;
+      --line:#38252b; --rim:rgba(255,255,255,.18);
+      --glass:rgba(42,26,32,0.72);
+      --grad:linear-gradient(30deg in oklab, #ff8a6b, #ff5993);
+      --on-grad:#140c10; --accent-text:#ff9d86;">
+      
+      <aside class="rail">
+        <div class="wordmark">타연</div>
+        <nav>
+          <a class="room active">이직 고민 상담</a>
+          <a class="room">올해 연애운</a>
+          <a class="room">새 대화</a>
+        </nav>
+        <div class="rail-bottom">
+          <button class="btn-accent">이용권 구입하기</button>
+        </div>
+      </aside>
+
+      <div class="col">
+        <!-- 유리 ①: 상단바. 네비게이션이므로 허용 범위. -->
+        <header class="topbar material">
+          <span class="ic">☰</span>
+          <b>새 대화</b>
+          <span class="pill">스탠다드 · 14회</span>
+        </header>
+
+        <!-- 콘텐츠는 불투명하다. 스펙의 "content layers에 쓰지 말 것"을 지킨다. -->
+        <div class="stream">
+          <div class="bubble">안녕하세요. 밝고 순수한 마음으로 당신의 이야기를 들어드릴게요.</div>
+          <div class="bubble me">올해 이직해도 괜찮을까?</div>
+          <div class="bubble card">
+            <p class="who">원 카드</p>
+            <h4 class="card-name">완드 7</h4>
+            <p class="body">지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+              버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.</p>
+          </div>
+          <!-- 유리 밑으로 지나가는 강한 색면 — 렌즈 효과가 보이는 지점이자 대비 최악 지점. -->
+          <div class="bubble accent-card">이번 리딩은 시간제 이용권으로 진행됐어요.</div>
+          <div class="bubble">더 궁금한 게 있으면 편하게 물어보세요.</div>
+        </div>
+
+        <!-- 유리 ②: 컴포저. 컨트롤이므로 허용 범위. -->
+        <div class="composer material">
+          <div class="modes">
+            <button class="seg on">원 카드</button>
+            <button class="seg">쓰리 카드</button>
+            <button class="seg">양자택일</button>
+            <button class="seg">켈틱</button>
+          </div>
+          <div class="input-row">
+            <span class="ph">궁금한 것을 물어보세요</span>
+            <button class="send">↑</button>
+          </div>
+        </div>
+        <p class="footnote"><a>회사 정보</a></p>
+      </div>
+    </div>
+
+    <dl class="facts">
+      <div><dt>본문 <small>불투명 말풍선 <code>#211519</code> 위 — 고정</small></dt><dd><span class="ratio pass">16.13<i>✓</i></span></dd></div>
+      <div><dt>보조 글자</dt><dd><span class="ratio pass">7.34<i>✓</i></span></dd></div>
+      <div><dt>유리 위 글자 · 평소<small>페이지가 뒤에 있을 때 <code>#24161c</code></small></dt><dd><span class="ratio pass">15.85<i>✓</i></span></dd></div>
+      <div><dt>유리 위 글자 · <b>최악</b><small>코랄 카드가 밑을 지날 때 <code>#662c40</code> — 스크롤 중 실제로 일어난다</small></dt><dd><span class="ratio pass">9.57<i>✓</i></span></dd></div>
+      <div><dt>액센트 면 위 라벨</dt><dd><span class="ratio pass">6.52<i>✓</i></span></dd></div>
+    </dl>
+  </figure>
+  </div>
+
+  <footer>
+    <b>웹에서는 근사치다.</b> 스펙의 Framework Compatibility가 <code>swiftui | uikit | appkit</code>
+    이고 Era/Origin이 “Apple platforms, 2025”다. 원본은 OS 머티리얼이라 렌즈 굴절과 주변광 반응을
+    시스템이 처리한다. <code>backdrop-filter</code>로는 “뒤가 비치고 채도가 올라간다” 정도까지다.
+    <br><br>
+    비용도 스펙에 <code>cost:moderate | drivers:animation,blur</code>로 적혀 있다. 셋 중 유일하게
+    moderate이고, 나머지는 전부 low다. 다만 유리를 두 군데로 제한했으므로 대화가 길어져도 겹치는
+    유리 면은 늘지 않는다 — 앞선 글래스모피즘 시안과 다른 점이다.
+    <br><br>
+    생성: <code>node doc/design/build-liquid-glass-mockup.mjs</code>
+  </footer>
+</div>
+</body>
+</html>

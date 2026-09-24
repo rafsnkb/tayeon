@@ -17,10 +17,8 @@ import {
 import {
   SPREADS,
   isSpreadKey,
-  SAJU_ADD_ON_COST,
-  ZIWEI_ADD_ON_COST,
-  COMPATIBILITY_ADD_ON_COST,
   COMBOS,
+  availableCount,
   type CountPassBalance,
   type ComboKey,
 } from "@/lib/tarot/pricing";
@@ -229,10 +227,26 @@ export async function POST(req: NextRequest) {
     // optionsCovered 여부로, 아니면 활성 이용권(우선순위 큐로 고른 후보)의 고정 조합으로 결정한다.
     // 이용권 자체가 없으면 이후 로직이 의미가 없으므로 여기서 바로 402로 막는다.
     const activePointerPassId = userData?.activeCountPass?.passId as string | undefined;
-    const chosenPass = spreadCovered ? undefined : pickActiveCountPass(countPasses, activePointerPassId);
+    // 후보를 고를 때부터 "이 스프레드를 감당할 수 있는가"를 본다. 남은 권리는 스프레드마다
+    // 환산이 달라서(원카드 10회 = 켈틱 4회) 원카드는 되지만 켈틱은 안 되는 잔량이 생기는데,
+    // 예전엔 remaining > 0 만 보고 통과시킨 뒤 모델 호출을 다 끝내고 나서야 차감 트랜잭션이
+    // 던져서 500 이 났다 — 토큰 비용은 쓰고 리딩은 버려졌다(2026-09-24).
+    const affordsThisSpread = (pass: CountPassBalance) => {
+      const { includeSaju: saju, includeZiwei: ziwei } = deriveIncludeOptions(pass, birthInfo);
+      return availableCount(pass, spread, saju, ziwei) >= 1;
+    };
+    const chosenPass = spreadCovered
+      ? undefined
+      : pickActiveCountPass(countPasses, activePointerPassId, affordsThisSpread);
     if (!spreadCovered && !chosenPass) {
+      // 이용권이 아예 없는 것과, 있는데 이 스프레드에는 모자란 것은 사용자가 할 일이 다르다.
+      const hasUsablePass = Boolean(pickActiveCountPass(countPasses, activePointerPassId));
       return NextResponse.json(
-        { error: "이용 가능한 횟수가 없어요. 이용권을 구입해주세요." },
+        {
+          error: hasUsablePass
+            ? `남은 횟수로는 ${SPREADS[spread].label}를 볼 수 없어요. 카드 수가 적은 스프레드를 선택하거나 이용권을 구입해주세요.`
+            : "이용 가능한 횟수가 없어요. 이용권을 구입해주세요.",
+        },
         { status: 402 }
       );
     }
@@ -633,13 +647,6 @@ export async function POST(req: NextRequest) {
       const sajuFree = Boolean(cardsOk && includeSaju && !attempt.sajuOk);
       const ziweiFree = Boolean(cardsOk && includeZiwei && !attempt.ziweiOk);
 
-      const chargedCost = cardsOk && !chosenPass
-        ? (spreadCovered ? 0 : { one: 200, three: 250, dual: 300, celtic: 400 }[spread]) +
-          (sajuCharged ? (spreadCovered && timePassCombo && COMBOS[timePassCombo].saju ? 0 : SAJU_ADD_ON_COST) : 0) +
-          (ziweiCharged ? (spreadCovered && timePassCombo && COMBOS[timePassCombo].ziwei ? 0 : ZIWEI_ADD_ON_COST) : 0) +
-          (compatibilityCharged ? (spreadCovered ? 0 : COMPATIBILITY_ADD_ON_COST) : 0)
-        : 0;
-
       const cards = cardsOk
         ? drawnCards.map((d) => ({
             id: d.card.id,
@@ -662,7 +669,12 @@ export async function POST(req: NextRequest) {
       await roomRef.collection(READINGS).add({
         question,
         spread,
-        cost: chargedCost,
+        // 코인 차감액. 코인 상품이 없어진 뒤로 항상 0이다 — 예전엔 여기 계산식이 있었는데,
+        // 위쪽 402 가드("이용권이 없으면 여기까지 오지 못함") 때문에 chosenPass 가 없다는 건
+        // 곧 시간제 이용권이 덮고 있다는 뜻이라 식의 모든 항이 0으로 접혔다(2026-09-24 제거).
+        // 필드 자체는 남긴다 — 이용 내역(/api/user/usage-history)이 읽고, 과거 리딩 문서에는
+        // 실제 차감액이 들어 있다.
+        cost: 0,
         countPassId: chargedPassId,
         cards,
         includeSaju: sajuCharged,
@@ -710,6 +722,15 @@ export async function POST(req: NextRequest) {
         roomTitle: newRoomTitle,
       });
     } catch (error) {
+      // 위 사전 검사를 통과한 뒤 다른 요청이 잔량을 먼저 써 버린 경우. 리딩은 이미 만들어졌지만
+      // 차감할 권리가 없으므로 지급하지 않는다 — 그래도 500 대신 이유를 알려준다.
+      if (error instanceof Error && error.message === "COUNT_PASS_UNAVAILABLE") {
+        console.error("[reading] 차감 직전에 잔량이 소진됨", uid, spread);
+        return NextResponse.json(
+          { error: "남은 횟수가 방금 소진됐어요. 이용권을 확인해주세요." },
+          { status: 409 }
+        );
+      }
       if (error instanceof Anthropic.APIError) {
         console.error("Anthropic API error:", error.status, error.message);
         return NextResponse.json(

@@ -1,0 +1,339 @@
+// Neumorphism + Soft UI Evolution 시안 (자홍 → 코랄).
+//   node doc/design/build-neu-soft-mockup.mjs  →  doc/design/neu-soft-mockup.html
+//
+// uupm.cc/demo/health-wellness에서 값을 직접 뽑아 옮긴다. 그 데모의 구조는 머티리얼 두 개를
+// 역할로 나눠 쓰는 것이다:
+//
+//   neu-card   배경과 **같은 색** + 이중 그림자(어두운 쪽 8/8, 밝은 쪽 -8/-8, blur 16), radius 24
+//              → 눌러 넣거나 솟아오른 느낌. 크롬·컨트롤에 쓴다.
+//   soft-card  흰 면 + 단일 그림자 rgba(0,0,0,.08) 0 4px 20px, radius 24
+//              → 페이지에서 떠 있는 느낌. 읽는 콘텐츠에 쓴다.
+//   btn-primary 액센트 면 + 액센트 그림자 rgba(accent,.3) 0 4px 14px, radius 16
+//
+// 뉴모피즘의 함정은 대비다. 카드가 배경과 같은 색이므로 경계를 그림자만으로 만드는데, 그림자는
+// 대비 계산에 잡히지 않는다. 그래서 콘텐츠를 neu에 올리면 읽기 어려워진다 — 데모가 읽는 카드에
+// soft(흰 면)를 쓰는 이유이고, 여기서도 그 구분을 지킨다.
+
+import { writeFileSync } from "node:fs";
+import { contrast } from "./build-point-ramp.mjs";
+
+const THEMES = {
+  light: {
+    label: "라이트",
+    // 데모의 #f5f5f5 자리. 코랄과 같이 놓이도록 따뜻한 쪽으로 아주 살짝 기울였다.
+    page: "#f4efed",
+    soft: "#ffffff",
+    text: "#2e1218",
+    muted: "#7b6367",
+    // 이중 그림자. 데모는 rgba(174,174,192,.4) / rgba(255,255,255,.8).
+    neuDark: "rgba(176, 150, 152, .45)",
+    neuLight: "rgba(255, 255, 255, .95)",
+    softShadow: "rgba(46, 18, 24, .08)",
+    ghostLine: "#e6d8d4",
+    gradFrom: "#c2005f",
+    gradTo: "#d23c21",
+    onGrad: "#ffffff",
+    accentText: "#ac0053",
+    accentShadow: "rgba(194, 0, 95, .3)",
+  },
+  dark: {
+    label: "다크",
+    // 다크 뉴모피즘은 면이 너무 어두우면 밝은 쪽 그림자가 안 보인다. 완전한 검정을 피한다.
+    page: "#241a1e",
+    soft: "#2e2126",
+    text: "#fdf2ef",
+    muted: "#bba5a4",
+    neuDark: "rgba(0, 0, 0, .55)",
+    neuLight: "rgba(255, 255, 255, .06)",
+    softShadow: "rgba(0, 0, 0, .35)",
+    ghostLine: "#4a353b",
+    gradFrom: "#ff8a6b",
+    gradTo: "#ff5993",
+    onGrad: "#241a1e",
+    accentText: "#ff9d86",
+    accentShadow: "rgba(255, 105, 140, .28)",
+  },
+};
+
+const fmt = (n) => n.toFixed(2);
+const chip = (n, floor = 4.5) =>
+  `<span class="ratio ${n >= floor ? "pass" : "fail"}">${fmt(n)}<i>${n >= floor ? "✓" : "✗"}</i></span>`;
+
+function frame(key, variant) {
+  const t = THEMES[key];
+  const desktop = variant === "desktop";
+  const onGrad = Math.min(contrast(t.gradFrom, t.onGrad), contrast(t.gradTo, t.onGrad));
+
+  const style = `
+      --page:${t.page}; --soft:${t.soft}; --text:${t.text}; --muted:${t.muted};
+      --neu-dark:${t.neuDark}; --neu-light:${t.neuLight}; --soft-shadow:${t.softShadow};
+      --ghost-line:${t.ghostLine}; --accent-shadow:${t.accentShadow};
+      --grad:linear-gradient(30deg in oklab, ${t.gradFrom}, ${t.gradTo});
+      --on-grad:${t.onGrad}; --accent-text:${t.accentText};
+      --g1:${t.gradFrom}; --g2:${t.gradTo};`;
+
+  return `
+  <figure class="frame ${desktop ? "desktop" : ""}">
+    <figcaption>${t.label}${desktop ? " · 데스크톱" : " · 모바일"}</figcaption>
+    <div class="screen" style="${style}">
+      ${desktop ? `
+      <aside class="rail">
+        <div class="wordmark">타연</div>
+        <nav>
+          <a class="room active">이직 고민 상담</a>
+          <a class="room">올해 연애운</a>
+          <a class="room">새 대화</a>
+        </nav>
+        <div class="rail-bottom">
+          <button class="btn-accent">이용권 구입하기</button>
+          <button class="btn-neu">새 대화</button>
+        </div>
+      </aside>` : ""}
+
+      <div class="col">
+        <!-- 크롬은 neu: 배경과 같은 색이고 그림자로만 형태를 만든다. -->
+        <header class="topbar">
+          <button class="icon-neu">☰</button>
+          <b>새 대화</b>
+          <span class="chip-neu">스탠다드 · 14회</span>
+        </header>
+
+        <div class="stream">
+          <!-- 읽는 내용은 soft: 흰 면 + 단일 그림자. neu 위에 올리면 읽기 어려워진다. -->
+          <div class="soft-card">
+            <p class="who">루미</p>
+            <p class="body">안녕하세요. 밝고 순수한 마음으로 당신의 이야기를 들어드릴게요.</p>
+          </div>
+
+          <div class="me-row"><div class="me-card">올해 이직해도 괜찮을까?</div></div>
+
+          <div class="soft-card">
+            <p class="who">원 카드</p>
+            <h4 class="card-name">완드 7</h4>
+            <p class="body">지금 자리를 지키려는 힘과 밖으로 나가려는 힘이 맞붙어 있어요.
+              버티는 쪽이 유리해 보이지만, 그 버팀이 목적이 되면 지칩니다.</p>
+            <div class="ring-row">
+              <span class="ring"><em>7</em></span>
+              <span class="ring-note">완드 · 불의 기운<br>행동과 경쟁</span>
+            </div>
+          </div>
+
+          <div class="suggest">
+            <button class="btn-neu sm">지금 준비해야 할 건 뭘까?</button>
+            <button class="btn-neu sm">올해 안에 결정해도 될까?</button>
+          </div>
+        </div>
+
+        <div class="composer">
+          <div class="modes">
+            <button class="seg on">원 카드</button>
+            <button class="seg">쓰리 카드</button>
+            <button class="seg">양자택일</button>
+            <button class="seg">켈틱</button>
+          </div>
+          <!-- 입력칸은 눌러 넣은 neu(inset) — 데모의 눌린 면과 같은 발상. -->
+          <div class="input-row">
+            <span class="ph">궁금한 것을 물어보세요</span>
+            <button class="send">↑</button>
+          </div>
+        </div>
+        <p class="footnote"><a>회사 정보</a></p>
+      </div>
+    </div>
+
+    <dl class="facts">
+      <div><dt>본문 <small>soft 면 <code>${t.soft}</code> 위 — 읽는 내용은 전부 여기</small></dt><dd>${chip(contrast(t.soft, t.text))}</dd></div>
+      <div><dt>보조 글자</dt><dd>${chip(contrast(t.soft, t.muted))}</dd></div>
+      <div><dt>neu 면 위 글자<small>배경과 같은 색 <code>${t.page}</code> — 크롬·컨트롤에만 쓴다</small></dt><dd>${chip(contrast(t.page, t.text))}</dd></div>
+      <div><dt>액센트 면 위 라벨<small>양 끝 중 불리한 쪽</small></dt><dd>${chip(onGrad)}</dd></div>
+      <div><dt>soft 카드가 페이지에서 떠 보이는 정도<small>그림자는 대비 계산에 안 잡힌다 — 참고값</small></dt><dd><span class="ratio note">${fmt(contrast(t.soft, t.page))}</span></dd></div>
+    </dl>
+  </figure>`;
+}
+
+const html = `<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>타연 — Neumorphism + Soft UI Evolution · 자홍 → 코랄</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; padding:32px 20px 64px; background:#ece5e3; color:#2e1218;
+    font:400 14px/1.6 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1320px; margin:0 auto; }
+  h1 { font-size:24px; font-weight:600; letter-spacing:-.02em; margin:0 0 6px; }
+  .lede { margin:0 0 8px; color:#7b6367; max-width:78ch; }
+  .changes { margin:0 0 26px; padding-left:18px; color:#7b6367; max-width:78ch; }
+  .changes li { margin-bottom:4px; }
+  .changes b { color:#2e1218; }
+  code { font-family:ui-monospace, Menlo, monospace; font-size:12px; }
+
+  .frames { display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+  .frame { margin:0; }
+  figcaption { font-size:12px; color:#7b6367; margin-bottom:8px; }
+
+  .screen { position:relative; width:390px; height:790px; overflow:hidden;
+    background:var(--page); display:flex; border-radius:30px;
+    box-shadow:0 16px 46px rgba(46,18,24,.22); }
+  .frame.desktop .screen { width:820px; }
+  .col { position:relative; display:flex; flex-direction:column; flex:1; min-width:0; }
+
+  /* neu: 배경과 같은 색 + 이중 그림자. 데모는 8/8·-8/-8 blur16, 작은 것은 4/4·-4/-4 blur8. */
+  .neu { background:var(--page);
+    box-shadow:8px 8px 16px var(--neu-dark), -8px -8px 16px var(--neu-light); }
+  .neu-sm { background:var(--page);
+    box-shadow:4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light); }
+  /* 눌러 넣은 면 — 입력칸처럼 "담는" 컨트롤에 쓴다. */
+  .neu-in { background:var(--page);
+    box-shadow:inset 4px 4px 9px var(--neu-dark), inset -4px -4px 9px var(--neu-light); }
+
+  .rail { width:238px; display:flex; flex-direction:column; padding:20px 16px; background:var(--page); }
+  .wordmark { font-size:19px; font-weight:700; color:var(--text); margin-bottom:22px; padding:0 6px; }
+  .rail nav { display:flex; flex-direction:column; gap:8px; flex:1; }
+  .room { display:block; padding:11px 14px; font-size:13px; color:var(--muted); border-radius:14px;
+    transition:box-shadow 260ms ease, color 260ms ease; }
+  .room.active { background:var(--page); color:var(--text); font-weight:600;
+    box-shadow:inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light); }
+  .room:not(.active):hover { color:var(--text);
+    box-shadow:3px 3px 7px var(--neu-dark), -3px -3px 7px var(--neu-light); }
+  .rail-bottom { display:flex; flex-direction:column; gap:10px; }
+
+  .topbar { display:flex; align-items:center; gap:10px; height:64px; padding:0 16px; }
+  .icon-neu { width:38px; height:38px; border:0; border-radius:12px; cursor:pointer;
+    background:var(--page); color:var(--text); font-size:14px;
+    box-shadow:4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light);
+    transition:box-shadow 240ms ease; }
+  .icon-neu:active { box-shadow:inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light); }
+  .topbar b { flex:1; text-align:center; color:var(--text); font-size:15px; font-weight:600; }
+  .chip-neu { font-size:11px; font-weight:600; color:var(--muted); background:var(--page);
+    border-radius:999px; padding:7px 13px; white-space:nowrap;
+    box-shadow:inset 3px 3px 6px var(--neu-dark), inset -3px -3px 6px var(--neu-light); }
+
+  .stream { flex:1; overflow:hidden; padding:8px 18px 196px; display:flex;
+    flex-direction:column; gap:14px; }
+
+  /* soft: 흰 면 + 단일 그림자. 읽는 내용은 전부 여기 올라간다. */
+  .soft-card { background:var(--soft); border-radius:24px; padding:16px 18px;
+    box-shadow:0 4px 20px var(--soft-shadow); }
+  .who { margin:0 0 4px; font-size:11px; color:var(--muted); }
+  .body { margin:0; font-size:13.5px; line-height:1.7; color:var(--text); }
+  .card-name { margin:2px 0 8px; font-size:22px; font-weight:600; letter-spacing:-.02em; color:var(--text); }
+
+  .ring-row { display:flex; align-items:center; gap:14px; margin-top:14px; }
+  /* 데모의 진행 링 자리 — 숫자 카드를 원형 게이지처럼 보여준다. */
+  .ring { width:56px; height:56px; border-radius:50%; flex:none; display:grid; place-items:center;
+    background:conic-gradient(from 180deg, var(--g1) 0turn, var(--g2) .7turn, var(--page) .7turn 1turn); }
+  .ring em { width:42px; height:42px; border-radius:50%; background:var(--soft); display:grid;
+    place-items:center; font-style:normal; font-weight:700; font-size:16px; color:var(--text); }
+  .ring-note { font-size:11.5px; line-height:1.55; color:var(--muted); }
+
+  .me-row { display:flex; justify-content:flex-end; }
+  .me-card { background:var(--grad); color:var(--on-grad); font-weight:600; max-width:80%;
+    border-radius:20px; padding:12px 16px; font-size:13.5px;
+    box-shadow:0 4px 14px var(--accent-shadow); }
+
+  .suggest { display:flex; flex-direction:column; gap:10px; }
+  .btn-neu { font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; border:0;
+    border-radius:16px; padding:12px 16px; background:var(--page); color:var(--text);
+    box-shadow:4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light);
+    transition:box-shadow 240ms ease; }
+  .btn-neu.sm { text-align:left; font-weight:500; color:var(--accent-text); }
+  .btn-neu:active { box-shadow:inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light); }
+
+  .composer { position:absolute; left:16px; right:16px; bottom:34px; }
+  .modes { display:flex; gap:7px; margin-bottom:12px; }
+  .seg { flex:1; font:inherit; font-size:11px; font-weight:600; cursor:pointer; border:0;
+    border-radius:12px; padding:9px 0; background:var(--page); color:var(--muted);
+    box-shadow:3px 3px 7px var(--neu-dark), -3px -3px 7px var(--neu-light);
+    transition:box-shadow 240ms ease, color 240ms ease; }
+  .seg.on { background:var(--grad); color:var(--on-grad); box-shadow:0 4px 14px var(--accent-shadow); }
+  .seg:not(.on):active { box-shadow:inset 3px 3px 6px var(--neu-dark), inset -3px -3px 6px var(--neu-light); }
+  .input-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border-radius:22px; padding:7px 7px 7px 18px; background:var(--page);
+    box-shadow:inset 5px 5px 11px var(--neu-dark), inset -5px -5px 11px var(--neu-light); }
+  .ph { color:var(--muted); font-size:13px; }
+  .send { width:42px; height:42px; border:0; border-radius:50%; cursor:pointer;
+    background:var(--grad); color:var(--on-grad); font-size:16px;
+    box-shadow:0 4px 14px var(--accent-shadow); transition:transform 240ms ease; }
+  .send:hover { transform:translateY(-2px); }
+  .send:active { transform:scale(.94); }
+
+  .btn-accent { font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border:0;
+    border-radius:16px; padding:13px; background:var(--grad); color:var(--on-grad);
+    box-shadow:0 4px 14px var(--accent-shadow); transition:transform 240ms ease; }
+  .btn-accent:hover { transform:translateY(-2px); }
+
+  .footnote { position:absolute; left:0; right:0; bottom:0; margin:0; padding:7px 0 11px; text-align:center; }
+  .footnote a { font-size:11px; color:var(--muted); text-decoration:underline; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition-duration:1ms !important; } }
+
+  .facts { margin:12px 0 0; display:grid; gap:5px; width:390px; }
+  .frame.desktop .facts { width:820px; }
+  .facts > div { display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    border-top:1px solid #d6cbc8; padding-top:5px; }
+  .facts dt { font-size:12px; color:#7b6367; }
+  .facts dt small { display:block; opacity:.8; font-size:11px; }
+  .facts dd { margin:0; }
+  .ratio { font-variant-numeric:tabular-nums; font-weight:700; font-size:12px;
+    border-radius:999px; padding:2px 8px; }
+  .ratio i { font-style:normal; margin-left:4px; }
+  .ratio.pass { background:#d7f0da; color:#12451c; }
+  .ratio.fail { background:#f7d9d5; color:#7a1a14; }
+  .ratio.note { background:rgba(120,100,100,.16); color:#2e1218; }
+
+  footer { margin-top:30px; color:#7b6367; font-size:12px; max-width:78ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Neumorphism + Soft UI Evolution · 자홍 → 코랄</h1>
+  <p class="lede">
+    <code>uupm.cc/demo/health-wellness</code>에서 값을 직접 뽑아 옮겼다. 그 데모의 구조는
+    <b>머티리얼 두 개를 역할로 나눠 쓰는 것</b>이다 — 크롬은 뉴모피즘, 읽는 내용은 Soft UI.
+  </p>
+  <ul class="changes">
+    <li><b>neu</b>: 배경과 <b>같은 색</b> + 이중 그림자(<code>8/8</code>, <code>-8/-8</code>, blur 16). 상단바 버튼, 스프레드, 추천 질문, 사이드바 항목에 쓴다.</li>
+    <li><b>soft</b>: 흰 면 + 단일 그림자(<code>0 4px 20px</code>), radius 24. 말풍선과 카드처럼 <b>읽는 내용은 전부 여기</b> 올린다.</li>
+    <li><b>입력칸은 눌러 넣은 면</b>(<code>inset</code>)이다. 담는 컨트롤은 들어가고, 누르는 컨트롤은 솟아오른다 — 뉴모피즘이 상태를 표현하는 방식이다.</li>
+    <li><b>눌리면 실제로 들어간다.</b> 버튼을 클릭해보면 그림자가 inset으로 뒤집힌다.</li>
+    <li><b>액센트만 그림자 색이 다르다.</b> 데모의 <code>rgba(accent,.3) 0 4px 14px</code> 자리에 코랄을 넣었다.</li>
+    <li><b>카드 번호를 원형 게이지</b>로 뒀다 — 데모의 75% 링 자리다.</li>
+  </ul>
+
+  <div class="frames">
+    ${frame("light", "mobile")}
+    ${frame("dark", "mobile")}
+    ${frame("dark", "desktop")}
+  </div>
+
+  <footer>
+    <b>뉴모피즘의 함정은 대비다.</b> 카드가 배경과 같은 색이라 경계를 그림자만으로 만드는데,
+    그림자는 대비 계산에 잡히지 않는다. 그래서 읽는 내용을 neu 면에 올리면 글자는 통과해도
+    면 자체가 안 보인다. 데모가 읽는 카드에 흰 면(soft)을 쓰는 이유이고, 여기서도 그 구분을
+    지켰다 — 아래 수치의 “본문”이 soft 기준인 것도 그래서다.
+    <br><br>
+    데모에서 뽑은 원본 값: page <code>#f5f5f5</code>,
+    neu <code>rgba(174,174,192,.4) 8px 8px 16px / rgba(255,255,255,.8) -8px -8px 16px</code>, radius 24,
+    soft <code>#fff / rgba(0,0,0,.08) 0 4px 20px</code>, radius 24,
+    primary <code>#22c55e / rgba(34,197,94,.3) 0 4px 14px</code>, radius 16,
+    ghost <code>2px solid #e2e8f0</code>, font DM Sans, h1 60/75 weight 600.
+    <br><br>
+    생성: <code>node doc/design/build-neu-soft-mockup.mjs</code>
+  </footer>
+</div>
+</body>
+</html>
+`;
+
+writeFileSync("doc/design/neu-soft-mockup.html", html);
+console.log("wrote doc/design/neu-soft-mockup.html");
+for (const [, t] of Object.entries(THEMES)) {
+  console.log(
+    `${t.label.padEnd(4)} soft본문 ${fmt(contrast(t.soft, t.text))}  보조 ${fmt(contrast(t.soft, t.muted))}` +
+      `  neu면글자 ${fmt(contrast(t.page, t.text))}` +
+      `  액센트 ${fmt(Math.min(contrast(t.gradFrom, t.onGrad), contrast(t.gradTo, t.onGrad)))}` +
+      `  soft-page ${fmt(contrast(t.soft, t.page))}`,
+  );
+}

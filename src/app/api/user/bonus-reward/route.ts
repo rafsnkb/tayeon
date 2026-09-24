@@ -6,7 +6,7 @@ import { USERS, PAYMENTS } from "@/lib/firestore/collections";
 
 /** 피그마 "Screen / RewardInfoModal", MyPage "n월 보너스 리워드" — 아직 정산 전인 이번 달의
  * 실시간 예상치를 보여준다. 실제 지급은 functions/src/index.ts의 monthlyBonusRewardPayout이
- * 다음달 5일에 처리한다(이 라우트는 조회만, 지급은 하지 않음). */
+ * 다음달 REWARD_PAYOUT_DAY_OF_MONTH일에 처리한다(이 라우트는 조회만, 지급은 하지 않음). */
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
   if (!uid) {

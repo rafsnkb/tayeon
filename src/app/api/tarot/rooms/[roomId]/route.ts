@@ -15,11 +15,18 @@ export async function DELETE(
   const { roomId } = await params;
   const roomRef = adminDb.collection(USERS).doc(uid).collection(ROOMS).doc(roomId);
 
+  // Firestore 배치는 최대 500 쓰기다. 리딩을 한 배치에 다 담으면 500개가 넘는 방(일 100회
+  // 상한이니 며칠이면 닿는다)은 커밋이 거부돼 **영구히 삭제 불가**가 된다(2026-09-24).
+  // recursiveDelete 를 쓰면 방 문서와 하위를 한 번에 지울 수 있지만, 여기선 쪼개서 지운다 —
+  // 방 문서를 마지막에 지워야 중간에 실패해도 "리딩만 사라진 방"이 남지 않는다.
+  const BATCH_LIMIT = 450;
   const readingsSnap = await roomRef.collection(READINGS).get();
-  const batch = adminDb.batch();
-  readingsSnap.docs.forEach((doc) => batch.delete(doc.ref));
-  batch.delete(roomRef);
-  await batch.commit();
+  for (let i = 0; i < readingsSnap.docs.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    for (const doc of readingsSnap.docs.slice(i, i + BATCH_LIMIT)) batch.delete(doc.ref);
+    await batch.commit();
+  }
+  await roomRef.delete();
 
   return NextResponse.json({ ok: true });
 }

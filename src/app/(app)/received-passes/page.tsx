@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatDateTime } from "@/lib/util/formatDate";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
@@ -11,10 +12,10 @@ import {
   PENDING_REWARD_CLAIM_WINDOW_MONTHS,
   formatMonths,
   type ComboKey,
-  type SpreadKey,
 } from "@/lib/tarot/pricing";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import NoBirthTimePopup from "@/components/NoBirthTimePopup";
+import { ComboAllowanceCard, ComboAllowanceList } from "@/components/ComboAllowanceCard";
 import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
 
 type ReceivedPass = {
@@ -30,17 +31,7 @@ type ReceivedPass = {
   comboAllowances?: Record<ComboKey, Record<string, number>>;
 };
 
-const SPREAD_KEYS: SpreadKey[] = ["one", "three", "dual", "celtic"];
-const SPREAD_SHORT: Record<SpreadKey, string> = {
-  one: "원 카드", three: "쓰리 카드", dual: "양자택일", celtic: "켈틱 크로스",
-};
-const COMBO_KEYS = Object.keys(COMBOS) as ComboKey[];
 
-function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 function statusBadge(status: ReceivedPass["status"]) {
   if (status === "pending") return { label: "미수령", className: "bg-success text-success-text" };
@@ -190,47 +181,16 @@ export default function ReceivedPassesPage() {
                             수령 후 유효기간은 수령일로부터 {formatMonths(COUNT_PASS_VALIDITY_MONTHS)}입니다.
                           </p>
                           {error && <p className="mb-2 text-center text-sm text-urgent">{error}</p>}
-                          <div className="flex flex-col gap-3">
-                            {COMBO_KEYS.map((combo) => {
-                              const isSelected = selectedCombo === combo;
-                              return (
-                                <button
-                                  key={combo}
-                                  type="button"
-                                  onClick={() => selectCombo(combo)}
-                                  className={`relative rounded-[28px] bg-topbar p-4 text-left ${
-                                    isSelected ? "border-2 border-point" : "border border-border"
-                                  }`}
-                                >
-                                  <div className="mb-4 flex items-center justify-center gap-2">
-                                    <span className="h-6 w-6 shrink-0" aria-hidden="true" />
-                                    <p className="flex-1 text-center text-sm font-semibold text-bold-text">{COMBOS[combo].label}</p>
-                                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSelected ? "bg-point" : "bg-[#34363c]"}`}>
-                                      <span className={`h-2.5 w-2.5 rounded-full ${isSelected ? "bg-white" : "bg-[#70747d]"}`} />
-                                    </span>
-                                  </div>
-                                  <div className="rounded-2xl bg-border p-3 text-xs">
-                                    <div className="flex justify-between rounded bg-topbar px-2 py-1 font-semibold text-icon-muted"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
-                                    {SPREAD_KEYS.map((spread) => (
-                                      <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-icon-muted">
-                                        <span>
-                                          {SPREAD_SHORT[spread]}
-                                          {COMBOS[combo].saju ? "+사주" : ""}
-                                          {COMBOS[combo].ziwei ? "+자미두수" : ""}
-                                        </span>
-                                        <strong className="shrink-0 text-white">{entry.comboAllowances![combo][spread]}회</strong>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
+                          <ComboAllowanceList
+                            allowanceFor={(combo, spread) => entry.comboAllowances![combo][spread]}
+                            selected={selectedCombo}
+                            onSelect={selectCombo}
+                          />
                           <button
                             type="button"
                             onClick={() => claim(entry)}
                             disabled={!selectedCombo || claiming}
-                            className="mt-4 h-12 w-full rounded-2xl bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-icon-muted disabled:opacity-60"
+                            className="mt-4 h-12 w-full rounded-2xl bg-point text-base font-bold text-white disabled:bg-chip-fill disabled:text-chip-muted-text disabled:opacity-60"
                           >
                             {claiming ? "받는 중..." : `${entry.label} 이용권 받기`}
                           </button>
@@ -243,22 +203,10 @@ export default function ReceivedPassesPage() {
                             {entry.claimedAt && `${formatDateTime(entry.claimedAt)}에 `}
                             {COMBOS[entry.claimedCombo].label} 옵션으로 수령했어요.
                           </p>
-                          <div className="rounded-[28px] border border-border bg-topbar p-4">
-                            <p className="mb-4 text-center text-sm font-semibold text-bold-text">{COMBOS[entry.claimedCombo].label}</p>
-                            <div className="rounded-2xl bg-border p-3 text-xs">
-                              <div className="flex justify-between rounded bg-topbar px-2 py-1 font-semibold text-icon-muted"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
-                              {SPREAD_KEYS.map((spread) => (
-                                <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-icon-muted">
-                                  <span>
-                                    {SPREAD_SHORT[spread]}
-                                    {COMBOS[entry.claimedCombo!].saju ? "+사주" : ""}
-                                    {COMBOS[entry.claimedCombo!].ziwei ? "+자미두수" : ""}
-                                  </span>
-                                  <strong className="shrink-0 text-white">{entry.comboAllowances![entry.claimedCombo!][spread]}회</strong>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                          <ComboAllowanceCard
+                            combo={entry.claimedCombo}
+                            allowanceFor={(combo, spread) => entry.comboAllowances![combo][spread]}
+                          />
                         </>
                       )}
 

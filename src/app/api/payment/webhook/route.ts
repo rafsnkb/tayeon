@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as PortOne from "@portone/server-sdk";
 import { fulfillPayment } from "@/lib/payment/fulfill";
 import { revokeCancelledPayment } from "@/lib/payment/revoke";
+import { notifyOwner } from "@/lib/notify/owner";
 
 // 결제가 취소됐다는 통지. 앱을 거치지 않고 포트원 콘솔이나 PG 측에서 취소된 경우가 여기로 온다.
 // Transaction.CancelPending은 아직 취소가 확정되지 않은 단계라 회수하지 않는다(확정되면
@@ -44,6 +45,24 @@ export async function POST(req: NextRequest) {
       const outcome = await revokeCancelledPayment(paymentId);
       if (outcome.kind === "rejected") {
         console.error("[payment webhook] 이용권 회수 실패", paymentId, outcome.reason);
+        await notifyOwner({
+          key: `revoke-failed/${paymentId}`,
+          level: "urgent",
+          title: "취소된 결제의 이용권 회수 실패",
+          fields: [["결제", paymentId], ["사유", outcome.reason]],
+          note: "**결제는 취소됐는데 이용권이 그대로 남아 있습니다.** 어드민에서 직접 회수해 주세요.",
+        }).catch((error) => console.error("[payment webhook] 회수 실패 알림 실패", paymentId, error));
+      } else if (outcome.kind === "partial") {
+        // 부분 취소는 상품 구조상(이용권 1건 = 결제 1건) 정상 흐름이 아니다. 자동 회수는
+        // 과잉이라 하지 않지만, 사람이 반드시 봐야 한다 — 돈은 일부 돌아갔는데 이용권은
+        // 미사용 상태 그대로라 그냥 쓸 수 있다.
+        await notifyOwner({
+          key: `partial-cancel/${paymentId}`,
+          level: "urgent",
+          title: "부분 취소 — 이용권이 그대로 남아 있습니다",
+          fields: [["결제", paymentId], ["사유", outcome.reason]],
+          note: "**일부 금액이 환불됐지만 이용권은 회수하지 않았습니다.** 과잉 회수를 피하려고 자동 처리하지 않습니다 — 직접 판단해 주세요.",
+        }).catch((error) => console.error("[payment webhook] 부분 취소 알림 실패", paymentId, error));
       } else if (outcome.kind === "revoked" && outcome.passStatusBefore !== "unused") {
         // 어드민 환불은 미사용 건만 허용하므로, 사용된 이용권이 취소됐다는 건 콘솔 직접 취소
         // 같은 비정상 경로를 뜻한다. 회수는 하되 추적할 수 있도록 남긴다.

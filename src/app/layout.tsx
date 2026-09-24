@@ -47,7 +47,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f7f4fb",
+  // globals.css 의 라이트 --bg 와 같은 값. 서버에서 뽑는 메타태그라 CSS 변수를 읽을 수
+  // 없어서 여기만 리터럴로 둔다 — 첫 페인트 전까지 쓰이는 값이고, 그 뒤로는
+  // ModalViewportChrome 이 토큰을 읽어 덮어쓴다. --bg 를 바꾸면 여기도 같이 바꿀 것.
+  themeColor: "#f9f3f3",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

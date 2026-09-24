@@ -34,7 +34,7 @@ function toneDescription(key: ToneKey): string {
   return TONE_DESCRIPTIONS[key];
 }
 
-function SectionPanel({ title, children }: { title: string; children: React.ReactNode }) {
+export function SectionPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="px-1 text-base font-semibold text-icon-muted">{title}</p>
@@ -150,7 +150,8 @@ export default function SettingsPage() {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       await signOut(auth);
-      router.replace("/login");
+      // 로그아웃과 같은 규칙 — 탈퇴한 사람도 로그인 카드가 아니라 메인 화면에서 나간다.
+      router.replace("/");
     } finally {
       setDeleting(false);
     }
@@ -261,7 +262,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => router.push("/settings/open-source")}
-            className="self-center text-sm font-semibold text-point underline underline-offset-2"
+            className="self-center text-sm font-semibold text-point-text underline underline-offset-2"
           >
             오픈소스 라이선스
           </button>
@@ -282,7 +283,7 @@ export default function SettingsPage() {
           onClick={handleSave}
           disabled={saving || !isDirty}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-fill text-placeholder"
+            isDirty ? "border border-point-strong bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           } disabled:opacity-60`}
         >
           저장하기

@@ -7,6 +7,8 @@ import {
   countAllowances,
   countAllowanceForCombo,
   countAllowancesForCombo,
+  basisForOneCardCount,
+  isHeldPass,
   comboKeyFor,
   availableCount,
   remainingAfterUse,
@@ -16,13 +18,15 @@ import {
   signupFreePassAllowances,
 } from "./pricing.ts";
 
+// 2026-09-24 사용자 확정 가격표. [상품][조합][스프레드] — 조합은 타로 / +사주 / +자미두수 /
+// +사주+자미두수, 스프레드는 원카드·쓰리카드·양자택일·켈틱크로스 순.
 const expected = [
-  [[15, 10, 8, 6], [13, 9, 7, 5], [11, 8, 6, 4], [8, 5, 4, 3]],
-  [[31, 21, 16, 12], [26, 18, 14, 10], [23, 16, 12, 9], [16, 11, 8, 6]],
-  [[70, 47, 35, 28], [60, 40, 30, 24], [53, 35, 26, 21], [35, 24, 18, 14]],
-  [[200, 133, 100, 80], [170, 113, 85, 68], [150, 100, 75, 60], [100, 67, 50, 40]],
-  [[325, 217, 163, 130], [276, 184, 139, 111], [244, 163, 122, 98], [163, 109, 82, 65]],
-  [[675, 450, 338, 270], [574, 383, 287, 230], [506, 338, 254, 203], [338, 225, 169, 135]],
+  [[10, 7, 5, 4], [9, 6, 4, 3], [8, 5, 3, 2], [5, 4, 2, 1]],
+  [[21, 14, 10, 8], [18, 12, 9, 7], [16, 11, 8, 6], [11, 7, 5, 4]],
+  [[47, 31, 23, 19], [40, 26, 20, 16], [35, 23, 17, 14], [24, 16, 12, 10]],
+  [[133, 89, 67, 53], [113, 76, 57, 45], [100, 67, 50, 40], [67, 45, 34, 27]],
+  [[217, 144, 108, 87], [184, 122, 92, 74], [163, 108, 81, 65], [109, 72, 54, 44]],
+  [[450, 300, 225, 180], [383, 255, 191, 153], [338, 225, 169, 135], [225, 150, 113, 90]],
 ];
 
 test("purchase allowances match the published table", () => {
@@ -80,11 +84,11 @@ test("every advertised last use is available, including rounded counts (combo:an
 test("switching options recalculates the same remaining entitlement (combo:any)", () => {
   const basis = COUNT_PACKAGES[1].basis;
   const pass = { basis, remaining: 1, expiresAt: "2099-01-01", combo: "any", status: "unused", allowances: countAllowances(basis) };
-  assert.equal(availableCount(pass, "one", false, false), 31);
-  assert.equal(availableCount(pass, "one", true, true), 16);
+  assert.equal(availableCount(pass, "one", false, false), 21);
+  assert.equal(availableCount(pass, "one", true, true), 11);
   pass.remaining = remainingAfterUse(pass, "one", true, true);
-  assert.equal(availableCount(pass, "one", true, true), 15);
-  assert.equal(availableCount(pass, "one", false, false), 29);
+  assert.equal(availableCount(pass, "one", true, true), 10);
+  assert.equal(availableCount(pass, "one", false, false), 19);
   assert.equal(availableCount({ ...pass, expiresAt: "2020-01-01" }, "one", false, false), 0);
 });
 
@@ -96,13 +100,17 @@ test("a fractional remainder with no usable question is exhausted (combo:any)", 
 });
 
 test("cashback is converted to rounded one-card passes", () => {
-  assert.equal(rewardPassesForWon(540_000, 0.05), 135);
-  assert.equal(rewardPassesForWon(100_000, 0.05), 25);
-  assert.equal(rewardPassesForWon(30_000, 0.01), 2);
+  // 원카드 단가 300원 기준(2026-09-24 개정). 27,000원 → 90회, 5,000원 → 16.67 → 17회.
+  assert.equal(rewardPassesForWon(540_000, 0.05), 90);
+  assert.equal(rewardPassesForWon(100_000, 0.05), 17);
+  assert.equal(rewardPassesForWon(30_000, 0.01), 1);
 });
 
-test("free rewards do not inherit a paid-package display exception", () => {
-  assert.equal(countAllowances(3_000, false)["celtic-0-1"], 5);
+test("free rewards do not inherit the published table's hand-tuned cells", () => {
+  // 공표표는 스타터(basis 3000) 켈틱+자미두수를 2회로 깎아뒀지만, 같은 basis 를 우연히 갖게 된
+  // 무료 리워드는 계산식 그대로 3회여야 한다(round(3000/750) = 4 → 4 × 0.75 = 3).
+  assert.equal(countAllowances(3_000, false)["celtic-0-1"], 3);
+  assert.equal(countAllowances(3_000, true)["celtic-0-1"], 2);
 });
 
 test("signup pass guarantees four uses regardless of spread or options", () => {
@@ -149,4 +157,77 @@ test("exhausted or expired status blocks availability regardless of remaining", 
   assert.equal(availableCount({ ...base, status: "expired" }, "one", false, false), 0);
   assert.ok(availableCount({ ...base, status: "unused" }, "one", false, false) > 0);
   assert.ok(availableCount({ ...base, status: "active" }, "one", false, false) > 0);
+});
+
+// basisForOneCardCount — "이 조합으로 정확히 N회"라는 약속을 basis 로 되돌리는 역산.
+// 생일 쿠폰(8/6/4회)과 어드민 커스텀 지급이 광고한 횟수를 그대로 주는지가 여기 달려 있다.
+// 예전엔 N × 200(나중엔 N × 300)을 basis 로 썼는데, countAllowance 가 조합 배율을 한 번 더
+// 곱해서 광고의 절반만 나갔다.
+test("a promised count is delivered exactly, whatever the combo", () => {
+  for (const combo of Object.keys(COMBOS)) {
+    for (let promised = 1; promised <= 60; promised++) {
+      const basis = basisForOneCardCount(promised, combo);
+      assert.equal(
+        countAllowanceForCombo(basis, "one", combo),
+        promised,
+        `${combo} ${promised}회 → basis ${basis}`
+      );
+    }
+  }
+});
+
+test("the birthday coupon's advertised counts survive the round trip", () => {
+  // functions/src/index.ts 의 BIRTHDAY_COUPON_OPTIONS 와 같은 표.
+  for (const [combo, freePasses] of [
+    ["tarot-saju", 8],
+    ["tarot-ziwei", 6],
+    ["tarot-saju-ziwei", 4],
+  ]) {
+    const basis = basisForOneCardCount(freePasses, combo);
+    assert.equal(countAllowanceForCombo(basis, "one", combo), freePasses);
+    // 단가를 그대로 곱하던 옛 계산은 약속보다 적게 준다 — 회귀하면 여기서 걸린다.
+    assert.notEqual(countAllowanceForCombo(freePasses * 300, "one", combo), freePasses);
+  }
+});
+
+test("a nonsensical promised count yields no entitlement rather than NaN", () => {
+  for (const bad of [0, -3, NaN, Infinity]) {
+    assert.equal(basisForOneCardCount(bad, "tarot"), 0);
+  }
+});
+
+// isHeldPass — 재구매를 막아야 하는 "아직 들고 있는" 이용권인가.
+// 만료된 이용권에 status:"expired" 를 써 주는 코드가 아무 데도 없어서, 상태만 보면
+// 만료분 하나가 재구매를 영구히 막았다(화면은 "보유 없음"인데 구매는 409).
+const NOW = Date.parse("2026-09-24T00:00:00.000Z");
+const ago = (days) => new Date(NOW - days * 86400000).toISOString();
+const ahead = (days) => new Date(NOW + days * 86400000).toISOString();
+
+test("an unexpired pass in a holding status blocks re-purchase", () => {
+  for (const status of ["unused", "active", "refund_pending"]) {
+    assert.equal(isHeldPass({ status, expiresAt: ahead(30) }, NOW), true, status);
+  }
+  assert.equal(isHeldPass({ status: "unused", expiresAt: null }, NOW), true, "기간 없는 이용권");
+});
+
+test("a finished pass never blocks re-purchase", () => {
+  for (const status of ["exhausted", "expired", "refunded", "revoked"]) {
+    assert.equal(isHeldPass({ status, expiresAt: ahead(30) }, NOW), false, status);
+  }
+});
+
+test("an expired pass stops blocking re-purchase even though its status was never updated", () => {
+  assert.equal(isHeldPass({ status: "unused", expiresAt: ago(1) }, NOW), false, "횟수제 expiresAt");
+  assert.equal(isHeldPass({ status: "active", usableUntil: ago(1) }, NOW), false, "시간제 usableUntil");
+  assert.equal(isHeldPass({ status: "unused", expiresAt: NOW ? ago(0) : null }, NOW), false, "정확히 만료 시점");
+});
+
+test("a refund still in flight keeps blocking even past its expiry", () => {
+  // 돈이 아직 정리되지 않았고, 거절되면 되살아난다.
+  assert.equal(isHeldPass({ status: "refund_pending", expiresAt: ago(1) }, NOW), true);
+});
+
+test("a garbled expiry is treated as no expiry rather than as expired", () => {
+  assert.equal(isHeldPass({ status: "unused", expiresAt: "언젠가" }, NOW), true);
+  assert.equal(isHeldPass({ status: undefined }, NOW), false);
 });

@@ -12,7 +12,12 @@ export const ping = onRequest((req, res) => {
 // 친구 초대(리퍼럴) 월간 5% 정산. Functions 패키지는 앱 코드와 분리되어 있어 아래 가격 규칙을
 // 같은 값으로 유지한다.
 const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
-const ONE_CARD_BASIS = 200;
+// 원카드 1회 단가 — src/lib/tarot/pricing.ts의 SPREADS.one.cost와 같은 값(패키지 분리로 복사).
+// 2026-09-24 가격표 개정(200 → 300)이 여기 반영되지 않아서, 배치가 표기한 freePasses가 실제
+// 이용권이 주는 횟수보다 1.5배 많았다(110,000원 결제 → 받은 이용권 내역 "17회" / 실제 11회 /
+// 마이페이지 예상치 11회). basis(= freePasses × 이 값)는 결국 결제액×요율 그대로라 지급되는
+// 가치는 바뀌지 않고, 표기만 사실과 맞게 된다.
+const ONE_CARD_BASIS = 300;
 
 function rewardPassesForWon(totalWon: number, rate: number): number {
   return Math.round((totalWon * rate) / ONE_CARD_BASIS);
@@ -97,10 +102,18 @@ function pendingRewardData(
   };
 }
 
-// 매월 5일 03:00(KST)에 "지난달" 결제 건을 정산한다 — 월초 며칠의 여유는 말일 늦은 밤 결제까지
+// 매월 10일 03:00(KST)에 "지난달" 결제 건을 정산한다 — 월초 며칠의 여유는 말일 늦은 밤 결제까지
 // 웹훅/콜백이 처리될 시간을 넉넉히 준 것.
+//
+// ⚠️ 5일이 아니라 10일인 이유(2026-09-24): 정산은 status=="fulfilled" 결제만 합산하는데,
+// 환불 가능 기간이 결제 후 7일이라 5일에 정산하면 아직 환불할 수 있는 결제까지 리워드로
+// 쳐준다. "말일에 결제 → 5일에 리워드 수령 → 6일에 환불"로 공짜 이용권을 만들 수 있었다.
+// 구간 경계가 Date.UTC 자정(= KST 09:00)이라 구간의 마지막 결제는 "다음달 1일 08:59 KST"이고,
+// 그 환불 마감이 8일 08:59 KST다 — 그래서 8일도 6시간이 모자라고 9일부터 닫힌다. 10일은
+// 42시간 여유를 둔 값이다. 이 상수를 앞당기려면 REFUND_WINDOW_DAYS(7)부터 다시 계산할 것.
+// 사용자 문구도 같이 맞춰 둠: src/app/(app)/invite/page.tsx, src/app/(app)/me/page.tsx.
 export const monthlyReferralPayout = onSchedule(
-  { schedule: "0 3 5 * *", timeZone: "Asia/Seoul", region: "asia-east1" },
+  { schedule: "0 3 10 * *", timeZone: "Asia/Seoul", region: "asia-east1" },
   async () => {
     const db = getFirestore();
 
@@ -200,9 +213,11 @@ function bonusRewardRateForWon(totalWon: number): number {
   return tier?.rate ?? 0;
 }
 
-// 매월 5일 03:00(KST)에 "지난달" 내가 결제한 코인ㆍ이용권 금액을 정산해 보너스 리워드를 지급한다.
+// 매월 10일 03:00(KST)에 "지난달" 내가 결제한 코인ㆍ이용권 금액을 정산해 보너스 리워드를 지급한다.
+// 5일이 아니라 10일인 이유는 monthlyReferralPayout 위의 주석 참고(환불 가능 기간과 겹치지
+// 않게 하기 위함 — 두 정산이 같은 날짜를 쓰므로 한쪽만 바꾸지 말 것).
 export const monthlyBonusRewardPayout = onSchedule(
-  { schedule: "0 3 5 * *", timeZone: "Asia/Seoul", region: "asia-east1" },
+  { schedule: "0 3 10 * *", timeZone: "Asia/Seoul", region: "asia-east1" },
   async () => {
     const db = getFirestore();
 
@@ -265,5 +280,38 @@ export const monthlyBonusRewardPayout = onSchedule(
     }
 
     console.log(`[bonus-reward-payout] ${payoutKey} 정산 완료 — 유저 ${totalByUid.size}명`);
+  }
+);
+
+/**
+ * 매시 :17에 어드민의 환불 자동 승인을 깨운다.
+ *
+ * 여기서는 판정도 결제 취소도 하지 않는다 — 환불 실행 로직은 어드민 한 곳에만 두고
+ * (admin/src/lib/refundExecute.ts) 이 함수는 호출만 한다. Functions 에 포트원 SDK 를 또
+ * 넣으면 "돈을 움직이는 코드"가 세 벌이 되고, 토스페이먼츠로 교체할 때 전부 고쳐야 한다.
+ *
+ * 정시(:00)를 피한 건 전 세계 스케줄러가 몰리는 시각이라서다. 2영업일 기한이라 몇 분 차이는
+ * 아무 의미가 없다.
+ */
+export const hourlyRefundAutoApprove = onSchedule(
+  { schedule: "17 * * * *", timeZone: "Asia/Seoul", region: "asia-east1" },
+  async () => {
+    const base = process.env.ADMIN_BASE_URL?.replace(/\/+$/, "");
+    const secret = process.env.INTERNAL_API_SECRET;
+    if (!base || !secret) {
+      console.warn("[refund-auto] ADMIN_BASE_URL/INTERNAL_API_SECRET 미설정 — 건너뛴다");
+      return;
+    }
+    const response = await fetch(`${base}/api/admin/refund-requests/auto-approve`, {
+      method: "POST",
+      headers: { "x-internal-secret": secret },
+    });
+    const text = await response.text().catch(() => "");
+    if (!response.ok) {
+      // 여기서 던지면 Functions 가 재시도한다 — 자동 승인은 멱등(이미 approved 면 건너뜀)이라
+      // 재시도가 안전하다.
+      throw new Error(`자동 승인 호출 실패 ${response.status}: ${text.slice(0, 300)}`);
+    }
+    console.log("[refund-auto]", text.slice(0, 300));
   }
 );

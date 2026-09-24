@@ -1,0 +1,46 @@
+/* 참고용 보존본 — 빌드에 포함되지 않는다.
+ *
+ * Claude Design "Tayeon Design System"(2026-09-15)의 tokens/colors.css 원문(다크).
+ * 같은 프로젝트를 덮어쓰기 전에 남긴다(2026-09-22). 짝인 라이트는 intended-light-theme.css.
+ *
+ * 다크는 코드(src/app/globals.css)와 값이 사실상 일치한다 — 이름만 다르다.
+ *   --color-bg #141517          = --bg
+ *   --color-surface #19191d     = --topbar
+ *   --color-surface-alt #1c1d21 = --surface
+ *   --color-border #2a2c31      = --border
+ *   --color-btn-neutral #27292d = --chip-fill
+ *   --color-btn-light #dcdee3   = --cta-fill
+ *   --color-text-tertiary #868b9a = --icon-muted
+ *   --color-text-disabled #585858 = --placeholder
+ * 어긋난 건 라이트 모드뿐이라, 컬러 정리의 무게중심은 라이트에 있다.
+ */
+:root{
+--color-bg:rgb(20,21,23);
+--color-surface:rgb(25,25,29);
+--color-surface-alt:rgb(28,29,33);
+--color-input:rgb(20,21,23);
+--color-overlay:rgba(0,0,0,0.5);
+--color-border:rgb(42,44,49);
+--color-border-strong:rgb(39,41,45);
+--color-divider-muted:rgb(52,54,60);
+--color-text-primary:rgb(255,255,255);
+--color-text-secondary:rgb(220,222,227);
+--color-text-tertiary:rgb(134,139,154);
+--color-text-chat-title:rgb(219,219,219);
+--color-text-disabled:rgb(88,88,88);
+--color-text-placeholder-field:rgb(42,44,49);
+--color-point:rgb(255,0,127);
+--color-point-strong:rgb(255,42,147);
+--color-point-muted:rgb(204,0,102);
+--color-point-tint-bg:rgb(44,19,34);
+--color-point-border-soft:rgba(255,0,127,0.5);
+--color-cta-yellow:rgb(250,225,0);
+--color-gold:rgb(249,222,146);
+--color-warning:rgb(236,93,89);
+--color-cyan-accent:rgb(138,231,235);
+--color-btn-neutral:rgb(39,41,45);
+--color-btn-light:rgb(220,222,227);
+--color-btn-light-text:rgb(0,0,0);
+--color-toggle-off:rgb(134,139,154);
+--color-success:rgb(67,160,71);
+}

@@ -7,7 +7,15 @@ import {
   REFERRAL_MONTHLY_COMMISSION_RATE,
   REFERRAL_SIGNUP_FRIEND_CAP,
   REFERRAL_SIGNUP_FREE_PASSES,
+  REWARD_PAYOUT_DAY_OF_MONTH,
+  rewardPassesForWon,
 } from "@/lib/tarot/pricing";
+
+// 안내 문구의 예시. 예전엔 "25회"가 문자열로 박혀 있었는데, 원카드 단가가 200 → 300으로
+// 오르면서(2026-09-24) 실제 지급은 17회가 돼 광고와 어긋났다. 같은 함수로 계산해서 가격표가
+// 또 바뀌어도 문구가 저절로 따라오게 한다.
+const EXAMPLE_FRIEND_SPEND_WON = 100_000;
+const EXAMPLE_PAYOUT_PASSES = rewardPassesForWon(EXAMPLE_FRIEND_SPEND_WON, REFERRAL_MONTHLY_COMMISSION_RATE);
 
 /** 피그마 "Screen / FriendInvite" — asset/Screen/friendInvite.png. 카카오톡 친구 목록/메시지
  * API는 신청 심사(영업일 3~5일)+건당 발신 비용이 들어서, 심사 없이 즉시 쓸 수 있는 "링크 복사"
@@ -50,7 +58,7 @@ export default function InvitePage() {
               친구를 초대하면 {REFERRAL_SIGNUP_FREE_PASSES}회 무료 이용권을 드려요!<br />
               나와 친구 모두 받을 수 있어요!
             </p>
-            <p className="mt-1 text-sm font-semibold text-point">(최대 {REFERRAL_SIGNUP_FRIEND_CAP}명)</p>
+            <p className="mt-1 text-sm font-semibold text-point-text">(최대 {REFERRAL_SIGNUP_FRIEND_CAP}명)</p>
             <p className="mt-4 text-base font-bold text-bold-text">내 링크로 가입한 친구: {invitedFriends}/{REFERRAL_SIGNUP_FRIEND_CAP}명</p>
           <button
             type="button"
@@ -67,11 +75,11 @@ export default function InvitePage() {
             <p className="mt-6 text-sm font-semibold text-bold-text">
               내 초대로 가입한 친구가 결제하면,<br />
               결제 비용의 {REFERRAL_MONTHLY_COMMISSION_RATE * 100}%를 이용권으로 환산해<br />
-              매월 5일에 보내드려요.
+              매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 보내드려요.
             </p>
             <p className="mt-5 text-xs font-semibold text-icon-muted">
-              (예: 친구들의 이번 달 총 결제액이 10만 원이면<br />
-              다음 달 5일에 원카드 기준 25회 이용권 지급)
+              (예: 친구들의 이번 달 총 결제액이 {(EXAMPLE_FRIEND_SPEND_WON / 10_000).toLocaleString("ko-KR")}만 원이면<br />
+              다음 달 {REWARD_PAYOUT_DAY_OF_MONTH}일에 원카드 기준 {EXAMPLE_PAYOUT_PASSES}회 이용권 지급)
             </p>
           </section>
         </div>

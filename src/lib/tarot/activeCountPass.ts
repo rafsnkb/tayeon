@@ -22,15 +22,28 @@ function isUsable(pass: CountPassBalance): boolean {
  */
 export function pickActiveCountPass(
   countPasses: QueryDocumentSnapshot[],
-  activePointerPassId: string | null | undefined
+  activePointerPassId: string | null | undefined,
+  /**
+   * 이번 요청에 실제로 쓸 수 있는 이용권인지 거르는 추가 조건(선택).
+   *
+   * 없으면 `remaining > 0` 만 본다. 그런데 남은 권리는 스프레드마다 환산이 달라서, 원카드는
+   * 아직 되지만 켈틱크로스는 안 되는 잔량이 존재한다 — 그 상태로 켈틱을 고르면 여기서는
+   * 통과하고 chargeActiveCountPass 가 트랜잭션에서 던져서, **모델 호출까지 다 끝낸 뒤** 500이
+   * 났다(2026-09-24). 호출부가 "이 스프레드를 감당할 수 있는가"를 넘겨서 미리 걸러낸다.
+   */
+  canUse?: (pass: CountPassBalance) => boolean
 ): QueryDocumentSnapshot | undefined {
+  const ok = (doc: QueryDocumentSnapshot) => {
+    const pass = doc.data() as CountPassBalance;
+    return isUsable(pass) && (canUse?.(pass) ?? true);
+  };
   if (activePointerPassId) {
     const pointed = countPasses.find((doc) => doc.id === activePointerPassId);
-    if (pointed && isUsable(pointed.data() as CountPassBalance) && (pointed.data() as CountPassBalance).status === "active") {
+    if (pointed && ok(pointed) && (pointed.data() as CountPassBalance).status === "active") {
       return pointed;
     }
   }
-  const usable = countPasses.filter((doc) => isUsable(doc.data() as CountPassBalance));
+  const usable = countPasses.filter(ok);
   const byCreatedAt = (a: QueryDocumentSnapshot, b: QueryDocumentSnapshot) =>
     String(a.data().createdAt).localeCompare(String(b.data().createdAt));
   const reward = usable.filter((doc) => doc.data().source !== "purchase").sort(byCreatedAt);

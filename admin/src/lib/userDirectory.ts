@@ -3,11 +3,14 @@ import { adminDb } from "@/lib/firebase/admin";
 
 export const USER_PAGE_SIZE = 100;
 
-type PassStatus = "unused" | "active" | "exhausted" | "expired" | "refunded" | undefined;
+type PassStatus = "unused" | "active" | "exhausted" | "expired" | "refunded" | "refund_pending" | undefined;
 
-function isCurrentlyHeld(data: DocumentData): boolean {
+/** 아직 사용자가 들고 있는 이용권인가 — 상태와 유효기간을 같이 본다.
+ *  본체 src/lib/tarot/pricing.ts 의 isHeldPass 와 같은 판정이다(별도 앱이라 복제). */
+export function isCurrentlyHeld(data: DocumentData): boolean {
   const status = data.status as PassStatus;
-  if (status !== "unused" && status !== "active") return false;
+  // 환불 신청 중인 이용권도 아직 사용자 소유다 — 승인 전까지는 보유로 센다.
+  if (status !== "unused" && status !== "active" && status !== "refund_pending") return false;
 
   const expiresAt = data.expiresAt ?? data.usableUntil;
   return !expiresAt || Date.parse(String(expiresAt)) > Date.now();

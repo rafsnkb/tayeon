@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FieldLabel, ToggleGroup } from "@/components/FormControls";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
-import type { BirthInfo } from "@/lib/tarot/birthInfo";
+import { toCalendarMode, type BirthInfo, type CalendarMode } from "@/lib/tarot/birthInfo";
 import { PRIVACY_POLICY_SECTIONS, TERMS_SECTIONS } from "@/lib/legal/content";
 import { BrandBi } from "@/components/BrandBi";
 
@@ -13,7 +14,7 @@ const POLICY_SECTIONS: Record<"terms" | "privacy", { title: string; sections: ty
   privacy: { title: "개인정보처리방침", sections: PRIVACY_POLICY_SECTIONS },
 };
 
-function PolicyModal({
+export function PolicyModal({
   policy,
   onClose,
 }: {
@@ -44,51 +45,6 @@ function PolicyModal({
       </div>
     </div>
   );
-}
-
-function ToggleGroup<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex gap-2 pt-2">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
-            value === opt.value
-              ? "border border-point-strong bg-point text-white"
-              : "bg-chip-fill text-white"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
-  return (
-    <span className="text-sm font-semibold text-icon-muted">
-      {children}
-      {required && <span className="text-urgent">*</span>}
-    </span>
-  );
-}
-
-type CalendarMode = "solar" | "lunar" | "lunarLeap";
-
-function toCalendarMode(calendarType: BirthInfo["calendarType"], isLeapMonth: boolean): CalendarMode {
-  if (calendarType === "solar") return "solar";
-  return isLeapMonth ? "lunarLeap" : "lunar";
 }
 
 /** 피그마 "Screen / Join" — 자시법/진태양시는 화면에 없어서(설정 화면으로 옮겨간 듯) 뺐고, 저장 시엔
@@ -184,7 +140,7 @@ export default function SignupPage() {
         return;
       }
 
-      router.replace("/tarot?welcome=1");
+      router.replace("/?welcome=1");
     } catch {
       setError("네트워크 오류가 발생했어요.");
     } finally {
@@ -294,7 +250,7 @@ export default function SignupPage() {
             />
             <span>
               [필수]{" "}
-              <button type="button" onClick={() => setOpenPolicy("terms")} className="text-point underline">
+              <button type="button" onClick={() => setOpenPolicy("terms")} className="text-point-text underline">
                 이용약관
               </button>
               에 동의합니다.
@@ -308,7 +264,7 @@ export default function SignupPage() {
             />
             <span>
               [필수]{" "}
-              <button type="button" onClick={() => setOpenPolicy("privacy")} className="text-point underline">
+              <button type="button" onClick={() => setOpenPolicy("privacy")} className="text-point-text underline">
                 개인정보처리방침
               </button>
               에 동의합니다.
@@ -322,7 +278,7 @@ export default function SignupPage() {
           type="submit"
           disabled={!canSubmit}
           className={`h-12 w-full shrink-0 rounded-2xl text-lg font-semibold ${
-            canSubmit ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            canSubmit ? "bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           }`}
         >
           타연 가입하기

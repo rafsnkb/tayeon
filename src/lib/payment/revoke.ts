@@ -15,6 +15,8 @@ import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/coll
 export type RevokeOutcome =
   | { kind: "revoked"; uid: string; passStatusBefore: string | null }
   | { kind: "already_revoked" }
+  /** 부분 취소 — 돈은 일부 돌아갔는데 이용권은 그대로다. 사람이 봐야 한다. */
+  | { kind: "partial"; reason: string }
   | { kind: "ignored"; reason: string }
   | { kind: "rejected"; reason: string };
 
@@ -40,7 +42,10 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
   if (payment.status !== "CANCELLED") {
     if (payment.status === "PARTIAL_CANCELLED") {
       console.error("[payment revoke] 부분 취소는 자동 회수하지 않음 — 수동 확인 필요", paymentId);
-      return { kind: "ignored", reason: "부분 취소는 자동 회수 대상이 아니에요." };
+      // 과잉 회수를 피하려고 자동 회수는 안 하지만, 그대로 두면 돈은 일부 돌려주고 이용권은
+      // 온전히 쓸 수 있는 상태가 된다. 예전엔 여기서 console.error 만 찍고 웹훅도 이 결과를
+      // 흘려보내서 아무도 몰랐다(2026-09-24) — 호출부가 알림을 보내도록 kind 를 구분한다.
+      return { kind: "partial", reason: "부분 취소는 자동 회수 대상이 아니에요." };
     }
     return { kind: "ignored", reason: `취소 상태가 아니에요(status=${String(payment.status)}).` };
   }

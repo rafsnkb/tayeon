@@ -1,0 +1,522 @@
+{
+  "Main_Dark": {
+    "frame": "412x732",
+    "mode": "다크",
+    "bgRamp": [
+      {
+        "y": 6.7,
+        "hex": "#1a1616"
+      },
+      {
+        "y": 78.3,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 150,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 221.7,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 293.3,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 365,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 436.7,
+        "hex": "#2b1b1d"
+      },
+      {
+        "y": 508.3,
+        "hex": "#3a1e23"
+      },
+      {
+        "y": 580,
+        "hex": "#492229"
+      },
+      {
+        "y": 651.7,
+        "hex": "#351d21"
+      },
+      {
+        "y": 723.3,
+        "hex": "#1f1819"
+      }
+    ],
+    "topbar": {
+      "fill": "#1a1616",
+      "height": 62,
+      "line": "#272222",
+      "lineWidth": 2
+    }
+  },
+  "Main_Light": {
+    "frame": "412x732",
+    "mode": "라이트",
+    "bgRamp": [
+      {
+        "y": 6.7,
+        "hex": "#ffffff"
+      },
+      {
+        "y": 78.3,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 150,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 221.7,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 293.3,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 365,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 436.7,
+        "hex": "#f1e3e4"
+      },
+      {
+        "y": 508.3,
+        "hex": "#edd7d8"
+      },
+      {
+        "y": 580,
+        "hex": "#eacbcd"
+      },
+      {
+        "y": 651.7,
+        "hex": "#e9cbcd"
+      },
+      {
+        "y": 723.3,
+        "hex": "#eaced0"
+      }
+    ],
+    "topbar": {
+      "fill": "#ffffff",
+      "height": 62,
+      "line": "#eae6e5",
+      "lineWidth": 2
+    }
+  },
+  "Chattingroom_UsingCountPass_Dark": {
+    "frame": "412x732",
+    "mode": "다크",
+    "bgRamp": [
+      {
+        "y": 6.7,
+        "hex": "#1a1616"
+      },
+      {
+        "y": 78.3,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 150,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 221.7,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 293.3,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 365,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 436.7,
+        "hex": "#2b1b1d"
+      },
+      {
+        "y": 508.3,
+        "hex": "#3a1e23"
+      },
+      {
+        "y": 580,
+        "hex": "#492229"
+      },
+      {
+        "y": 651.7,
+        "hex": "#351d21"
+      },
+      {
+        "y": 723.3,
+        "hex": "#1f1819"
+      }
+    ],
+    "topbar": {
+      "fill": "#1a1616",
+      "height": 62,
+      "line": "#272222",
+      "lineWidth": 2
+    },
+    "composer": {
+      "w": 373.3,
+      "h": 56.7,
+      "left": 16,
+      "fill": "#1d1818",
+      "stroke": "#22191a"
+    },
+    "chip": {
+      "d": 40,
+      "fill": "#2f2a2a",
+      "cx": 43.8,
+      "cy": 686.8
+    },
+    "send": {
+      "d": 42,
+      "grad": [
+        "#fe788a",
+        "#301b20"
+      ],
+      "cx": 368,
+      "cy": 683.5
+    },
+    "spreadIcon": {
+      "w": 24.3,
+      "h": 23.3
+    },
+    "sendIcon": {
+      "w": 28.3,
+      "h": 28
+    },
+    "badge": {
+      "d": 16,
+      "fill": "#f53a63",
+      "glyph": {
+        "w": 10.7,
+        "h": 9.3
+      },
+      "overTop": 4,
+      "overRight": 4
+    },
+    "composerText": {
+      "inkCss": 14.33,
+      "color": "#e3dede"
+    },
+    "passBar": {
+      "w": 382,
+      "h": 32,
+      "fill": "#2f2a2a",
+      "inkCss": 10.67,
+      "color": "#8b8786"
+    }
+  },
+  "Chattingroom_UsingCountPass_Light": {
+    "frame": "412x732",
+    "mode": "라이트",
+    "bgRamp": [
+      {
+        "y": 6.7,
+        "hex": "#fefdfd"
+      },
+      {
+        "y": 78.3,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 150,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 221.7,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 293.3,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 365,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 436.7,
+        "hex": "#f1e3e4"
+      },
+      {
+        "y": 508.3,
+        "hex": "#edd7d8"
+      },
+      {
+        "y": 580,
+        "hex": "#eacbcd"
+      },
+      {
+        "y": 651.7,
+        "hex": "#e9cbcd"
+      },
+      {
+        "y": 723.3,
+        "hex": "#eaced0"
+      }
+    ],
+    "topbar": {
+      "fill": "#fefdfd",
+      "height": 62,
+      "line": "#eae6e5",
+      "lineWidth": 2
+    },
+    "composer": {
+      "w": 382,
+      "h": 57,
+      "left": 15,
+      "fill": "#ffffff",
+      "stroke": "#eacecf"
+    },
+    "chip": {
+      "d": 50.7,
+      "fill": "#e7e2e1",
+      "cx": 49.7,
+      "cy": 687.2
+    },
+    "send": {
+      "d": 43.3,
+      "grad": [
+        "#fe788a",
+        "#fef2f5"
+      ],
+      "cx": 369.2,
+      "cy": 683.3
+    },
+    "spreadIcon": {
+      "w": 34.3,
+      "h": 34
+    },
+    "sendIcon": {
+      "w": 29.3,
+      "h": 29.7
+    },
+    "badge": {
+      "d": 16,
+      "fill": "#e04e6e",
+      "glyph": {
+        "w": 10.7,
+        "h": 9.3
+      },
+      "overTop": -2.3,
+      "overRight": -12.7
+    },
+    "composerText": {
+      "inkCss": 14.33,
+      "color": "#312d2d"
+    },
+    "passBar": {
+      "w": 382,
+      "h": 32,
+      "fill": "#e7e2e1",
+      "inkCss": 12,
+      "color": "#6b6666"
+    }
+  },
+  "Chattingroom_UsingTimePass_Dark": {
+    "frame": "412x732",
+    "mode": "다크",
+    "bgRamp": [
+      {
+        "y": 6.7,
+        "hex": "#1a1616"
+      },
+      {
+        "y": 78.3,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 150,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 221.7,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 293.3,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 365,
+        "hex": "#1d1818"
+      },
+      {
+        "y": 436.7,
+        "hex": "#2b1b1d"
+      },
+      {
+        "y": 508.3,
+        "hex": "#3a1e23"
+      },
+      {
+        "y": 580,
+        "hex": "#492229"
+      },
+      {
+        "y": 651.7,
+        "hex": "#351d21"
+      },
+      {
+        "y": 723.3,
+        "hex": "#1f1819"
+      }
+    ],
+    "topbar": {
+      "fill": "#1a1616",
+      "height": 62,
+      "line": "#272222",
+      "lineWidth": 2
+    },
+    "composer": {
+      "w": 373.3,
+      "h": 56.7,
+      "left": 16,
+      "fill": "#1d1818",
+      "stroke": "#22191a"
+    },
+    "chip": {
+      "d": 40,
+      "fill": "#2f2a2a",
+      "cx": 43.8,
+      "cy": 686.8
+    },
+    "send": {
+      "d": 40,
+      "grad": [
+        "#fe788a",
+        "#fc647b"
+      ],
+      "cx": 367.8,
+      "cy": 686.8
+    },
+    "spreadIcon": {
+      "w": 22,
+      "h": 20
+    },
+    "sendIcon": {
+      "w": 23,
+      "h": 22
+    },
+    "composerText": {
+      "inkCss": 14.33,
+      "color": "#e3dede"
+    },
+    "passBar": {
+      "w": 382,
+      "h": 32,
+      "fill": "#2f2a2a",
+      "inkCss": 11.67,
+      "color": "#8b8786"
+    }
+  },
+  "Chattingroom_UsingTimePass_Light": {
+    "frame": "412x732",
+    "mode": "라이트",
+    "bgRamp": [
+      {
+        "y": 6.7,
+        "hex": "#fefdfd"
+      },
+      {
+        "y": 78.3,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 150,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 221.7,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 293.3,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 365,
+        "hex": "#f5f0f0"
+      },
+      {
+        "y": 436.7,
+        "hex": "#f1e3e4"
+      },
+      {
+        "y": 508.3,
+        "hex": "#edd7d8"
+      },
+      {
+        "y": 580,
+        "hex": "#eacbcd"
+      },
+      {
+        "y": 651.7,
+        "hex": "#e9cbcd"
+      },
+      {
+        "y": 723.3,
+        "hex": "#eaced0"
+      }
+    ],
+    "topbar": {
+      "fill": "#fefdfd",
+      "height": 62,
+      "line": "#eae6e5",
+      "lineWidth": 2
+    },
+    "composer": {
+      "w": 382,
+      "h": 57,
+      "left": 15,
+      "fill": "#ffffff",
+      "stroke": "#eacecf"
+    },
+    "chip": {
+      "d": 40,
+      "fill": "#2f2a2a",
+      "cx": 52.7,
+      "cy": 686.8
+    },
+    "send": {
+      "d": 40,
+      "grad": [
+        "#fe788a",
+        "#fc647b"
+      ],
+      "cx": 367.8,
+      "cy": 686.8
+    },
+    "spreadIcon": {
+      "w": 27,
+      "h": 26.7
+    },
+    "sendIcon": {
+      "w": 23,
+      "h": 22
+    },
+    "composerText": {
+      "inkCss": 14.33,
+      "color": "#312d2d"
+    },
+    "passBar": {
+      "w": 382,
+      "h": 32,
+      "fill": "#2f2a2a",
+      "inkCss": 12,
+      "color": "#2f2a2a"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+/* 참고용 보존본 — 실제로 빌드에 포함되지 않는다(doc/ 아래라 import되지 않음).
+ *
+ * Claude Design의 기존 "Tayeon Design System" 프로젝트(2026-09-15 갱신)에 있던
+ * tokens/colors-light.css 원문. 그 프로젝트를 코드 기반 시스템으로 덮어쓰기 전에,
+ * 여기 담긴 "의도된 라이트 테마"만 남겨둔다(2026-09-22).
+ *
+ * 왜 남기는가: 현재 src/app/globals.css의 라이트 모드는 --chip-fill과 --icon-muted가
+ * 둘 다 #6b5c84라 칩 배경 위 아이콘의 대비가 1.00 — 즉 완전히 보이지 않는다.
+ * 아래 원본은 버튼/칩 배경(--color-btn-neutral)을 #ede9f2로 따로 두고 #6b5c84는
+ * 텍스트/아이콘(--color-text-tertiary)으로만 쓴다. 같은 조합의 대비가 5.03이 된다.
+ * 즉 코드 쪽이 이 설계를 잃어버린 상태이고, 라이트 모드 시인성을 고칠 때의 기준점이 된다.
+ *
+ * 헤더 주석에 적혀 있던 출처와 설계 의도도 그대로 보존한다.
+ */
+
+/* Light theme — apply by setting data-theme="light" on <html> or any ancestor.
+   Base values sourced from the Figma file's "Light" Variable mode (see tokens/fig/fig-tokens.css --fig-* refs);
+   remaining semantic tokens (surface-alt, dividers, disabled/placeholder text, gold/warning contrast) are derived
+   to hold WCAG text contrast on a white ground, since the source only defined 15 base variables. */
+[data-theme="light"]{
+--color-bg:rgb(247,244,251);
+--color-surface:rgb(255,255,255);
+--color-surface-alt:rgb(250,248,252);
+--color-input:rgb(255,255,255);
+--color-overlay:rgba(26,15,46,0.4);
+--color-border:rgb(224,213,240);
+--color-border-strong:rgb(210,199,226);
+--color-divider-muted:rgb(234,227,242);
+--color-text-primary:rgb(26,15,46);
+--color-text-secondary:rgb(60,48,82);
+--color-text-tertiary:rgb(107,92,132);
+--color-text-chat-title:rgb(70,58,92);
+--color-text-disabled:rgb(170,160,185);
+--color-text-placeholder-field:rgb(200,190,215);
+--color-point:rgb(255,0,127);
+--color-point-strong:rgb(255,42,147);
+--color-point-muted:rgb(204,0,102);
+--color-point-tint-bg:rgb(255,224,239);
+--color-point-border-soft:rgba(255,0,127,0.35);
+--color-cta-yellow:rgb(250,225,0);
+--color-gold:rgb(168,124,20);
+--color-warning:rgb(200,45,40);
+--color-cyan-accent:rgb(60,180,186);
+--color-btn-neutral:rgb(237,233,242);
+--color-btn-light:rgb(26,15,46);
+--color-btn-light-text:rgb(255,255,255);
+--color-toggle-off:rgb(200,190,215);
+--color-success:rgb(67,160,71);
+}
+[data-theme="light"] button, [data-theme="light"] .card-neutral-text{color:rgb(60,48,82);}

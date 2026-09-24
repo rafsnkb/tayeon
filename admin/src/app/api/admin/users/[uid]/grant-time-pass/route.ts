@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getAdminUidFromRequest } from "@/lib/auth/verifyAdminRequest";
 import { TIME_PASS_PACKAGES } from "@/lib/timePassPackages";
+import { isCurrentlyHeld } from "@/lib/userDirectory";
 
 const byProductId = new Map<string, (typeof TIME_PASS_PACKAGES)[number]>(
   TIME_PASS_PACKAGES.map((pkg) => [pkg.id, pkg])
@@ -45,7 +46,11 @@ export async function POST(
   // 시간제 이용권은 미사용/사용중인 게 하나라도 있으면 새로 보유할 수 없다(2026-09-18 —
   // "여러 개 보유해두고 하나 활성화" 방식을 없애고 구매/지급 모두 1개 슬롯으로 통일).
   const existingPasses = await userRef.collection("timePasses").get();
-  if (existingPasses.docs.some((doc) => ["unused", "active"].includes(doc.data().status))) {
+  // 예전엔 ["unused","active"] 만 봤다. refund_pending 을 빼먹으면 환불 신청 중인 이용권을
+  // "없는 것"으로 보고 보상용을 하나 더 지급하게 되고, 그 환불이 거절되면 원래 것이 unused 로
+  // 되살아나 1슬롯 상품을 두 개 들고 있게 된다(2026-09-24). 어드민 목록이 쓰는 판정을 그대로
+  // 재사용해서 두 곳이 어긋날 수 없게 한다 — 유효기간 확인도 같이 붙는다.
+  if (existingPasses.docs.some((doc) => isCurrentlyHeld(doc.data()))) {
     return NextResponse.json({ error: "이 유저는 이미 미사용/사용중인 시간제 이용권을 보유하고 있습니다." }, { status: 409 });
   }
 

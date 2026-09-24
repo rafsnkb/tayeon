@@ -83,6 +83,18 @@ export async function GET(req: NextRequest) {
   let referredBy: string | null = null;
   if (isNewUser && referralCode) {
     referredBy = await findUidByReferralCode(referralCode);
+    // 자기 자신을 추천인으로 저장하지 않는다.
+    //
+    // uid 는 kakao:{카카오ID} 로 결정적이고 referralCodes/{code} 는 최상위 컬렉션이라 탈퇴해도
+    // 남는다. 그래서 "내 초대 링크를 복사해 두고 탈퇴 → 그 링크로 재가입"하면 referredBy 에
+    // 자기 uid 가 박혔다. grantSignupReferralReward 는 referrerUid === newUid 를 걸러서 가입
+    // 보상은 안 나갔지만, 그 필드가 남아 있으면 monthlyReferralPayout 이 매달 **본인 결제액의
+    // 5%** 를 본인에게 추천 수수료로 얹어 준다 — 보너스 리워드와 중복으로, 무제한, 영구히
+    // (2026-09-24 발견). 한 번 저장되면 지우는 코드가 없어서 여기서 막는 게 유일한 관문이다.
+    if (referredBy === uid) {
+      console.warn("[referral] 자기 자신을 추천인으로 지정한 가입 — 무시한다", uid);
+      referredBy = null;
+    }
   }
 
   await userRef.set(

@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { addMonthsClamped } from "@/lib/util/dateMath";
-import { COMBOS, COUNT_PASS_VALIDITY_MONTHS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
+import {
+  COMBOS,
+  isComboKey,
+  COUNT_PASS_VALIDITY_MONTHS,
+  countAllowancesForCombo,
+  basisForOneCardCount,
+} from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
 import { checkSuspension, SUSPENSION_CLEARED } from "@/lib/auth/suspension";
-
-function isComboKey(value: unknown): value is ComboKey {
-  return typeof value === "string" && value in COMBOS;
-}
 
 /** POST /api/user/pending-rewards/[id]/claim — 미수령 리워드를 고른 조합으로 실제 이용권으로
  * 전환한다. 구매(source:"purchase") 1개 제한(src/app/api/payment/prepare/route.ts)은 여기엔
@@ -61,7 +63,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (data.status !== "pending") throw new Error("ALREADY_RESOLVED");
       if (new Date(data.claimWindowExpiresAt).getTime() <= Date.now()) throw new Error("EXPIRED");
       const birthdayOption = Array.isArray(data.options) ? data.options.find((option: { combo?: string }) => option.combo === combo) : null;
-      const basis = birthdayOption ? Number(birthdayOption.freePasses) * 200 : data.basis;
+      // 생일 쿠폰은 조합별로 "정확히 N회"를 약속한다(8/6/4). 예전엔 freePasses × 200 을 basis 로
+      // 썼는데, 그러면 countAllowancesForCombo 가 조합 배율을 한 번 더 곱해서 광고의 절반(4/3/2)만
+      // 나갔다 — 단가가 200 이던 시절에도 틀렸던 계산이다(2026-09-24). 역산해서 잡는다.
+      const basis = birthdayOption ? basisForOneCardCount(Number(birthdayOption.freePasses), combo) : data.basis;
       if (!Number.isFinite(basis) || basis <= 0) throw new Error("INVALID_REWARD");
 
       const now = new Date().toISOString();

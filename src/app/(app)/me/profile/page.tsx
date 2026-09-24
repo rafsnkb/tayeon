@@ -1,51 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FieldLabel, ToggleGroup } from "@/components/FormControls";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
-import type { BirthInfo, JasiRule } from "@/lib/tarot/birthInfo";
+import { toCalendarMode, type BirthInfo, type CalendarMode, type JasiRule } from "@/lib/tarot/birthInfo";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import InfoModal from "@/components/InfoModal";
-
-function ToggleGroup<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: string;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex gap-2 pt-2">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
-            value === opt.value
-              ? "border border-point-strong bg-point text-white"
-              : "bg-chip-fill text-white"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
-  return (
-    <span className="text-sm font-semibold text-icon-muted">
-      {children}
-      {required && <span className="text-urgent">*</span>}
-    </span>
-  );
-}
-
-type CalendarMode = "solar" | "lunar" | "lunarLeap";
 
 type ProfileSnapshot = {
   nickname: string;
@@ -58,11 +19,6 @@ type ProfileSnapshot = {
   gender: BirthInfo["gender"] | "";
   birthPlace: string;
 };
-
-function toCalendarMode(calendarType: BirthInfo["calendarType"], isLeapMonth: boolean): CalendarMode {
-  if (calendarType === "solar") return "solar";
-  return isLeapMonth ? "lunarLeap" : "lunar";
-}
 
 /** 피그마 "Screen / MyProfile" — 기존 /me에 있던 생년월일시 폼을 그대로 가져오고, 닉네임 수정
  * (피그마엔 있는데 기존엔 가입 후 수정할 방법이 없었음), 음력 윤달/출생지/성별 "선택안함"까지
@@ -271,7 +227,7 @@ export default function MyProfilePage() {
           type="submit"
           disabled={!canSave || saving}
           className={`mx-auto block h-12 w-full max-w-2xl rounded-2xl text-lg font-semibold ${
-            canSave ? "bg-point text-white" : "bg-chip-fill text-placeholder"
+            canSave ? "bg-point text-white" : "bg-chip-fill text-chip-muted-text"
           } disabled:opacity-60`}
         >
           저장하기

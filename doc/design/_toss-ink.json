@@ -1,0 +1,137 @@
+[
+  {
+    "shot": "home",
+    "label": "이성희 (헤더 이름)",
+    "str": "이성희",
+    "inkCss": 15.333333333333334,
+    "bg": "#171719",
+    "ink": "#dedfe2",
+    "clipped": ""
+  },
+  {
+    "shot": "home",
+    "label": "신분증·인증 (헤더 보조)",
+    "str": "신분증·인증",
+    "inkCss": 13.666666666666666,
+    "bg": "#171719",
+    "ink": "#6b6c6e",
+    "clipped": ""
+  },
+  {
+    "shot": "home",
+    "label": "바로가기 (섹션 제목)",
+    "str": "바로가기",
+    "inkCss": 13.666666666666666,
+    "bg": "#171719",
+    "ink": "#dddfe5",
+    "clipped": ""
+  },
+  {
+    "shot": "home",
+    "label": "미니앱 (아이콘 캡션)",
+    "str": "미니앱",
+    "inkCss": 11.666666666666666,
+    "bg": "#171719",
+    "ink": "#8b8d8f",
+    "clipped": ""
+  },
+  {
+    "shot": "home",
+    "label": "계좌 개설 (목록 제목)",
+    "str": "계좌 개설",
+    "inkCss": 15,
+    "bg": "#171719",
+    "ink": "#dddfe5",
+    "clipped": ""
+  },
+  {
+    "shot": "home",
+    "label": "홈 (탭바 라벨)",
+    "str": "홈",
+    "inkCss": 9.666666666666666,
+    "bg": "#171719",
+    "ink": "#dddfe5",
+    "clipped": ""
+  },
+  {
+    "shot": "settings",
+    "label": "이성희 (프로필)",
+    "str": "이성희",
+    "inkCss": 15.333333333333334,
+    "bg": "#101012",
+    "ink": "#dddee5",
+    "clipped": ""
+  },
+  {
+    "shot": "settings",
+    "label": "내 정보 · 주소 관리",
+    "str": "내 정보 · 주소 관리",
+    "inkCss": 13,
+    "bg": "#101012",
+    "ink": "#6b6c6e",
+    "clipped": ""
+  },
+  {
+    "shot": "settings",
+    "label": "언어 (행 라벨)",
+    "str": "언어",
+    "inkCss": 15,
+    "bg": "#171719",
+    "ink": "#b6b8bb",
+    "clipped": ""
+  },
+  {
+    "shot": "settings",
+    "label": "인증 및 보안 (섹션)",
+    "str": "인증 및 보안",
+    "inkCss": 15.666666666666666,
+    "bg": "#171719",
+    "ink": "#dddfe5",
+    "clipped": ""
+  },
+  {
+    "shot": "bank",
+    "label": "가입해둔 보험이 있네요 (화면 제목)",
+    "str": "가입해둔 보험이 있네요",
+    "inkCss": 20,
+    "bg": "#1d1e21",
+    "ink": "#ffffff",
+    "clipped": ""
+  },
+  {
+    "shot": "bank",
+    "label": "보험 점검하기 (버튼)",
+    "str": "보험 점검하기",
+    "inkCss": 15.333333333333334,
+    "bg": "#3182f6",
+    "ink": "#ffffff",
+    "clipped": ""
+  },
+  {
+    "shot": "card",
+    "label": "878원 (금액 대, 콤마 뒤만)",
+    "str": "878원",
+    "inkCss": 25.666666666666668,
+    "bg": "#101013",
+    "ink": "#ffffff",
+    "clipped": ""
+  },
+  {
+    "shot": "card",
+    "label": "000원 (금액 소, 콤마 뒤만)",
+    "str": "000원",
+    "inkCss": 15,
+    "bg": "#17171c",
+    "ink": "#c3c3c6",
+    "clipped": ""
+  },
+  {
+    "shot": "home",
+    "label": "금융 서비스 (섹션 라벨)",
+    "str": "금융 서비스",
+    "inkCss": 13.67,
+    "bg": "#171719",
+    "ink": "#dddfe5",
+    "clipped": ""
+  }
+]

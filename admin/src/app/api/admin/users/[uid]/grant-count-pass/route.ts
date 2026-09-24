@@ -6,6 +6,8 @@ import {
   COUNT_PACKAGES,
   COUNT_PASS_VALIDITY_MONTHS,
   countAllowancesForCombo,
+  basisForOneCardCount,
+  oneCardCountFor,
   type ComboKey,
 } from "@/lib/countPassPackages";
 
@@ -50,8 +52,13 @@ export async function POST(
     return NextResponse.json({ error: "태어난 시간이 없는 사용자에게는 자미두수 포함 이용권을 지급할 수 없어요." }, { status: 409 });
   }
 
-  const basis = selected ? selected.basis : count! * 200;
-  const freePasses = selected ? Math.round(selected.basis / 200) : count!;
+  // 커스텀 지급은 "이 조합으로 N회"를 뜻한다. 예전엔 basis 를 count × 200 으로 잡았는데,
+  // 원카드 단가가 300 이 된 데다(2026-09-24) countAllowancesForCombo 가 조합 배율을 한 번 더
+  // 곱해서, 타로+사주 10회를 지급하면 실제로는 6회만 들어갔다. 역산해서 잡는다.
+  const basis = selected ? selected.basis : basisForOneCardCount(count!, combo);
+  // 문서에 남기는 표기 횟수도 아래 allowances 와 같은 함수로 뽑아서 둘이 어긋날 수 없게 한다
+  // (예전엔 basis/200 이라 얼티밋 지급이 675회로 기록됐지만 실제 원카드는 450회였다).
+  const freePasses = oneCardCountFor(basis, combo);
 
   const passRef = userRef.collection("countPasses").doc();
   const createdAt = new Date().toISOString();

@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { SUPPORT_EMAIL } from "@/lib/company";
 import { DISPUTE_RECORD_RETENTION_MONTHS } from "@/lib/legal/retention";
 import { retentionExpiresAt } from "@/lib/legal/retentionTimestamp";
 import { consumeRateLimit, clientIp } from "@/lib/rateLimit";
+import { notifyOwner } from "@/lib/notify/owner";
 
 // 이 엔드포인트는 일부러 비로그인도 받는다 — 로그인이 안 되는 상황이야말로 문의가 필요하기
 // 때문이다. 대신 한 번 호출될 때마다 Firestore 쓰기와 Resend 메일(첨부 포함)이 발생하므로,
@@ -138,5 +139,22 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     });
   }
+  // 메일은 실제 업무용이다 — 첨부와 회신 주소가 붙어 있어 여기서 바로 답장한다. 디스코드는
+  // "문의가 왔다"를 바로 알기 위한 것이라 내용 일부만 싣는다. level:"info" 라 메일은 다시
+  // 나가지 않는다(환불 알림과 달리 이 경로는 위 sendAdminEmail 이 이미 보냈다).
+  after(() => notifyOwner({
+    key: `support-inquiry/${inquiryRef.id}`,
+    level: "info",
+    channel: "support",
+    title: `고객센터 문의 · ${nickname}`,
+    fields: [
+      ["이름", name],
+      ["닉네임", nickname],
+      ["회신 이메일", email],
+      ["UID", uid ?? "비로그인"],
+      ["첨부", attachments.length ? `${attachments.length}개 (메일 확인)` : "없음"],
+      ["내용", content.length > 900 ? `${content.slice(0, 900)}…(메일에 전문)` : content],
+    ],
+  }));
   return NextResponse.json({ ok: true, inquiryId: inquiryRef.id }, { status: 201 });
 }

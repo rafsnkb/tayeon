@@ -64,8 +64,12 @@ type RoomsContextValue = {
   setHasUnreadNotifications: Dispatch<SetStateAction<boolean>>;
   rooms: Room[];
   activeRoomId: string | null;
-  selectRoom: (roomId: string) => void;
+  /** null 이면 "방 없음"(메인 화면). 라우트를 따라간다 — TarotScreen 이 동기화한다. */
+  selectRoom: (roomId: string | null) => void;
   loaded: boolean;
+  /** 방 목록을 못 받아온 채로 로딩이 끝난 상태. `loaded && !activeRoomId`로 유추하지 않고
+   *  따로 들고 있는 이유: 마지막 방을 지운 직후에도 그 조합이 나올 수 있어서 구분이 안 된다. */
+  loadFailed: boolean;
   authChecked: boolean;
   createRoom: (force?: boolean) => Promise<Room | null>;
   deleteRoom: (roomId: string) => Promise<void>;
@@ -77,7 +81,7 @@ type RoomsContextValue = {
   markReadingDone: (roomId: string) => void;
 };
 
-const RoomsContext = createContext<RoomsContextValue | null>(null);
+export const RoomsContext = createContext<RoomsContextValue | null>(null);
 
 export function RoomsProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -96,6 +100,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   // 리딩 요청(handleSubmit)이 "어느 방에" 진행 중인지 — TarotChat 로컬 state가 아니라 여기 두는
   // 이유: 로딩 중에 다른 페이지로 이동했다가 돌아오면 TarotChat이 통째로 재마운트되는데, 그
@@ -118,7 +123,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const selectRoom = useCallback((roomId: string) => setActiveRoomId(roomId), []);
+  const selectRoom = useCallback((roomId: string | null) => setActiveRoomId(roomId), []);
 
   const refreshMe = useCallback(async () => {
     if (!user) return;
@@ -144,17 +149,37 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) {
         setUser(null);
+        setLoadFailed(false);
         setAuthChecked(true);
         return;
       }
       setUser(u);
       setAuthChecked(true);
 
-      const idToken = await u.getIdToken();
-      const [meRes, roomsRes] = await Promise.all([
-        fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } }),
-        fetch("/api/tarot/rooms", { headers: { Authorization: `Bearer ${idToken}` } }),
-      ]);
+      // getIdToken()과 두 fetch는 전부 던질 수 있다(오프라인, 토큰 갱신 실패 등). 예전엔
+      // 그대로 새어나가서 이 async 콜백이 reject되고 setLoaded(true)에 도달하지 못했다 —
+      // 그러면 화면이 로딩 상태로 굳는다. 실패해도 로딩은 반드시 끝낸다.
+      let idToken: string;
+      try {
+        idToken = await u.getIdToken();
+      } catch {
+        setLoadFailed(true);
+        setLoaded(true);
+        return;
+      }
+
+      let meRes: Response;
+      let roomsRes: Response;
+      try {
+        [meRes, roomsRes] = await Promise.all([
+          fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } }),
+          fetch("/api/tarot/rooms", { headers: { Authorization: `Bearer ${idToken}` } }),
+        ]);
+      } catch {
+        setLoadFailed(true);
+        setLoaded(true);
+        return;
+      }
 
       if (meRes.ok) {
         const data = await meRes.json();
@@ -172,22 +197,40 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setHasUnreadNotifications(Boolean(data.hasUnreadNotifications));
       }
 
+      // 실패 응답을 방으로 착각하지 않도록 두 요청 모두 ok를 본다. 예전엔 POST 결과를
+      // `roomList = [await createRes.json()]`로 그냥 받았는데, 401 본문이
+      // `{ error: "unauthorized" }`라는 정상 JSON이라 파싱이 성공해서 id가 undefined인 유령
+      // 방이 들어왔다 — 그러면 activeRoomId가 null로 남아 /tarot가 "이전 대화를 불러오는
+      // 중..."에서 영구히 멈추고, 드로어의 rooms.map은 key={undefined} 경고를 냈다.
+      // 방이 하나도 없으면 여기서 POST 로 하나 만들어두던 코드가 있었는데 걷어냈다
+      // (2026-09-24) — 로그인만 하고 아무 말도 안 한 사람에게 빈 "새 대화" 방이 생기는 게
+      // 이상했고, 메인/대화방을 가른 뒤로는 그 방이 어디에도 안 쓰인다. 방은 첫 질문을 보낼 때
+      // 만들어진다(TarotScreen.handleSubmit).
       let roomList: Room[] = [];
-      if (roomsRes.ok) {
-        const data = await roomsRes.json();
-        roomList = data.rooms;
+      let failed = false;
+      try {
+        if (roomsRes.ok) {
+          const data = await roomsRes.json();
+          roomList = data.rooms;
+        } else {
+          failed = true;
+        }
+      } catch {
+        // 본문이 JSON이 아닌 실패(프록시 HTML 오류 페이지 등)까지 여기로 온다.
+        failed = true;
       }
-      if (roomList.length === 0) {
-        const createRes = await fetch("/api/tarot/rooms", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        roomList = [await createRes.json()];
-      }
+
+      // 여기서 signOut을 부르고 싶어지는데, 하면 안 된다 — 401은 "이 토큰이 무효"와 "서버가
+      // 지금 아무 토큰도 검증할 수 없다"를 구분하지 못한다. getUidFromRequest가 verifyIdToken의
+      // 모든 예외를 catch해서 null로 뭉개기 때문이다(verifyRequest.ts). 실제로 2026-09-23
+      // 로컬에서 이 화면이 멈춘 원인은 무효 토큰이 아니라 만료된 application default
+      // credentials였다(admin SDK가 invalid_grant). 그 상태에서 401로 로그아웃시켰다면
+      // 멀쩡한 사용자 전원이 튕겨나갔을 것이다.
+      setLoadFailed(failed);
       setRooms(roomList);
-      // /tarot는 URL ?room= 파라미터가 있으면 마운트 시 selectRoom으로 덮어쓴다 — 여기서는
-      // 그냥 기본값(가장 최근 방)만 잡아둔다.
-      setActiveRoomId((prev) => prev ?? roomList[0]?.id ?? null);
+      // 여기서 "가장 최근 방"을 기본값으로 잡던 코드도 걷어냈다(2026-09-24). 이제 활성 방은
+      // 전적으로 라우트가 정한다 — `/` 면 null, `/tarot/[roomId]` 면 그 방. 기본값을 잡으면
+      // 진입 즉시 마지막 방이 열린 것처럼 되어, "진입은 항상 메인"이라는 전제가 깨진다.
       setLoaded(true);
     });
   }, []);
@@ -296,6 +339,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         activeRoomId,
         selectRoom,
         loaded,
+        loadFailed,
         authChecked,
         createRoom,
         deleteRoom,
