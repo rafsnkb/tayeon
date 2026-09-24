@@ -272,6 +272,23 @@ export function TrashIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** 원 안의 물음표. 목업(MyProfile_*)이 "태어난 시간" 안내문 앞에 두는 것 — 옆의
+ *  InfoCircleIcon("i")과 쓰임이 다르다: 이건 제약을 알려 주는 자리다. */
+export function QuestionCircleIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M6.2 6.1C6.2 5.1 6.98 4.4 8 4.4C9.02 4.4 9.8 5.1 9.8 6.05C9.8 6.85 9.35 7.2 8.75 7.6C8.3 7.9 8 8.2 8 8.9V9.3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="8" cy="11.3" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function InfoCircleIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import WheelPicker, { type WheelColumn } from "@/components/WheelPicker";
+import { QuestionCircleIcon } from "@/app/(app)/tarot/icons";
+import { leapMonthsOf, lunarMonthDays } from "@/lib/tarot/lunarCalendar";
+import type { CalendarMode } from "@/lib/tarot/birthInfo";
 
 /* 생년월일시 입력 폼이 쓰는 작은 컨트롤들. 가입(`/signup`)·내 정보(`/me/profile`)·
  * 궁합(`/compatibility`) 세 화면이 거의 같은 폼을 그리는데, 이것들이 **세 곳에 각자 복사**돼
@@ -76,6 +79,17 @@ function WheelField({
   );
 }
 
+/** "태어난 시간" 아래 안내문. 목업(MyProfile_*)이 원형 물음표를 앞에 둔다. 같은 문장이 가입·
+ *  내 프로필·궁합 세 곳에 복사돼 있었다. */
+export function BirthTimeNotice() {
+  return (
+    <p className="flex items-center gap-1.5 pt-1 text-sm font-semibold text-urgent">
+      <QuestionCircleIcon className="h-4 w-4 shrink-0" />
+      태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요
+    </p>
+  );
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const range = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -93,10 +107,14 @@ export function BirthDateField({
   value,
   onChange,
   required,
+  calendarMode = "solar",
 }: {
   value: string;
   onChange: (v: string) => void;
   required?: boolean;
+  /** 음력이면 달마다 29/30일이고, 윤달은 있는 달이 정해져 있다. 양력 일수를 쓰면 없는 날짜가
+   *  저장된다(`manseryeok` 이 이미 음력 표를 들고 있다 — src/lib/tarot/lunarCalendar.ts). */
+  calendarMode?: CalendarMode;
 }) {
   const [open, setOpen] = useState(false);
   const thisYear = new Date().getFullYear();
@@ -106,14 +124,20 @@ export function BirthDateField({
     month: m || "01",
     day: d || "01",
   };
+  const year = Number(draft.year);
+  const month = Number(draft.month);
+  const isLeap = calendarMode === "lunarLeap";
+  const lunar = calendarMode !== "solar";
+  // "음력(윤달)" 이면 그 해에 윤달이 붙는 달만 고를 수 있다 — 대부분의 해엔 아예 없고,
+  // 있는 해라도 한 달뿐이다.
+  const monthChoices = isLeap ? leapMonthsOf(year) : range(1, 12);
+  const dayCount = lunar
+    ? lunarMonthDays(year, month, isLeap) || daysInMonth(year, month)
+    : daysInMonth(year, month);
   const columns: WheelColumn[] = [
     { key: "year", label: "년", items: range(1930, thisYear).map((n) => ({ value: String(n), label: String(n) })) },
-    { key: "month", label: "월", items: range(1, 12).map((n) => ({ value: pad(n), label: pad(n) })) },
-    {
-      key: "day",
-      label: "일",
-      items: range(1, daysInMonth(Number(draft.year), Number(draft.month))).map((n) => ({ value: pad(n), label: pad(n) })),
-    },
+    { key: "month", label: "월", items: monthChoices.map((n) => ({ value: pad(n), label: pad(n) })) },
+    { key: "day", label: "일", items: range(1, dayCount).map((n) => ({ value: pad(n), label: pad(n) })) },
   ];
 
   return (
@@ -127,8 +151,12 @@ export function BirthDateField({
           value={draft}
           onClose={() => setOpen(false)}
           onConfirm={(next) => {
-            // 고른 달의 날 수를 넘으면 마지막 날로 당긴다(2월 31일 같은 값이 저장되지 않도록).
-            const last = daysInMonth(Number(next.year), Number(next.month));
+            // 고른 달의 날 수를 넘으면 마지막 날로 당긴다(2월 31일, 음력 30일 같은 값 방지).
+            const nextYear = Number(next.year);
+            const nextMonth = Number(next.month);
+            const last = lunar
+              ? lunarMonthDays(nextYear, nextMonth, isLeap) || daysInMonth(nextYear, nextMonth)
+              : daysInMonth(nextYear, nextMonth);
             const day = Math.min(Number(next.day), last);
             onChange(`${next.year}-${next.month}-${pad(day)}`);
             setOpen(false);

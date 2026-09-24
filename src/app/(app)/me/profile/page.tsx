@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BirthDateField, BirthTimeField, FieldLabel, ToggleGroup } from "@/components/FormControls";
+import { BirthDateField, BirthTimeField, BirthTimeNotice, FieldLabel, ToggleGroup } from "@/components/FormControls";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { toCalendarMode, type BirthInfo, type CalendarMode, type JasiRule } from "@/lib/tarot/birthInfo";
@@ -153,7 +153,7 @@ export default function MyProfilePage() {
           </label>
 
           <div className="flex flex-col gap-1">
-            <BirthDateField required value={birthDate} onChange={setBirthDate} />
+            <BirthDateField required value={birthDate} onChange={setBirthDate} calendarMode={calendarMode} />
             <ToggleGroup
               options={[
                 { value: "solar", label: "양력" },
@@ -175,9 +175,7 @@ export default function MyProfilePage() {
               />
               태어난 시간을 몰라요
             </label>
-            <p className="pt-1 text-sm font-semibold text-urgent">
-              태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요
-            </p>
+            <BirthTimeNotice />
           </div>
 
           <div className="flex flex-col gap-1">
