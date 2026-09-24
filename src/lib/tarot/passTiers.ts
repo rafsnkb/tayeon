@@ -46,7 +46,10 @@ export const TIME_COMBO_TIER: Record<ComboKey, PassTier> = {
  *  그림이 들어간다.
  *
  *  원본은 `asset/texture/` 의 1254px 정사각(합쳐 45MB)이라 그대로 web 에 못 올린다 —
- *  824px webp 로 줄여 `public/pass/` 에 둔다(`.impeccable/review/convert-art.js`).
+ *  `scripts/build-pass-art.js` 가 `public/pass/` 에 **두 크기**로 만든다: 히어로용 1254px
+ *  (`.webp`)와 목록 카드용 552px(`-card.webp`). 목록은 한 화면에 6장이 깔려서 히어로 크기를
+ *  쓰면 그 화면만 1.2MB가 된다.
+ *
  *  그림 자체에는 흰 그러데이션이 없다. 아래로 흐려지는 건 카드가 덧씌우는 것이다. */
 const COUNT_PACKAGE_ART: Record<string, string> = {
   "count-starter": "/pass/count-starter.webp",
@@ -57,8 +60,10 @@ const COUNT_PACKAGE_ART: Record<string, string> = {
   "count-ultimate": "/pass/count-ultimate.webp",
 };
 
-export function countPackageArt(productId: string): string {
-  return COUNT_PACKAGE_ART[productId] ?? COUNT_PACKAGE_ART["count-starter"];
+/** `size: "card"` 는 목록 그리드용 552px 판을 준다. 기본은 히어로용 1254px. */
+export function countPackageArt(productId: string, size: "hero" | "card" = "hero"): string {
+  const base = COUNT_PACKAGE_ART[productId] ?? COUNT_PACKAGE_ART["count-starter"];
+  return size === "card" ? base.replace(/\.webp$/, "-card.webp") : base;
 }
 
 /** 시간제는 "분 × 조합" 12종에 각각 그림이 있다. 파일 이름의 tier 1~4 는 COMBO_ORDER 순서
@@ -70,8 +75,9 @@ const TIME_COMBO_INDEX: Record<ComboKey, 1 | 2 | 3 | 4> = {
   "tarot-saju-ziwei": 4,
 };
 
-export function timePassArt(minutes: number, combo: ComboKey): string {
-  return `/pass/time-${minutes}-${TIME_COMBO_INDEX[combo] ?? 1}.webp`;
+export function timePassArt(minutes: number, combo: ComboKey, size: "hero" | "card" = "hero"): string {
+  const suffix = size === "card" ? "-card" : "";
+  return `/pass/time-${minutes}-${TIME_COMBO_INDEX[combo] ?? 1}${suffix}.webp`;
 }
 
 // 위 표가 상품 목록과 어긋나면 개발 중에 바로 알 수 있게 해 둔다 — 그림이 하나 빠져도 화면은

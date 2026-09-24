@@ -246,7 +246,7 @@ export default function ChargePage() {
               {COUNT_PACKAGES.map((pkg) => (
                 <PassArtCard
                   key={pkg.id}
-                  art={countPackageArt(pkg.id)}
+                  art={countPackageArt(pkg.id, "card")}
                   name={`${pkg.name} 이용권`}
                   caption={pkg.bonus}
                   price={formatWon(pkg.priceWon)}
@@ -264,7 +264,7 @@ export default function ChargePage() {
                 return (
                   <PassArtCard
                     key={combo}
-                    art={timePassArt(timeDuration, combo)}
+                    art={timePassArt(timeDuration, combo, "card")}
                     name={timePassName(timeDuration)}
                     caption={timePassCaption(combo)}
                     price={formatWon(pkg.priceWon)}
