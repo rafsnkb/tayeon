@@ -318,64 +318,64 @@ export default function MyPage() {
             {/* 두 탭 — 예상 리워드(내 결제액 기준 실제 지급 예정 횟수) / 리워드 비율(요율표).
                 예전엔 한 화면에 둘을 쌓아 뒀는데, 예상 쪽이 조합 4종 × 스프레드 4종 표로 커지면서
                 한 모달에 다 들어가지 않는다(목업 2026-09-24). */}
-            <div className="mb-4 flex rounded-full bg-bg p-1 dark:bg-border">
+            <div className="mb-4 flex rounded-full bg-chip-soft p-1">
               {([["expected", "예상 리워드"], ["rate", "리워드 비율"]] as const).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setRewardTab(key)}
                   className={`flex-1 rounded-full py-2.5 text-base font-bold ${
-                    rewardTab === key ? "point-pill text-white" : "text-bold-text"
+                    rewardTab === key ? "point-pill text-white" : "text-placeholder dark:text-chip-soft-text"
                   }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            <p className="mb-4 text-center text-sm font-semibold text-icon-muted">
+            <p className="mb-4 text-center text-sm font-semibold text-placeholder">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
             </p>
             {rewardTab === "expected" ? (
               <>
-                <div className="mb-4 flex items-center justify-between rounded-2xl bg-bg p-4 text-sm dark:bg-border">
-                  <span className="text-icon-muted">
+                <div className="mb-4 flex items-center justify-between rounded-2xl bg-chip-soft p-4 text-sm">
+                  <span className="text-placeholder">
                     {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
                   </span>
                   {/* 요율이 걸리는 금액(VAT 제외)을 보여준다 — 총액을 띄우면 옆의 요율과 곱해도
                       아래 횟수가 안 나와서 사용자가 검산할 수 없다. */}
-                  <span className="font-semibold text-bold-text">
+                  <span className="font-semibold text-chip-soft-text">
                     {(bonusReward?.supplyWon ?? 0).toLocaleString("ko-KR")}원
                   </span>
                 </div>
                 {bonusReward && bonusReward.projectedPasses > 0 ? (
                   <>
-                    <p className="mb-2 text-center text-sm font-semibold text-icon-muted">예상 보너스 리워드 이용권</p>
+                    <p className="mb-2 text-center text-sm font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
                     {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다. */}
                     <div className="mb-3 flex items-center justify-center gap-3">
                       <button
                         type="button"
                         aria-label="이전 조합"
                         onClick={() => setRewardCombo((i) => (i + COMBO_ORDER.length - 1) % COMBO_ORDER.length)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg text-bold-text dark:bg-border"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
                       >
                         <ChevronLeftIcon className="h-4 w-2" />
                       </button>
-                      <span className="flex-1 text-center text-lg font-bold text-bold-text">
+                      <span className="flex-1 text-center text-lg font-bold text-chip-soft-text">
                         {COMBOS[COMBO_ORDER[rewardCombo]].label}
                       </span>
                       <button
                         type="button"
                         aria-label="다음 조합"
                         onClick={() => setRewardCombo((i) => (i + 1) % COMBO_ORDER.length)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg text-bold-text dark:bg-border"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
                       >
                         <ChevronRightIcon className="h-4 w-2" />
                       </button>
                     </div>
-                    <div className="mb-3 rounded-3xl border border-border bg-bg p-3 dark:border-border dark:bg-border">
-                      <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+                    <div className="mb-3 rounded-3xl bg-chip-soft p-3">
+                      <div className="grid grid-cols-2 rounded-xl bg-bg px-4 py-2 text-xs font-semibold text-placeholder dark:bg-topbar">
                         <span>옵션 이름</span>
                         <span className="text-right">질문 횟수</span>
                       </div>
@@ -390,18 +390,18 @@ export default function MyPage() {
                         );
                         return SPREAD_ORDER.map((spread) => (
                           <div key={spread} className="grid grid-cols-2 px-4 py-3 text-sm">
-                            <span className="font-semibold text-bold-text dark:text-white">
+                            <span className="font-semibold text-placeholder">
                               {SPREADS[spread].label}
                               {suffix}
                             </span>
-                            <span className="text-right font-bold text-point-text">{allowances[spread]}회</span>
+                            <span className="text-right font-bold text-chip-soft-text">{allowances[spread]}회</span>
                           </div>
                         ));
                       })()}
                     </div>
                   </>
                 ) : (
-                  <p className="mb-3 rounded-2xl bg-bg p-4 text-center text-sm font-semibold text-icon-muted dark:bg-border">
+                  <p className="mb-3 rounded-2xl bg-chip-soft p-4 text-center text-sm font-semibold text-placeholder">
                     {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
                     <br />
                     리워드 이용권을 지급해 드려요.
@@ -410,20 +410,19 @@ export default function MyPage() {
               </>
             ) : (
               <>
-                <p className="mb-2 text-center text-sm font-bold text-bold-text">리워드 지급 비율</p>
-                {/* 다크모드 RewardInfoModal.png 실측(sharp 픽셀 샘플, 2026-09-20): 헤더 칩이 바깥 박스
-                    가장자리에 딱 붙지 않고 안쪽에 여백을 두고 떠 있는 형태(박스 bg=--border, 헤더 칩
-                    bg=--topbar로 안쪽이 더 어둡게 "패인" 느낌). 라이트모드 목업은 헤더가 박스 끝까지
-                    꽉 차 있었지만, 사용자 요청(2026-09-20)으로 두 모드 구조를 동일하게 통일함 —
-                    라이트도 같은 여백/독립 라운딩을 쓰고, 행 라벨은 톤을 유지한 진한 색(--bold-text)으로. */}
-                <div className="mb-3 rounded-3xl border border-border bg-bg p-3 dark:border-border dark:bg-border">
-                  <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+                <p className="mb-2 text-center text-sm font-bold text-chip-soft-text">리워드 지급 비율</p>
+                {/* 표의 색은 새 목업(RewardInfoModal_Percent, 2026-09-24)을 sharp 로 픽셀 샘플해서
+                    맞췄다 — 박스 bg=--chip-soft(라이트 #e7e2e1 정확 일치), 헤더 칩은 그보다 한 톤
+                    "패인" 면(라이트 --bg / 다크 --topbar), 라벨은 --placeholder(양쪽 정확 일치).
+                    2026-09-20 에 --border/--chip-fill 로 맞춰 둔 값은 그때 목업 기준이라 폐기. */}
+                <div className="mb-3 rounded-3xl bg-chip-soft p-3">
+                  <div className="grid grid-cols-2 rounded-xl bg-bg px-4 py-2 text-xs font-semibold text-placeholder dark:bg-topbar">
                     <span>당월 결제금액</span>
                     <span className="text-right">리워드 비율</span>
                   </div>
                   {REWARD_TIER_ROWS.map((row) => (
                     <div key={row.label} className="grid grid-cols-2 px-4 py-3 text-sm">
-                      <span className="font-semibold text-bold-text dark:text-white">{row.label}</span>
+                      <span className="font-semibold text-placeholder">{row.label}</span>
                       <span className="text-right font-bold text-point-text">{formatRate(row.rate)}</span>
                     </div>
                   ))}

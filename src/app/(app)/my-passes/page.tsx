@@ -98,7 +98,7 @@ export default function MyPassesPage() {
           </p>
         ) : (
           <div className="mx-auto w-full max-w-2xl rounded-[28px] border border-border bg-topbar p-4">
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-chip-soft">
               {passes.map((pass) => {
                 const open = openId === pass.id;
                 // 시간제는 스프레드별 횟수가 없으니(무제한) 펼칠 것도 없다.
@@ -112,10 +112,10 @@ export default function MyPassesPage() {
                       className={`grid w-full text-left ${expandable ? "grid-cols-[1fr_auto]" : "cursor-default"}`}
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-xl font-bold text-bold-text">{pass.title}</span>
+                        <span className="block truncate text-xl font-bold text-chip-soft-text">{pass.title}</span>
                         <span className="mt-1.5 flex flex-wrap items-center gap-2">
                           {pass.combo && (
-                            <span className="rounded-full bg-border px-2.5 py-1 text-xs font-semibold text-icon-muted">
+                            <span className="rounded-full bg-chip-soft px-2.5 py-1 text-xs font-semibold text-placeholder">
                               {comboLabel(pass.combo)}
                             </span>
                           )}
@@ -127,14 +127,14 @@ export default function MyPassesPage() {
                             </span>
                           )}
                         </span>
-                        <span className="mt-1.5 block text-sm text-icon-muted">
+                        <span className="mt-1.5 block text-sm text-placeholder">
                           {pass.acquiredLabel} 날짜: {formatDateTime(pass.acquiredAt)}
                         </span>
                       </span>
                       {expandable && (
                         <span className="flex aspect-square items-center justify-center">
                           <BackIcon
-                            className={`h-4 w-2 text-bold-text transition-transform ${open ? "rotate-90" : "-rotate-90"}`}
+                            className={`h-4 w-2 text-placeholder transition-transform ${open ? "rotate-90" : "-rotate-90"}`}
                           />
                         </span>
                       )}
@@ -152,18 +152,18 @@ export default function MyPassesPage() {
                     )}
 
                     {open && pass.allowances && (
-                      <div className="mt-3 rounded-[24px] bg-bg p-3 dark:bg-border">
-                        <p className="mb-2 text-center text-sm font-bold text-bold-text">
+                      <div className="mt-3 rounded-[24px] bg-chip-soft p-3">
+                        <p className="mb-2 text-center text-sm font-bold text-chip-soft-text">
                           {tableTitle(pass.acquiredLabel)}
                         </p>
-                        <div className="grid grid-cols-2 rounded-xl bg-chip-fill px-4 py-2 text-xs font-semibold text-white dark:bg-topbar dark:text-icon-muted">
+                        <div className="grid grid-cols-2 rounded-xl bg-bg px-4 py-2 text-xs font-semibold text-placeholder dark:bg-topbar">
                           <span>옵션 이름</span>
                           <span className="text-right">질문 횟수</span>
                         </div>
                         {SPREAD_ORDER.map((spread) => (
                           <div key={spread} className="grid grid-cols-2 px-4 py-2 text-sm">
-                            <span className="text-icon-muted">{spreadLabel(spread, pass.combo)}</span>
-                            <span className="text-right font-bold text-bold-text">
+                            <span className="text-placeholder">{spreadLabel(spread, pass.combo)}</span>
+                            <span className="text-right font-bold text-chip-soft-text">
                               {pass.allowances?.[spread] ?? 0}회
                             </span>
                           </div>
