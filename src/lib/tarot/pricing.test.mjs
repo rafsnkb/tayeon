@@ -104,11 +104,24 @@ test("a fractional remainder with no usable question is exhausted (combo:any)", 
   assert.equal(remainingAfterUse(pass, "one", false, false), 0);
 });
 
-test("cashback is converted to rounded one-card passes", () => {
-  // 원카드 단가 300원 기준(2026-09-24 개정). 27,000원 → 90회, 5,000원 → 16.67 → 17회.
+test("cashback never buys more than the commission behind it", () => {
+  // 원카드 단가 300원 기준(2026-09-24 개정). 27,000원 → 90회.
   assert.equal(rewardPassesForWon(540_000, 0.05), 90);
-  assert.equal(rewardPassesForWon(100_000, 0.05), 17);
+  // 자투리는 버린다 — 5,000원은 16.67회분이지 17회분이 아니다.
+  assert.equal(rewardPassesForWon(100_000, 0.05), 16);
+  // 단가에 못 미치는 커미션은 아예 0회. 올림이면 여기서 공짜 한 회가 생긴다.
   assert.equal(rewardPassesForWon(30_000, 0.01), 1);
+  assert.equal(rewardPassesForWon(29_000, 0.01), 0);
+});
+
+// 0.07 같은 요율은 부동소수점에서 56000.00000000001 로 떨어진다. 반대 방향으로 어긋난 값이
+// 버림과 만나면 한 회가 조용히 사라지므로, 커미션을 원 단위 정수로 먼저 확정한다.
+test("a reward is never lost to floating point drift", () => {
+  for (const rate of [0.03, 0.04, 0.05, 0.07, 0.1]) {
+    for (let won = 100_000; won <= 2_000_000; won += 1_000) {
+      assert.equal(rewardPassesForWon(won, rate), Math.floor(Math.round(won * rate) / 300));
+    }
+  }
 });
 
 test("free rewards do not inherit the published table's hand-tuned cells", () => {

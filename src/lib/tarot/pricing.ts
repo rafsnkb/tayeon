@@ -97,10 +97,17 @@ export function bonusRewardRateForWon(totalWon: number): number {
 }
 
 export function rewardPassesForWon(totalWon: number, rate: number): number {
-  // 원카드 1회 단가(SPREADS.one.cost) 상당을 1회로 환산하며, 표에 표시되는 횟수처럼 반올림으로
-  // 지급한다. 2026-09-24 단가가 200→300으로 오르면서 같은 금액에 대한 페이백 회수도 그만큼
-  // 줄어든다 — 요율(%)이 아니라 금액 기준 페이백이므로 이게 일관된 동작이다.
-  return Math.round((totalWon * rate) / SPREADS.one.cost);
+  // 원카드 1회 단가(SPREADS.one.cost) 상당을 1회로 환산한다. 2026-09-24 단가가 200→300으로
+  // 오르면서 같은 금액에 대한 페이백 회수도 그만큼 줄어든다 — 요율(%)이 아니라 금액 기준
+  // 페이백이므로 이게 일관된 동작이다.
+  //
+  // 커미션은 돈이라 원 단위 정수로 먼저 확정한다. 0.07 같은 요율은 부동소수점에서
+  // 56000.00000000001 처럼 떨어지는데, 반대로 어긋나는 값이 생기면 버림과 만나 한 회를 잃는다.
+  const commissionWon = Math.round(totalWon * rate);
+  // 반올림이 아니라 버림이다. 올려 주면 지급하는 이용권이 리워드로 받은 금액보다 비싸진다 —
+  // 단가에 모자라는 자투리를 한 회로 쳐 주는 셈이고, 금액이 작을수록 그 비중이 컸다
+  // (2026-09-24). 지급 횟수를 버림으로 바꾼 rewardAllowanceForCombo 와 같은 이유·같은 규칙이다.
+  return Math.floor(commissionWon / SPREADS.one.cost);
 }
 
 // 코인 경로(SAJU_ADD_ON_COST / ZIWEI_ADD_ON_COST / COMPATIBILITY_ADD_ON_COST)는 2026-09-24

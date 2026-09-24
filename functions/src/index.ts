@@ -27,8 +27,11 @@ const REFERRAL_MONTHLY_MIN_WON = 100_000;
 // 가치는 바뀌지 않고, 표기만 사실과 맞게 된다.
 const ONE_CARD_BASIS = 300;
 
+// src/lib/tarot/pricing.ts의 rewardPassesForWon과 같은 규칙(패키지 분리로 복사). 버림인 이유는
+// 본체 주석 참고 — 올려 주면 지급하는 이용권이 리워드 금액보다 비싸진다(2026-09-24).
 function rewardPassesForWon(totalWon: number, rate: number): number {
-  return Math.round((totalWon * rate) / ONE_CARD_BASIS);
+  const commissionWon = Math.round(totalWon * rate);
+  return Math.floor(commissionWon / ONE_CARD_BASIS);
 }
 
 // 받은 이용권 수령 가능 기간(지급일로부터 이 기간 내 미수령 시 소멸) — src/lib/tarot/pricing.ts의
