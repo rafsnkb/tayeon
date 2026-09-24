@@ -55,6 +55,39 @@ const COUNT_PACKAGE_TIER: Record<string, PassTier> = {
   "count-ultimate": TIER.coral,
 };
 
+/** 상품 한 종류마다 그림이 따로 있다(목업 Buy_CountPass / Buy_TimePass, 2026-09-25).
+ *  예전 카드는 등급 텍스처 4장을 여럿이 나눠 썼는데, 새 목업은 2열 그리드의 카드마다 고유한
+ *  그림이 들어간다.
+ *
+ *  원본은 `asset/texture/` 의 1254px 정사각(합쳐 45MB)이라 그대로 web 에 못 올린다 —
+ *  824px webp 로 줄여 `public/pass/` 에 둔다(`.impeccable/review/convert-art.js`).
+ *  그림 자체에는 흰 그러데이션이 없다. 아래로 흐려지는 건 카드가 덧씌우는 것이다. */
+const COUNT_PACKAGE_ART: Record<string, string> = {
+  "count-starter": "/pass/count-starter.webp",
+  "count-basic": "/pass/count-basic.webp",
+  "count-standard": "/pass/count-standard.webp",
+  "count-plus": "/pass/count-plus.webp",
+  "count-premium": "/pass/count-premium.webp",
+  "count-ultimate": "/pass/count-ultimate.webp",
+};
+
+export function countPackageArt(productId: string): string {
+  return COUNT_PACKAGE_ART[productId] ?? COUNT_PACKAGE_ART["count-starter"];
+}
+
+/** 시간제는 "분 × 조합" 12종에 각각 그림이 있다. 파일 이름의 tier 1~4 는 COMBO_ORDER 순서
+ *  (타로 / +사주 / +자미두수 / +사주+자미두수)와 같다 — 목업 카드와 원본을 나란히 놓고 확인했다. */
+const TIME_COMBO_INDEX: Record<ComboKey, 1 | 2 | 3 | 4> = {
+  tarot: 1,
+  "tarot-saju": 2,
+  "tarot-ziwei": 3,
+  "tarot-saju-ziwei": 4,
+};
+
+export function timePassArt(minutes: number, combo: ComboKey): string {
+  return `/pass/time-${minutes}-${TIME_COMBO_INDEX[combo] ?? 1}.webp`;
+}
+
 /** 등급을 못 찾으면 가장 낮은 등급으로 떨어뜨린다 — 상품이 새로 생겼을 때 화면이 깨지는
  *  것보다 색 하나가 밋밋한 편이 낫다. */
 export function countPackageTier(productId: string): PassTier {

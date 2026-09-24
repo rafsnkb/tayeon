@@ -23,11 +23,15 @@ export function ComboAllowanceCard({
   allowanceFor,
   selected = false,
   onSelect,
+  layout = "table",
 }: {
   combo: ComboKey;
   allowanceFor: (combo: ComboKey, spread: SpreadKey) => number;
   selected?: boolean;
   onSelect?: () => void;
+  /** 목업이 화면마다 다르다 — 받은 이용권 수령(MyPass_Send)은 세로 표, 구입 상세
+   *  (Buy_*_Purchase)는 가로 4열이다. */
+  layout?: "table" | "columns";
 }) {
   const inner = (
     <>
@@ -48,22 +52,37 @@ export function ComboAllowanceCard({
           박스는 --chip-soft, 그 안의 헤더 줄만 한 톤 더 눌린 면(라이트 --bg / 다크 --topbar),
           글자는 --placeholder. 반지름은 1236px 목업에서 박스 34px ≈ 화면 11px 이라 rounded-xl
           (16px 였던 rounded-2xl 은 바깥 카드(28px)와 어긋나 보였다). */}
-      <div className="rounded-xl bg-chip-soft p-3 text-sm">
-        {/* 헤더는 목업에서 본문 행과 **같은 크기**다. text-xs 로 줄이면 표가 한 단계 작아 보인다. */}
-        <div className="flex justify-between gap-2 rounded bg-bg px-2 py-1 text-base font-semibold text-placeholder dark:bg-topbar"><span>옵션 이름</span><span className="shrink-0">질문 가능 횟수</span></div>
-        {SPREAD_ORDER.map((spread) => (
-          <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-placeholder">
-            <span>
-              {SPREAD_SHORT[spread]}
-              {COMBOS[combo].saju ? "+사주" : ""}
-              {COMBOS[combo].ziwei ? "+자미두수" : ""}
-            </span>
-            {/* 예전엔 text-white 였다. 다크에서만 확인하고 넣은 색이라 라이트 모드에서는
-                밝은 박스 위 흰 글자가 되어 횟수가 보이지 않았다(2026-09-24). */}
-            <strong className="shrink-0 text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
-          </div>
-        ))}
-      </div>
+      {layout === "columns" ? (
+        /* 네 스프레드를 가로로 늘어놓는다(목업 Buy_*_Purchase). 옵션은 줄을 나눠 쌓는다 —
+           "원 카드 / +사주 / +자미두수" 처럼. 헤더 줄은 없다. */
+        <div className="grid grid-cols-4 gap-1 rounded-2xl bg-chip-soft px-2 py-3">
+          {SPREAD_ORDER.map((spread) => (
+            <div key={spread} className="flex flex-col items-center gap-0.5 text-center">
+              <span className="text-sm font-semibold leading-tight text-placeholder">{SPREAD_SHORT[spread]}</span>
+              {COMBOS[combo].saju && <span className="text-sm font-semibold leading-tight text-placeholder">+사주</span>}
+              {COMBOS[combo].ziwei && <span className="text-sm font-semibold leading-tight text-placeholder">+자미두수</span>}
+              <strong className="mt-1 text-base text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl bg-chip-soft p-3 text-sm">
+          {/* 헤더는 목업에서 본문 행과 **같은 크기**다. text-xs 로 줄이면 표가 한 단계 작아 보인다. */}
+          <div className="flex justify-between gap-2 rounded bg-bg px-2 py-1 text-base font-semibold text-placeholder dark:bg-topbar"><span>옵션 이름</span><span className="shrink-0">질문 가능 횟수</span></div>
+          {SPREAD_ORDER.map((spread) => (
+            <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-placeholder">
+              <span>
+                {SPREAD_SHORT[spread]}
+                {COMBOS[combo].saju ? "+사주" : ""}
+                {COMBOS[combo].ziwei ? "+자미두수" : ""}
+              </span>
+              {/* 예전엔 text-white 였다. 다크에서만 확인하고 넣은 색이라 라이트 모드에서는
+                  밝은 박스 위 흰 글자가 되어 횟수가 보이지 않았다(2026-09-24). */}
+              <strong className="shrink-0 text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 
@@ -88,13 +107,15 @@ export function ComboAllowanceList({
   allowanceFor,
   selected,
   onSelect,
+  layout = "table",
 }: {
   allowanceFor: (combo: ComboKey, spread: SpreadKey) => number;
   selected: ComboKey | null;
   onSelect: (combo: ComboKey) => void;
+  layout?: "table" | "columns";
 }) {
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col ${layout === "columns" ? "gap-6" : "gap-3"}`}>
       {COMBO_ORDER.map((combo) => (
         <ComboAllowanceCard
           key={combo}
@@ -102,6 +123,7 @@ export function ComboAllowanceList({
           allowanceFor={allowanceFor}
           selected={selected === combo}
           onSelect={() => onSelect(combo)}
+          layout={layout}
         />
       ))}
     </div>
