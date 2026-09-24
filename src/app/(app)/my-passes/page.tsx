@@ -25,8 +25,9 @@ type HeldPass = {
   minutes: number | null;
 };
 
-/** 목업(MyPass_Held)의 표 제목 — 구매분은 "구입 옵션", 무상 지급분은 고를 수 있었으니 "선택 옵션". */
-const tableTitle = (label: "구입" | "수령") => (label === "구입" ? "구입한 옵션" : "선택한 옵션");
+/** 목업(MyPass_Held) 문구. 위의 "구입 날짜/수령 날짜"와 같은 말을 쓴다 — 한 화면에서 같은
+ *  이용권을 두 가지로 부르지 않게. (2026-09-25 목업 개정: "선택한 옵션" → "수령한 옵션") */
+const tableTitle = (label: "구입" | "수령") => `${label}한 옵션`;
 
 /** 조합이 확정된 이용권만 조합 카드로 그릴 수 있다. 운영자 지급분은 "모든 옵션"일 수 있다. */
 function isComboKey(combo: ComboKey | "any" | null): combo is ComboKey {
@@ -103,8 +104,11 @@ export default function MyPassesPage() {
             이용권을 구입하면 여기에 표시돼요.
           </p>
         ) : (
-          <div className="mx-auto w-full max-w-2xl rounded-[28px] border border-border bg-topbar p-4">
-            <div className="divide-y divide-chip-soft">
+          /* 목업(MyPass_Held)은 제목·조합칩·날짜·"구입한 옵션"을 **페이지 배경 위에 그대로** 놓는다.
+             바깥에 흰 카드를 한 겹 두르면 그 안의 조합 카드와 같은 흰면·같은 28px 반지름이 두 겹으로
+             겹친다 — 받은 이용권에서 이미 걷어낸 것과 같은 문제다(실측 2026-09-25). */
+          <div className="mx-auto w-full max-w-2xl">
+            <div className="divide-y divide-border">
               {passes.map((pass) => {
                 const open = openId === pass.id;
                 // 시간제는 스프레드별 횟수가 없으니(무제한) 펼칠 것도 없다.

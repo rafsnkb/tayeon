@@ -316,7 +316,7 @@ export default function MyPage() {
               **정확히 같고** 비율 탭은 행 간격을 넓혀 그 높이를 채운다 — 내용에 맡기면 토글할
               때마다 모달이 늘었다 줄었다 한다(사용자 지적). 그래서 flex 로 나눠 갖는다. */}
           <div
-            className="flex h-[516px] w-full max-w-[380px] flex-col rounded-[32px] border border-border bg-topbar p-4"
+            className="flex h-[516px] w-full max-w-[380px] flex-col rounded-[32px] border border-border bg-topbar px-4 pt-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-14 shrink-0 items-center justify-between">
@@ -343,7 +343,7 @@ export default function MyPage() {
               ))}
             </div>
 
-            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-sm font-semibold leading-tight text-placeholder">
+            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-[14px] font-semibold leading-tight text-placeholder">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
@@ -366,7 +366,7 @@ export default function MyPage() {
                   /* 금액 상자와 아래 표 사이는 목업에서도 그냥 빈 곳이다(실측 72) — mt-auto 로
                      아래쪽 세 덩어리를 바닥에 붙이면 그 여백이 자연히 남는다. */
                   <div className="mt-auto">
-                    <p className="text-center text-sm font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
+                    <p className="text-center text-[14px] font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
                     {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다.
                         알약은 48×32, 가운데 이름은 폭을 고정해 화살표가 춤추지 않게 한다. */}
                     <div className="mt-1 flex h-8 items-center justify-center gap-2.5">
@@ -401,7 +401,7 @@ export default function MyPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-auto flex items-center justify-center rounded-2xl bg-chip-soft p-4">
+                  <div className="my-auto flex items-center justify-center rounded-2xl bg-chip-soft p-4">
                     <p className="text-center text-sm font-semibold text-placeholder">
                       {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
                       <br />
@@ -435,7 +435,7 @@ export default function MyPage() {
               </div>
             )}
 
-            <p className="flex h-[33px] shrink-0 items-center justify-center text-center text-sm text-icon-muted">
+            <p className="flex h-[34px] shrink-0 items-center justify-center text-center text-[14px] text-icon-muted">
               보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.
             </p>
           </div>

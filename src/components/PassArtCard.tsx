@@ -46,9 +46,9 @@ export default function PassArtCard({
       className="relative flex h-[262px] flex-col overflow-hidden rounded-[20px] bg-topbar text-left disabled:opacity-60"
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- 정적 webp 18장, 크기도 고정이라 최적화할 것이 없다 */}
-      <img src={art} alt="" className="absolute inset-x-0 top-0 h-[184px] w-full object-cover" />
-      <div className="absolute inset-x-0 top-[96px] h-[88px] bg-gradient-to-b from-transparent to-topbar" />
-      <div className="relative mt-auto px-2 pb-4 text-center">
+      <img src={art} alt="" className="absolute inset-x-0 top-0 h-[200px] w-full object-cover" />
+      <div className="absolute inset-x-0 top-[112px] h-[88px] bg-gradient-to-b from-transparent to-topbar" />
+      <div className="relative mt-auto px-2 pb-2 text-center">
         <p className="truncate text-lg font-bold text-bold-text">{name}</p>
         <p className="mt-0.5 truncate text-xs font-semibold text-icon-muted">{highlightPercent(caption)}</p>
         <p className="mt-5 text-base font-bold text-bold-text">{price}</p>
