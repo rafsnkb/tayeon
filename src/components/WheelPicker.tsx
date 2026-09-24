@@ -20,6 +20,28 @@ const ROW = 32;
 const VISIBLE = 5;
 const PAD = ((VISIBLE - 1) / 2) * ROW; // 가운데 칸을 중앙에 두기 위한 위아래 여백
 
+/**
+ * 아이폰처럼 글자가 **원통에 붙어 돌아가게** 하는 값들(사용자 요청, 2026-09-25).
+ *
+ * 기울이기만 하면 안 된다 — 32px 짜리 줄을 18도 눌러 봤자 거의 표가 안 났다. 진짜 느낌은
+ * 줄이 원통 표면에 있어서 **위아래로 좁혀지는** 데서 나온다. 그래서 각 줄을 원통 위 제자리로
+ * 옮긴다: 각도 θ 인 줄은 중앙에서 `R·sinθ` 만큼 떨어져 있고 `R·cosθ - R` 만큼 뒤로 물러나 있다.
+ * 흐름상 위치는 `(i - offset)·ROW` 이므로 그 차이만 `translateY` 로 보정한다.
+ *
+ * 원근은 **줄마다** 준다(`perspective()` 함수). 스크롤 컨테이너에 `perspective` 를 걸고
+ * `preserve-3d` 를 이어 붙이는 방법도 크롬에서는 같은 그림이 나오지만, `overflow` 가 있는
+ * 요소는 규격상 3D 문맥이 평면으로 바뀌어서 브라우저마다 결과를 보장할 수 없다.
+ *
+ * 스크롤·스냅 기하는 **하나도 건드리지 않는다**. transform 은 레이아웃에 영향을 주지 않으므로
+ * `scrollTop / ROW` 매핑과 실측 치수(칸 32, 5칸)가 그대로 살아 있다.
+ */
+const ANGLE = 22; // 한 칸당 회전 각도
+const PERSPECTIVE = 420;
+const MAX_TILT_ROWS = 3; // 이보다 먼 줄은 더 눕히지 않는다(뒤로 넘어가 뒤집혀 보인다)
+const RADIUS = ROW / ((ANGLE * Math.PI) / 180); // 호 길이가 칸 높이와 맞는 반지름
+/** 기울임을 계산해 둘 줄의 범위. 보이는 5칸보다 넉넉히 잡아 두면 굴릴 때 빈 줄이 안 생긴다. */
+const PAINT_MARGIN = 4;
+
 export type WheelColumn = {
   key: string;
   /** 칸 위에 붙는 이름 — "년", "월", "오전/오후" 처럼. */
@@ -37,9 +59,53 @@ function Column({
   onChange: (v: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const index = Math.max(0, column.items.findIndex((it) => it.value === value));
   const [active, setActive] = useState(index);
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 기울임을 써 둔 줄들. 벗어난 줄을 되돌리려면 어디를 건드렸는지 알아야 한다. */
+  const paintedRows = useRef<number[]>([]);
+
+  /** 굴림 위치에 맞춰 각 줄을 원통 위에 놓는다.
+   *
+   *  React 상태로 하지 않고 DOM 에 직접 쓴다 — 스크롤은 초당 수십 번 일어나고 연 칸은 줄이
+   *  100 개에 가깝다. 다시 그릴 일이 아니라 **칠할** 일이다. 손 댄 줄만 기억해 두고 범위를
+   *  벗어나면 되돌려 놓는다(안 지우면 화면 밖에 누운 줄이 남는다). */
+  const paint = useCallback(() => {
+    const el = ref.current;
+    const list = listRef.current;
+    if (!el || !list) return;
+    const rows = list.children;
+    const offset = el.scrollTop / ROW;
+    const from = Math.max(0, Math.floor(offset) - PAINT_MARGIN);
+    const to = Math.min(rows.length - 1, Math.ceil(offset) + PAINT_MARGIN);
+    for (const i of paintedRows.current) {
+      if (i < from || i > to) {
+        const row = rows[i] as HTMLElement | undefined;
+        if (row) {
+          row.style.transform = "";
+          row.style.opacity = "";
+        }
+      }
+    }
+    const next: number[] = [];
+    for (let i = from; i <= to; i++) {
+      const row = rows[i] as HTMLElement | undefined;
+      if (!row) continue;
+      const delta = i - offset;
+      const tilt = Math.max(-MAX_TILT_ROWS, Math.min(MAX_TILT_ROWS, delta));
+      const theta = (tilt * ANGLE * Math.PI) / 180;
+      const dy = RADIUS * Math.sin(theta) - delta * ROW;
+      const dz = RADIUS * Math.cos(theta) - RADIUS;
+      row.style.transform =
+        `perspective(${PERSPECTIVE}px) translateY(${dy.toFixed(2)}px)` +
+        ` translateZ(${dz.toFixed(2)}px) rotateX(${(-tilt * ANGLE).toFixed(1)}deg)`;
+      // 멀어질수록 흐려진다. 색 단계(아래 className)만으로는 원통 끝이 뚝 끊겨 보인다.
+      row.style.opacity = Math.max(0.2, 1 - Math.abs(delta) / 3.2).toFixed(2);
+      next.push(i);
+    }
+    paintedRows.current = next;
+  }, []);
 
   // 바깥에서 값이 바뀌면(달이 바뀌어 일수가 줄어드는 등) 그 자리로 옮겨 놓는다.
   // 스크롤 중에는 건드리지 않는다 — 사용자가 굴리는 중에 되돌아가면 안 된다.
@@ -48,7 +114,15 @@ function Column({
     if (!el || settle.current) return;
     el.scrollTop = index * ROW;
     setActive(index);
-  }, [index]);
+    paint();
+  }, [index, paint]);
+
+  // 줄 목록이 바뀌면(2월로 옮겨 일수가 줄는 등) React 가 줄을 새로 만들어서 기울임이 없는
+  // 상태로 돌아온다. 그때 다시 칠한다.
+  useEffect(() => {
+    paintedRows.current = [];
+    paint();
+  }, [column.items, paint]);
 
   /** PC 에서 끌어서 굴리기. 스크롤 휠만으로는 굴림판인 줄 모르고 지나친다(사용자 지적).
    *  터치는 건드리지 않는다 — 모바일은 이미 관성 스크롤이 자연스럽고, 여기서 가로채면 그걸
@@ -76,6 +150,7 @@ function Column({
     const el = ref.current;
     if (!el || !drag.current) return;
     el.scrollTop = drag.current.startTop - (e.clientY - drag.current.startY);
+    paint(); // scroll 이벤트로도 오지만, 끌 때는 한 프레임이라도 밀리면 눈에 띈다
   };
 
   const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -90,6 +165,7 @@ function Column({
   const handleScroll = useCallback(() => {
     const el = ref.current;
     if (!el) return;
+    paint();
     const i = Math.max(0, Math.min(column.items.length - 1, Math.round(el.scrollTop / ROW)));
     setActive(i);
     if (settle.current) clearTimeout(settle.current);
@@ -100,7 +176,7 @@ function Column({
       const item = column.items[i];
       if (item && item.value !== value) onChange(item.value);
     }, 120);
-  }, [column.items, onChange, value]);
+  }, [column.items, onChange, paint, value]);
 
   useEffect(() => () => { if (settle.current) clearTimeout(settle.current); }, []);
 
@@ -122,7 +198,7 @@ function Column({
         // 고를 수가 없었다(2026-09-25 실측: 오후로 굴려도 scrollTop 이 0 으로 돌아왔다).
         style={{ height: VISIBLE * ROW, scrollbarWidth: "none" }}
       >
-        <div style={{ paddingTop: PAD, paddingBottom: PAD }}>
+        <div ref={listRef} style={{ paddingTop: PAD, paddingBottom: PAD }}>
           {column.items.map((item, i) => {
             const distance = Math.abs(i - active);
             return (
@@ -133,9 +209,9 @@ function Column({
                     ? "font-bold text-bold-text"
                     : distance === 1
                       ? "font-semibold text-placeholder"
-                      : "font-semibold text-icon-muted opacity-50"
+                      : "font-semibold text-icon-muted"
                 }`}
-                style={{ height: ROW }}
+                style={{ height: ROW, backfaceVisibility: "hidden" }}
               >
                 {item.label}
               </div>
