@@ -12,31 +12,24 @@ export const ping = onRequest((req, res) => {
   res.json({ ok: true });
 });
 
-// 친구 초대(리퍼럴) 월간 5% 정산. Functions 패키지는 앱 코드와 분리되어 있어 아래 가격 규칙을
-// 같은 값으로 유지한다.
-const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
-
-// 친구 결제 리워드 최소 기준 — src/lib/tarot/pricing.ts의 REFERRAL_MONTHLY_MIN_WON과 같은 값
-// (패키지 분리로 값만 복사). 추천인의 친구들이 그 달에 합쳐서 이 금액 이상 결제해야 지급하며,
-// 미달분은 다음 달로 이월되지 않는다.
-const REFERRAL_MONTHLY_MIN_WON = 100_000;
-// 원카드 1회 단가 — src/lib/tarot/pricing.ts의 SPREADS.one.cost와 같은 값(패키지 분리로 복사).
-// 2026-09-24 가격표 개정(200 → 300)이 여기 반영되지 않아서, 배치가 표기한 freePasses가 실제
-// 이용권이 주는 횟수보다 1.5배 많았다(110,000원 결제 → 받은 이용권 내역 "17회" / 실제 11회 /
-// 마이페이지 예상치 11회). basis(= freePasses × 이 값)는 결국 결제액×요율 그대로라 지급되는
-// 가치는 바뀌지 않고, 표기만 사실과 맞게 된다.
-const ONE_CARD_BASIS = 300;
-
-// src/lib/tarot/pricing.ts의 rewardPassesForWon과 같은 규칙(패키지 분리로 복사). 버림인 이유는
-// 본체 주석 참고 — 올려 주면 지급하는 이용권이 리워드 금액보다 비싸진다(2026-09-24).
-function rewardPassesForWon(totalWon: number, rate: number): number {
-  const commissionWon = Math.round(totalWon * rate);
-  return Math.floor(commissionWon / ONE_CARD_BASIS);
-}
-
-// 받은 이용권 수령 가능 기간(지급일로부터 이 기간 내 미수령 시 소멸) — src/lib/tarot/pricing.ts의
-// PENDING_REWARD_CLAIM_WINDOW_MONTHS와 동일한 값(패키지 분리로 값만 복사).
-const PENDING_REWARD_CLAIM_WINDOW_MONTHS = 1;
+// 리워드 규칙은 src/lib/reward/rules.ts 가 단일 출처이고, 아래 사본은
+// `npm run sync:reward-rules` 가 그 파일을 그대로 복사해 만든다(Functions 는 별도 패키지라
+// @/lib/... 를 import 할 수 없다). 사본을 직접 고치지 말 것 — 앱의 `npm test` 가 두 파일이
+// 어긋나면 실패한다(src/lib/reward/rules.sync.test.mjs).
+//
+// 2026-09-25 이전에는 이 값들이 여기 손으로 복사돼 있었고, 그래서 VAT 를 빼는 supplyWon() 이
+// 앱에만 있고 여기엔 없었다 — 에뮬레이터 검증에서 110만원 결제에 366회(앱 표기 333회)가
+// 지급되는 것으로 실제 확인됐다.
+import {
+  ONE_CARD_BASIS,
+  PENDING_REWARD_CLAIM_WINDOW_MONTHS,
+  REFERRAL_MONTHLY_COMMISSION_RATE,
+  REFERRAL_MONTHLY_MIN_WON,
+  addMonthsClamped,
+  bonusRewardRateForWon,
+  rewardPassesForWon,
+  supplyWon,
+} from "./shared/rewardRules.ts";
 
 // 생일 쿠폰 수령 시 고를 수 있는 조합과 무료 횟수. 예전에는 이 표가 이 파일과
 // src/lib/rewards/birthday.ts 양쪽에 그대로 복제돼 있었는데, 후자는 호출하는 곳이 없는 죽은
@@ -46,17 +39,6 @@ const BIRTHDAY_COUPON_OPTIONS = [
   { combo: "tarot-ziwei", freePasses: 6 },
   { combo: "tarot-saju-ziwei", freePasses: 4 },
 ];
-
-// src/lib/util/dateMath.ts의 addMonthsClamped와 동일한 로직(패키지 분리로 복사).
-function addMonthsClamped(iso: string, months: number): string {
-  const date = new Date(iso);
-  const day = date.getUTCDate();
-  date.setUTCDate(1);
-  date.setUTCMonth(date.getUTCMonth() + months);
-  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
-  date.setUTCDate(Math.min(day, lastDay));
-  return date.toISOString();
-}
 
 /** 매일 KST 00:10에 저장된 생년월일과 일치하는 사용자에게 생일 쿠폰을 1회 발급한다. */
 export const dailyBirthdayCouponPayout = onSchedule(
@@ -176,10 +158,13 @@ export const monthlyReferralPayout = onSchedule(
 
     const passesByReferrerUid = new Map<string, number>();
     for (const [referrerUid, totalWon] of totalWonByReferrerUid) {
+      // 요율도 하한 판정도 공급가액(VAT 제외) 기준이다 — 근거는 supplyWon 주석. 합계를 먼저
+      // 내고 한 번만 VAT 를 뺀다(결제 건마다 빼면 버림이 건수만큼 쌓여 값이 달라진다).
+      const supply = supplyWon(totalWon);
       // 합계가 기준 미달이면 그 달은 건너뛴다. 소액일수록 횟수 환산에서 남는 자투리 비중이 커져
       // 리워드가 제 가치보다 후해지기 때문이다(2026-09-24).
-      if (totalWon < REFERRAL_MONTHLY_MIN_WON) continue;
-      const freePasses = rewardPassesForWon(totalWon, REFERRAL_MONTHLY_COMMISSION_RATE);
+      if (supply < REFERRAL_MONTHLY_MIN_WON) continue;
+      const freePasses = rewardPassesForWon(supply, REFERRAL_MONTHLY_COMMISSION_RATE);
       if (freePasses > 0) passesByReferrerUid.set(referrerUid, freePasses);
     }
 
@@ -209,22 +194,6 @@ export const monthlyReferralPayout = onSchedule(
     console.log(`[referral-payout] ${payoutKey} 정산 완료 — 추천인 ${passesByReferrerUid.size}명`);
   }
 );
-
-// 보너스 리워드(자체 결제 캐시백) 티어 — src/lib/tarot/pricing.ts의 PAYMENT_BONUS_REWARD_TIERS와
-// 동일한 값을 쓴다(패키지가 분리돼 있어 값만 그대로 복사, 바꾸려면 두 군데 다 고칠 것). 친구 결제
-// 리워드(monthlyReferralPayout)와 달리 이건 유저 "본인"의 결제 총액을 기준으로 한다.
-const PAYMENT_BONUS_REWARD_TIERS: { minWon: number; rate: number }[] = [
-  { minWon: 1_000_000, rate: 0.1 },
-  { minWon: 800_000, rate: 0.07 },
-  { minWon: 400_000, rate: 0.05 },
-  { minWon: 200_000, rate: 0.04 },
-  { minWon: 100_000, rate: 0.03 },
-];
-
-function bonusRewardRateForWon(totalWon: number): number {
-  const tier = PAYMENT_BONUS_REWARD_TIERS.find((t) => totalWon >= t.minWon);
-  return tier?.rate ?? 0;
-}
 
 // 매월 10일 03:00(KST)에 "지난달" 내가 결제한 코인ㆍ이용권 금액을 정산해 보너스 리워드를 지급한다.
 // 5일이 아니라 10일인 이유는 monthlyReferralPayout 위의 주석 참고(환불 가능 기간과 겹치지
@@ -267,8 +236,11 @@ export const monthlyBonusRewardPayout = onSchedule(
     // 2. 유저별로 이번 정산 주기 1회만 지급(bonusRewardPayouts/{yyyy-mm} 문서를 멱등성 키로 사용 —
     // 함수가 재시도/중복 실행되더라도 같은 달에 두 번 지급되지 않는다).
     for (const [uid, totalWon] of totalByUid) {
-      const rate = bonusRewardRateForWon(totalWon);
-      const freePasses = rewardPassesForWon(totalWon, rate);
+      // 요율 구간 판정과 지급 회수 모두 공급가액(VAT 제외) 기준 — 앱의 예상치 화면
+      // (/api/user/bonus-reward)과 같은 입력을 써야 표기와 지급이 맞는다.
+      const supply = supplyWon(totalWon);
+      const rate = bonusRewardRateForWon(supply);
+      const freePasses = rewardPassesForWon(supply, rate);
       if (freePasses <= 0) continue;
 
       const userRef = db.collection("users").doc(uid);
@@ -284,6 +256,7 @@ export const monthlyBonusRewardPayout = onSchedule(
           freePasses,
           rate,
           totalWon,
+          supplyWon: supply,
           periodStart: startIso,
           periodEnd: endIso,
           createdAt,

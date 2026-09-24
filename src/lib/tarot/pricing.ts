@@ -1,10 +1,37 @@
+// 리워드(무상 지급) 규칙은 이 파일이 아니라 `@/lib/reward/rules` 가 단일 출처다 — Cloud
+// Functions 가 같은 값을 써야 하는데 별도 패키지라 import 를 못 해서, 그 파일만 사본을
+// 두고 테스트로 동기화를 강제한다. 여기서는 기존 호출부가 그대로 돌도록 재수출만 한다.
+import {
+  ONE_CARD_BASIS,
+  PAYMENT_BONUS_REWARD_TIERS,
+  REFERRAL_MONTHLY_COMMISSION_RATE,
+  REFERRAL_MONTHLY_MIN_WON,
+  REWARD_PAYOUT_DAY_OF_MONTH,
+  PENDING_REWARD_CLAIM_WINDOW_MONTHS,
+  supplyWon,
+  bonusRewardRateForWon,
+  rewardPassesForWon,
+} from "@/lib/reward/rules";
+
+export {
+  ONE_CARD_BASIS,
+  PAYMENT_BONUS_REWARD_TIERS,
+  REFERRAL_MONTHLY_COMMISSION_RATE,
+  REFERRAL_MONTHLY_MIN_WON,
+  REWARD_PAYOUT_DAY_OF_MONTH,
+  PENDING_REWARD_CLAIM_WINDOW_MONTHS,
+  supplyWon,
+  bonusRewardRateForWon,
+  rewardPassesForWon,
+};
+
 // cost 는 "금액 ↔ 횟수" 환산 단가다. 2026-09-24 사용자 가격표 개정으로 네 스프레드 모두
 // 1.5배: 200/300/400/500 → 300/450/600/750. 같은 금액으로 살 수 있는 횟수가 그만큼 줄어든다.
 //
 // 이 값을 바꾸면 리워드 표기까지 같이 움직인다 — 개정 때 200을 손으로 박아둔 네 곳(배치·수령·
 // 받은내역·어드민 지급)이 따라오지 않아서 광고 횟수와 실제 지급이 어긋났었다(2026-09-24 수정).
 export const SPREADS = {
-  one: { label: "원카드", cardCount: 1, cost: 300 },
+  one: { label: "원카드", cardCount: 1, cost: ONE_CARD_BASIS },
   three: { label: "쓰리카드", cardCount: 3, cost: 450 },
   dual: { label: "양자택일", cardCount: 5, cost: 600 },
   celtic: { label: "켈틱크로스", cardCount: 10, cost: 750 },
@@ -45,26 +72,14 @@ export function comboKeyFor(saju: boolean, ziwei: boolean): ComboKey {
   return saju && ziwei ? "tarot-saju-ziwei" : saju ? "tarot-saju" : ziwei ? "tarot-ziwei" : "tarot";
 }
 
-/** 월간 리워드(친구 결제 5% + 본인 결제 캐시백) 지급일. functions/src/index.ts의
- *  monthlyReferralPayout·monthlyBonusRewardPayout 크론(`0 3 10 * *`)과 **반드시 같아야 한다** —
- *  functions는 별도 패키지라 import할 수 없어서 값을 손으로 맞춘다.
- *
- *  5일이 아니라 10일인 이유: 정산은 아직 환불되지 않은(status=="fulfilled") 결제만 세는데,
- *  환불 가능 기간이 결제 후 REFUND_WINDOW_DAYS(7)일이라 5일에 정산하면 "말일 결제 → 5일 리워드
- *  수령 → 6일 환불"로 공짜 이용권을 만들 수 있었다(2026-09-24). 이 값을 앞당기려면 그 계산부터
- *  다시 할 것. */
-export const REWARD_PAYOUT_DAY_OF_MONTH = 10;
+// 월간 리워드 지급일(REWARD_PAYOUT_DAY_OF_MONTH)은 @/lib/reward/rules 로 옮겼다 — 위에서
+// 재수출하므로 기존 import 는 그대로 쓴다.
 
 // 친구 초대는 가입한 친구와 추천인 모두에게 원카드 기준 무료 이용권 5회를 준다.
 // 추천 가능한 친구 수는 5명이며, 월간 결제 리워드에는 횟수 제한이 없다.
 export const REFERRAL_SIGNUP_FREE_PASSES = 5;
 export const REFERRAL_SIGNUP_FRIEND_CAP = 5;
-export const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
-
-/** 친구 결제 리워드 최소 기준 — 추천인의 친구들이 그 달에 합쳐서 이 금액 이상 결제해야 지급한다.
- *  미달이면 그 달은 지급하지 않는다(다음 달로 이월되지 않는다). 보너스 리워드의 최저 구간과
- *  같은 금액으로 맞춘다 — 두 리워드의 진입선이 다르면 안내가 두 배로 복잡해진다(2026-09-24). */
-export const REFERRAL_MONTHLY_MIN_WON = 100_000;
+// REFERRAL_MONTHLY_COMMISSION_RATE / REFERRAL_MONTHLY_MIN_WON 은 @/lib/reward/rules 로 옮겼다.
 
 // 첫 카카오 가입 보상은 스프레드/옵션 조합과 무관하게 정확히 4회를 쓸 수 있는 체험 이용권이다.
 // 남은 권리를 옵션 변경에 따라 환산하는 유료 이용권과 달리, 모든 조합을 같은 4회로 고정한다.
@@ -83,64 +98,12 @@ export function signupFreePassAllowances(): Record<string, number> {
   );
 }
 
-// 보너스 리워드 — "내가" 이번 달에 결제한 이용권 금액(VAT 제외)에 따라 다음달
-// REWARD_PAYOUT_DAY_OF_MONTH일에 원카드 기준 무료 이용권으로 페이백해주는 자체 캐시백(친구
-// 결제 리워드와는 별개). asset/Screen/RewardInfoModal.png
-// 기획표 그대로: 결제금액이 해당 구간(minWon) 이상이면 전체 금액에 그 구간 요율을 적용한다
-// (누진세처럼 구간별로 쪼개 계산하지 않는 단일 구간 조회 — 내림차순으로 첫 매치).
-// 2026-09-18: 하위 2단계(1%/0.5%) 제거 — 5만원 미만 결제는 리워드 미지급으로 정리.
-// 2026-09-24: 5만원/1.5% 구간도 제거해 진입선을 10만원으로 올렸다. 금액이 작을수록 횟수 환산에서
-// 남는 자투리 비중이 커져 리워드가 제 가치보다 후해지는데, 그 구간이 딱 거기였다.
-export const PAYMENT_BONUS_REWARD_TIERS = [
-  { minWon: 1_000_000, rate: 0.1 },
-  { minWon: 800_000, rate: 0.07 },
-  { minWon: 400_000, rate: 0.05 },
-  { minWon: 200_000, rate: 0.04 },
-  { minWon: 100_000, rate: 0.03 },
-] as const;
+// 보너스 리워드 표(PAYMENT_BONUS_REWARD_TIERS)와 금액→횟수 환산(supplyWon /
+// bonusRewardRateForWon / rewardPassesForWon)도 @/lib/reward/rules 로 옮겼다 — 위에서 재수출한다.
+// 기획표 원본은 asset/Screen/RewardInfoModal.png.
 
 /** 부가세율. */
 export const VAT_RATE = 0.1;
-
-/**
- * 결제 총액(VAT 포함)에서 공급가액을 뽑는다 — 리워드 계산의 입력은 항상 이 값이다.
- *
- * 상품 가격표(`COUNT_PACKAGES.priceWon`)와 결제 기록은 전부 **VAT 포함 표시가**다(구매 화면이
- * "상품금액 (VAT 포함)"으로 보여주는 그 값). 그걸 그대로 요율에 넣으면 사용자가 낸 세금까지
- * 리워드로 돌려주는 셈이 된다 — 그 돈은 우리 몫이 아니라 국고로 가므로 환급해 줄 이유가 없다
- * (2026-09-24 사용자 결정. 안내 문구는 처음부터 "VAT 제외"라고 쓰고 있었는데 계산만 총액이었다).
- *
- * 요율 구간 판정에도 같이 쓰인다. 즉 "10만원 이상" 구간에 들려면 공급가액이 10만원이어야 하고,
- * 총액으로는 110,000원을 결제해야 한다.
- *
- * **1.1 로 나누지 않는다.** `110000 / 1.1` 은 이진 부동소수점에서 99999.99999999999 로 떨어져서
- * 버림과 만나면 99,999원이 된다 — 딱 10만원어치를 결제한 사람이 구간에 못 들고, 110만원 결제가
- * 10% 가 아니라 7% 가 됐다. `× 10 / 11` 은 정수 분자로 한 번만 나눠서 11의 배수를 정확히 떨어뜨린다.
- */
-export function supplyWon(grossWon: number): number {
-  if (!Number.isFinite(grossWon) || grossWon <= 0) return 0;
-  // 버림 — 올려서 구간 경계를 넘겨주지 않는다(rewardPassesForWon 과 같은 방향).
-  return Math.floor((grossWon * 10) / 11);
-}
-
-export function bonusRewardRateForWon(totalWon: number): number {
-  const tier = PAYMENT_BONUS_REWARD_TIERS.find((t) => totalWon >= t.minWon);
-  return tier?.rate ?? 0;
-}
-
-export function rewardPassesForWon(totalWon: number, rate: number): number {
-  // 원카드 1회 단가(SPREADS.one.cost) 상당을 1회로 환산한다. 2026-09-24 단가가 200→300으로
-  // 오르면서 같은 금액에 대한 페이백 회수도 그만큼 줄어든다 — 요율(%)이 아니라 금액 기준
-  // 페이백이므로 이게 일관된 동작이다.
-  //
-  // 커미션은 돈이라 원 단위 정수로 먼저 확정한다. 0.07 같은 요율은 부동소수점에서
-  // 56000.00000000001 처럼 떨어지는데, 반대로 어긋나는 값이 생기면 버림과 만나 한 회를 잃는다.
-  const commissionWon = Math.round(totalWon * rate);
-  // 반올림이 아니라 버림이다. 올려 주면 지급하는 이용권이 리워드로 받은 금액보다 비싸진다 —
-  // 단가에 모자라는 자투리를 한 회로 쳐 주는 셈이고, 금액이 작을수록 그 비중이 컸다
-  // (2026-09-24). 지급 횟수를 버림으로 바꾼 rewardAllowanceForCombo 와 같은 이유·같은 규칙이다.
-  return Math.floor(commissionWon / SPREADS.one.cost);
-}
 
 // 코인 경로(SAJU_ADD_ON_COST / ZIWEI_ADD_ON_COST / COMPATIBILITY_ADD_ON_COST)는 2026-09-24
 // 삭제했다. 코인 상품은 판매가 끝났고(resolveProduct가 prepare에서 거부, validatePayment가
@@ -191,7 +154,7 @@ export const COUNT_PASS_VALIDITY_MONTHS = 12;
 export const TIME_PASS_VALIDITY_MONTHS = 12;
 
 // 받은 이용권(결제 리워드/친구초대 리워드)의 수령 가능 기간 — 지급일로부터 이 기간 내 미수령 시 소멸.
-export const PENDING_REWARD_CLAIM_WINDOW_MONTHS = 1;
+// PENDING_REWARD_CLAIM_WINDOW_MONTHS 도 @/lib/reward/rules 로 옮겼다(위에서 재수출).
 
 /** 안내 문구가 위 상수를 그대로 반영하도록, 개월 수를 사람이 읽는 표현으로 바꾼다.
  *  12의 배수는 "1년"처럼 연 단위로 읽는 게 자연스러워서 나눠 쓴다. */
