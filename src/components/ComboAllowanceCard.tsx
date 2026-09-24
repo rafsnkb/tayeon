@@ -45,8 +45,9 @@ export function ComboAllowanceCard({
           박스는 --chip-soft, 그 안의 헤더 줄만 한 톤 더 눌린 면(라이트 --bg / 다크 --topbar),
           글자는 --placeholder. 반지름은 1236px 목업에서 박스 34px ≈ 화면 11px 이라 rounded-xl
           (16px 였던 rounded-2xl 은 바깥 카드(28px)와 어긋나 보였다). */}
-      <div className="rounded-xl bg-chip-soft p-3 text-xs">
-        <div className="flex justify-between rounded bg-bg px-2 py-1 font-semibold text-placeholder dark:bg-topbar"><span>옵션 이름</span><span>질문 가능 횟수</span></div>
+      <div className="rounded-xl bg-chip-soft p-3 text-sm">
+        {/* 헤더는 목업에서 본문 행과 **같은 크기**다. text-xs 로 줄이면 표가 한 단계 작아 보인다. */}
+        <div className="flex justify-between gap-2 rounded bg-bg px-2 py-1 text-base font-semibold text-placeholder dark:bg-topbar"><span>옵션 이름</span><span className="shrink-0">질문 가능 횟수</span></div>
         {SPREAD_ORDER.map((spread) => (
           <div key={spread} className="flex justify-between gap-2 px-2 py-1 text-placeholder">
             <span>

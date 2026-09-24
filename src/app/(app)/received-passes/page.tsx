@@ -36,8 +36,8 @@ type ReceivedPass = {
 
 function statusBadge(status: ReceivedPass["status"]) {
   if (status === "pending") return { label: "미수령", className: "bg-success text-success-text" };
-  if (status === "expired") return { label: "만료", className: "bg-chip-fill text-white" };
-  return { label: "수령완료", className: "bg-chip-fill text-white" };
+  if (status === "expired") return { label: "만료", className: "bg-chip-soft text-placeholder" };
+  return { label: "수령완료", className: "bg-chip-soft text-placeholder" };
 }
 
 /** 피그마 "Screen / SendTicketHistory"("받은 이용권 내역") — 결제 리워드/친구초대 리워드는
@@ -149,14 +149,13 @@ export default function ReceivedPassesPage() {
                     aria-expanded={canExpand ? open : undefined}
                     className={`grid w-full text-left ${canExpand ? "grid-cols-[1fr_auto]" : ""} ${canExpand ? "" : "cursor-default"}`}
                   >
-                    {/* 화살표 자리를 "행 높이와 같은 폭의 정사각형" 영역으로 두고 그 정중앙에
-                        아이콘을 놓는다(사용자 요청, 2026-09-20) — flex+aspect-square+self-stretch는
-                        flex-basis(너비) 계산이 stretch로 정해질 높이보다 먼저 일어나 아이콘 크기만큼만
-                        좁게 잡히는 경우가 있어(실측으로 확인) grid로 바꿈: grid는 행 높이를 먼저
-                        확정한 뒤 aspect-square 칸의 너비를 그 높이에서 유도해 항상 정사각형이 된다. */}
+                    {/* 화살표 칸은 아이콘 폭만 차지한다. 한동안 "행 높이와 같은 폭의 정사각형"
+                        이었는데(2026-09-20), 행이 높아질수록 칸도 같이 넓어져 화살표가 오른쪽
+                        끝에서 34px이나 안쪽으로 밀렸다 — 목업(MyPass_Send)은 카드 본문의 오른쪽
+                        끝선에 붙어 있다(2026-09-24 실측). */}
                     <span className="min-w-0 py-4">
                       <span className="flex items-center gap-2">
-                        <span className="truncate text-base font-semibold text-bold-text">[{entry.label}]</span>
+                        <span className="truncate text-2xl font-bold text-bold-text">[{entry.label}]</span>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${badge.className}`}>
                           {badge.label}
                         </span>
@@ -164,7 +163,7 @@ export default function ReceivedPassesPage() {
                       <span className="mt-1 block text-sm text-placeholder">{formatDateTime(entry.createdAt)}</span>
                     </span>
                     {canExpand && (
-                      <span className="flex aspect-square items-center justify-center">
+                      <span className="flex w-6 items-center justify-center">
                         <BackIcon className={`h-4 w-2 text-bold-text transition-transform ${open ? "rotate-90" : "-rotate-90"}`} />
                       </span>
                     )}

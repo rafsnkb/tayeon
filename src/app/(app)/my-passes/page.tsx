@@ -25,7 +25,7 @@ type HeldPass = {
 };
 
 /** 목업(MyPass_Held)의 표 제목 — 구매분은 "구입 옵션", 무상 지급분은 고를 수 있었으니 "선택 옵션". */
-const tableTitle = (label: "구입" | "수령") => (label === "구입" ? "이용권 구입 옵션" : "이용권 선택 옵션");
+const tableTitle = (label: "구입" | "수령") => (label === "구입" ? "구입한 옵션" : "선택한 옵션");
 
 function comboLabel(combo: ComboKey | "any" | null): string | null {
   if (!combo) return null;
@@ -112,17 +112,17 @@ export default function MyPassesPage() {
                       className={`grid w-full text-left ${expandable ? "grid-cols-[1fr_auto]" : "cursor-default"}`}
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-xl font-bold text-chip-soft-text">{pass.title}</span>
+                        <span className="block truncate text-2xl font-bold text-chip-soft-text">{pass.title}</span>
                         <span className="mt-1.5 flex flex-wrap items-center gap-2">
                           {pass.combo && (
-                            <span className="rounded-full bg-chip-soft px-2.5 py-1 text-xs font-semibold text-placeholder">
+                            <span className="rounded-full bg-chip-soft px-3 py-1 text-base font-semibold text-placeholder">
                               {comboLabel(pass.combo)}
                             </span>
                           )}
                           {/* 잠긴 이용권임을 여기서 말해 준다 — 목록에 있는데 쓸 수 없으면
                               사용자는 고장으로 읽는다. */}
                           {pass.refundPending && (
-                            <span className="rounded-full bg-chip-fill px-2.5 py-1 text-xs font-semibold text-white">
+                            <span className="rounded-full bg-chip-soft px-3 py-1 text-base font-semibold text-urgent">
                               환불 대기중
                             </span>
                           )}
@@ -132,7 +132,7 @@ export default function MyPassesPage() {
                         </span>
                       </span>
                       {expandable && (
-                        <span className="flex aspect-square items-center justify-center">
+                        <span className="flex w-6 items-center justify-center">
                           <BackIcon
                             className={`h-4 w-2 text-placeholder transition-transform ${open ? "rotate-90" : "-rotate-90"}`}
                           />
@@ -156,12 +156,12 @@ export default function MyPassesPage() {
                         <p className="mb-2 text-center text-sm font-bold text-chip-soft-text">
                           {tableTitle(pass.acquiredLabel)}
                         </p>
-                        <div className="grid grid-cols-2 rounded-xl bg-bg px-4 py-2 text-xs font-semibold text-placeholder dark:bg-topbar">
+                        <div className="grid grid-cols-[1fr_auto] gap-2 rounded-xl bg-bg px-4 py-1.5 text-base font-semibold text-placeholder dark:bg-topbar">
                           <span>옵션 이름</span>
                           <span className="text-right">질문 횟수</span>
                         </div>
                         {SPREAD_ORDER.map((spread) => (
-                          <div key={spread} className="grid grid-cols-2 px-4 py-2 text-sm">
+                          <div key={spread} className="grid grid-cols-[1fr_auto] gap-2 px-4 py-1.5 text-sm">
                             <span className="text-placeholder">{spreadLabel(spread, pass.combo)}</span>
                             <span className="text-right font-bold text-chip-soft-text">
                               {pass.allowances?.[spread] ?? 0}회

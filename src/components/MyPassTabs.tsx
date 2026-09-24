@@ -22,14 +22,17 @@ export default function MyPassTabs() {
   const pathname = usePathname();
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-topbar p-4">
-      <div className="mx-auto flex w-full max-w-2xl overflow-hidden rounded-full bg-chip-fill">
+      {/* 활성 탭은 트랙에 꽉 찬 "반쪽"이 아니라 사방 8px 안쪽으로 들어간 알약이다(목업
+          MyPass_Held/Send). 트랙을 꽉 채우면 알약의 안쪽 두 모서리가 각져서 목업과 다르다 —
+          트랙에 패딩을 주고 버튼 자신을 rounded-full 로 만들어야 네 모서리가 다 둥글다. */}
+      <div className="mx-auto flex w-full max-w-2xl rounded-full bg-chip-soft p-2">
         {TABS.map((tab) => (
           <button
             key={tab.href}
             type="button"
             onClick={() => pathname !== tab.href && router.replace(tab.href)}
-            className={`h-14 flex-1 text-base font-semibold ${
-              pathname === tab.href ? "bg-point text-white" : "text-white"
+            className={`h-10 flex-1 rounded-full text-base font-semibold ${
+              pathname === tab.href ? "bg-point text-white" : "text-placeholder"
             }`}
           >
             {tab.label}
