@@ -26,10 +26,11 @@ export default function SubPageTopBar({ title, onBack, backHref }: { title: stri
           type="button"
           onClick={onBack ?? goBack}
           aria-label="뒤로가기"
-          /* 눌리는 곳을 56×64 로 넓힌다(아이콘은 10×20 뿐이라 32 폭으로는 너무 작았다,
-             2026-09-25 지시). 아이콘 중심이 왼쪽에서 40px 인 것은 그대로다 — 폭을 24 늘린
-             만큼 left 를 12 줄여서 상쇄했다. 넓어진 부분은 투명하다. */
-          className="absolute left-3 flex h-16 w-14 items-center justify-center text-bold-text"
+          /* 눌리는 곳은 48×64 다. 아이콘은 10×20 뿐이라 원래의 32 폭으로는 너무 작았다
+             (2026-09-25 지시). 넓어진 부분은 투명하다.
+             화살표 자체는 왼쪽에서 16px — 아래 본문의 좌우 여백(p-4)과 같은 선이다. 예전엔
+             35px 로 혼자 더 들어가 있었고, 사용자 지시로 절반 정도 줄였다. */
+          className="absolute left-0 flex h-16 w-12 items-center justify-start pl-4 text-bold-text"
         >
           <BackIcon className="h-5 w-2.5" />
         </button>

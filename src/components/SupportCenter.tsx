@@ -135,8 +135,8 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
     <div className="flex min-h-dvh flex-col bg-bg xl:h-dvh">
       <div className="app-topbar-glass fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-center border-b border-border">
         <div className="relative mx-auto flex h-full w-full max-w-2xl items-center justify-center">
-          {/* 눌리는 영역은 SubPageTopBar 와 같은 56×64 다. */}
-          <Link href="/" aria-label="뒤로가기" className="absolute left-3 flex h-16 w-14 items-center justify-center text-bold-text"><BackIcon className="h-5 w-2.5" /></Link>
+          {/* 눌리는 영역·화살표 위치 모두 SubPageTopBar 와 같다(48×64, 왼쪽 16). */}
+          <Link href="/" aria-label="뒤로가기" className="absolute left-0 flex h-16 w-12 items-center justify-start pl-4 text-bold-text"><BackIcon className="h-5 w-2.5" /></Link>
           <span className="text-xl font-semibold text-bold-text">고객센터</span>
         </div>
       </div>
