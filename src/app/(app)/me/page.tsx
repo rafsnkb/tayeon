@@ -343,7 +343,7 @@ export default function MyPage() {
               ))}
             </div>
 
-            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-[14px] font-semibold leading-tight text-placeholder">
+            <p className="flex h-[50px] shrink-0 items-center justify-center text-center text-sm font-semibold leading-tight text-placeholder">
               월별 타연 내 결제금액(VAT 제외)에 따라
               <br />
               리워드 이용권을 지급해 드립니다.
@@ -366,7 +366,7 @@ export default function MyPage() {
                   /* 금액 상자와 아래 표 사이는 목업에서도 그냥 빈 곳이다(실측 72) — mt-auto 로
                      아래쪽 세 덩어리를 바닥에 붙이면 그 여백이 자연히 남는다. */
                   <div className="mt-auto">
-                    <p className="text-center text-[14px] font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
+                    <p className="text-center text-sm font-semibold text-placeholder">예상 보너스 리워드 이용권</p>
                     {/* 조합을 좌우로 넘겨 본다. 네 조합을 한 화면에 쌓으면 모달이 스크롤된다.
                         알약은 48×32, 가운데 이름은 폭을 고정해 화살표가 춤추지 않게 한다. */}
                     <div className="mt-1 flex h-8 items-center justify-center gap-2.5">
@@ -435,7 +435,7 @@ export default function MyPage() {
               </div>
             )}
 
-            <p className="flex h-[34px] shrink-0 items-center justify-center text-center text-[14px] text-icon-muted">
+            <p className="flex h-[34px] shrink-0 items-center justify-center text-center text-sm text-icon-muted">
               보너스 리워드 이용권은 매월 {REWARD_PAYOUT_DAY_OF_MONTH}일에 지급됩니다.
             </p>
           </div>

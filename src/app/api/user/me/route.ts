@@ -5,6 +5,7 @@ import { DEFAULT_TONE } from "@/lib/tarot/tone";
 import { pickActiveCountPass } from "@/lib/tarot/activeCountPass";
 import type { ComboKey, CountPassStatus } from "@/lib/tarot/pricing";
 import { USERS, TIME_PASSES, COUNT_PASSES, PENDING_REWARDS, REFUND_REQUESTS } from "@/lib/firestore/collections";
+import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 
 export async function GET(req: NextRequest) {
   const uid = await getUidFromRequest(req);
@@ -118,6 +119,12 @@ export async function GET(req: NextRequest) {
     tone: data?.tone ?? DEFAULT_TONE,
     useReversedCards: data?.useReversedCards ?? true,
     birthInfo: data?.birthInfo ?? null,
+    // 화면은 birthDate 만 보고 "정보 있음"으로 판정했는데, 자미두수를 실제로 막는 서버
+    // (pending-rewards claim / payment prepare)는 isValidBirthInfo 로 gender·calendarType·
+    // jasiRule 까지 본다. 두 판정이 갈리면 조합이 선택되고 버튼도 눌리는데 서버가 409 로
+    // 막고, 화면에는 엉뚱하게 "태어난 시간이 없으면…" 팝업이 뜬다. 판정을 서버가 내려준다.
+    // (2026-09-25 라이브 점검에서는 해당 계정 0명이었지만, 구조는 그대로였다.)
+    birthInfoComplete: isValidBirthInfo(data?.birthInfo),
     partner: data?.partner ?? null,
     activeTimePass: activeTimePass
       ? { ...activeTimePass, combo: activeTimePass.combo ?? (activeTimePass.includesOptions ? "tarot-saju-ziwei" : "tarot") }

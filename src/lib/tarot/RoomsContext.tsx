@@ -136,7 +136,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setEmail(data.email ?? null);
     setCountPasses(data.countPasses ?? []);
     setActiveCountPass(data.activeCountPass ?? null);
-    setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
+    // 서버가 내려주는 판정을 그대로 쓴다 — birthDate 만 보면 자미두수를 실제로 막는
+    // 서버 검사(isValidBirthInfo)와 어긋나 "버튼은 눌리는데 409" 가 된다(2026-09-25).
+    setHasBirthInfo(Boolean(data.birthInfoComplete));
     setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
     setHasPartner(Boolean(data.partner?.nickname));
     setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
@@ -188,7 +190,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         setEmail(data.email ?? null);
         setCountPasses(data.countPasses ?? []);
         setActiveCountPass(data.activeCountPass ?? null);
-        setHasBirthInfo(Boolean(data.birthInfo?.birthDate));
+        setHasBirthInfo(Boolean(data.birthInfoComplete));
         setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
         setHasPartner(Boolean(data.partner?.nickname));
         setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);

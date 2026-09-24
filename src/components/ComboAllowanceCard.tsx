@@ -30,10 +30,9 @@ export function ComboAllowancePanel({
     <div className="grid grid-cols-4 gap-1 rounded-2xl bg-chip-soft p-2">
       {SPREAD_ORDER.map((spread) => (
         <div key={spread} className="flex flex-col items-center text-center leading-tight">
-          {/* 14px — 앱의 --text-sm 은 15px 라 text-sm 을 쓰면 1px 커진다(목업 실측 14). */}
-          <span className="text-[14px] font-semibold text-placeholder">{SPREAD_SHORT[spread]}</span>
-          {COMBOS[combo].saju && <span className="text-[14px] font-semibold text-placeholder">+사주</span>}
-          {COMBOS[combo].ziwei && <span className="text-[14px] font-semibold text-placeholder">+자미두수</span>}
+          <span className="text-sm font-semibold text-placeholder">{SPREAD_SHORT[spread]}</span>
+          {COMBOS[combo].saju && <span className="text-sm font-semibold text-placeholder">+사주</span>}
+          {COMBOS[combo].ziwei && <span className="text-sm font-semibold text-placeholder">+자미두수</span>}
           <strong className="text-base text-chip-soft-text">{allowanceFor(combo, spread)}회</strong>
         </div>
       ))}
