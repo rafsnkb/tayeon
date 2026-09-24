@@ -4,6 +4,13 @@
 // 컴포넌트에서도 쓰이므로 firebase-admin을 물릴 수 없다. 그래서 Timestamp가 필요한 이 부분만
 // 따로 떼어냈다.
 //
+// !! `firebase deploy --only firestore:indexes` 에 **절대 `--force` 를 붙이지 말 것.**
+// TTL 정책은 Firestore 에서 "field override" 로 저장되는데 firestore.indexes.json 의
+// fieldOverrides 는 비어 있다. --force 는 "파일에 없는 override 를 지우는" 플래그라, 한 번
+// 누르면 여기서 심은 만료 시각들이 **전부 집행되지 않는 상태**가 된다(2026-09-24 배포 때
+// "6 field overrides ... To delete them, run with --force" 경고로 확인). 보존기간을 지나
+// 파기되지 않는 것도 위반이므로 조용히 법을 어기게 된다.
+//
 // !! TTL은 문자열이 아니라 Firestore `Timestamp` 타입 필드만 인식한다. ISO 문자열을 넣어두면
 // 정책을 켜도 아무것도 삭제되지 않는다(실제로 paymentArchive.retainUntil이 문자열이라 5년
 // 파기가 동작하지 않고 있었다 — 2026-09-21 수정). 만료 필드는 반드시 이 헬퍼로 만들 것.
