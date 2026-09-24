@@ -6,6 +6,7 @@ import {
   COUNT_PACKAGES,
   COUNT_PASS_VALIDITY_MONTHS,
   countAllowancesForCombo,
+  rewardAllowancesForCombo,
   basisForOneCardCount,
   oneCardCountFor,
   type ComboKey,
@@ -58,7 +59,7 @@ export async function POST(
   const basis = selected ? selected.basis : basisForOneCardCount(count!, combo);
   // 문서에 남기는 표기 횟수도 아래 allowances 와 같은 함수로 뽑아서 둘이 어긋날 수 없게 한다
   // (예전엔 basis/200 이라 얼티밋 지급이 675회로 기록됐지만 실제 원카드는 450회였다).
-  const freePasses = oneCardCountFor(basis, combo);
+  const freePasses = oneCardCountFor(basis, combo, !selected);
 
   const passRef = userRef.collection("countPasses").doc();
   const createdAt = new Date().toISOString();
@@ -78,7 +79,9 @@ export async function POST(
     basis,
     remaining: 1,
     usedCount: 0,
-    allowances: countAllowancesForCombo(basis, combo),
+    // 상점 상품을 그대로 지급하면 구매와 똑같아야 하니 공표표를, 횟수를 직접 입력한 커스텀
+    // 지급은 리워드와 같은 무상 지급 규칙을 따른다(2026-09-24).
+    allowances: selected ? countAllowancesForCombo(basis, combo) : rewardAllowancesForCombo(basis, combo),
     status: "unused",
     priceWon: selected?.priceWon ?? null,
     reason: trimmedReason,

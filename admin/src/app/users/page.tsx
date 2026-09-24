@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { kstDateTime } from "@/lib/datetime";
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 import { COUNT_PACKAGES } from "@/lib/countPassPackages";
 import { TIME_PASS_PACKAGES } from "@/lib/timePassPackages";
@@ -29,6 +30,7 @@ type PassItem = {
   type: "countPass" | "timePass" | "pendingReward";
   source: string;
   status: string;
+  revokedForced?: boolean;
   combo: string | null;
   minutes: number | null;
   remainingCount: number | null;
@@ -58,7 +60,8 @@ const PAYMENT_STATUS_LABEL: Record<string, string> = {
   refunded: "환불완료",
   duplicate_cancelled: "중복 취소",
 };
-const passStatusLabel = (status: string) => PASS_STATUS_LABEL[status] ?? status;
+const passStatusLabel = (status: string, forced?: boolean) =>
+  status === "revoked" && forced ? "강제 회수됨" : PASS_STATUS_LABEL[status] ?? status;
 const paymentStatusLabel = (status: string) => PAYMENT_STATUS_LABEL[status] ?? status;
 
 type ReviewReading = {
@@ -100,9 +103,7 @@ const COMBO_LABEL: Record<string, string> = {
   "tarot-saju-ziwei": "타로+사주+자미두수",
 };
 
-function shortDate(value: string | null) {
-  return value ? value.replace("T", " ").slice(0, 19) : "-";
-}
+const shortDate = (value: string | null) => kstDateTime(value);
 
 type PassCategory = "all" | "purchase" | "reward" | "admin-grant";
 
@@ -173,25 +174,41 @@ function HeldPassesPanel({
     }
   }
 
-  async function revoke(pass: PassItem) {
+  /** 운영자 지급분 회수. force 면 사용자가 이미 쓰기 시작한 것까지 거둬들인다 — 남은 횟수를
+   *  통째로 뺏는 일이라 무엇을 뺏는지 보여주고 한 번 더 확인받는다. */
+  async function revoke(pass: PassItem, force = false) {
     const admin = auth.currentUser;
     if (!admin || (pass.type !== "countPass" && pass.type !== "timePass")) return;
-    const reason = prompt("회수 사유를 입력하세요.");
+    const reason = prompt(force ? "강제 회수 사유를 입력하세요. (기록에 남습니다)" : "회수 사유를 입력하세요.");
     if (!reason?.trim()) return;
-    if (!confirm("이 이용권을 회수할까요? 되돌릴 수 없습니다.")) return;
+    const held =
+      pass.remainingCount !== null
+        ? `잔여 ${pass.remainingCount}회(원카드 기준)`
+        : pass.minutes
+          ? `${pass.minutes}분 시간제`
+          : "";
+    const question = force
+      ? `사용 중인 이용권을 강제로 회수합니다${held ? ` — ${held}` : ""}. 사용자는 즉시 쓸 수 없게 됩니다. 되돌릴 수 없습니다. 진행할까요?`
+      : "이 이용권을 회수할까요? 되돌릴 수 없습니다.";
+    if (!confirm(question)) return;
     setRevokeBusy(pass.id);
     try {
       const token = await admin.getIdToken();
       const segment = pass.type === "countPass" ? "count-passes" : "time-passes";
       const response = await fetch(
         `/api/admin/users/${encodeURIComponent(uid)}/${segment}/${encodeURIComponent(pass.id)}/revoke`,
-        { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ reason: reason.trim() }) }
+        { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ reason: reason.trim(), force }) }
       );
       if (!response.ok) { alert((await response.json().catch(() => ({}))).error ?? "회수에 실패했습니다."); return; }
+      // 회수한 이용권을 목록에서 지우면 방금 무엇을 거둬들였는지 확인할 방법이 사라진다.
+      // 서버는 회수분도 그대로 내려주는데 지운 건 화면뿐이었다(2026-09-24). 환불과 같이
+      // 상태만 바꿔서 자리에 남긴다.
+      const markRevoked = (list: PassItem[]) =>
+        list.map((p) => (p.id === pass.id ? { ...p, status: "revoked", revokedForced: force } : p));
       onUpdate(uid, (prev) => ({
         ...prev,
-        purchasedPasses: prev.purchasedPasses.filter((p) => p.id !== pass.id),
-        rewardPasses: prev.rewardPasses.filter((p) => p.id !== pass.id),
+        purchasedPasses: markRevoked(prev.purchasedPasses),
+        rewardPasses: markRevoked(prev.rewardPasses),
       }));
     } finally {
       setRevokeBusy(null);
@@ -224,7 +241,13 @@ function HeldPassesPanel({
       ) : (
         <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {filtered.map((pass) => {
-            const revocable = pass.source === "admin-grant" && pass.status === "unused" && (pass.type === "countPass" || pass.type === "timePass");
+            const granted = pass.source === "admin-grant" && (pass.type === "countPass" || pass.type === "timePass");
+            const revocable = granted && pass.status === "unused";
+            // 사용을 시작한 지급분은 평소 경로로 거둬들일 수 없었다 — 잘못 지급한 이용권을
+            // 사용자가 쓰기 시작하면 남은 횟수를 다 쓸 때까지 지켜보는 것 말고 할 수 있는 게
+            // 없었다(2026-09-24). 라이브에서 쓸 일은 드물지만 실수 지급·테스트 계정 정리에
+            // 필요하다. 구매분은 여전히 대상이 아니다(돈이 걸린 건은 환불로만).
+            const forceRevocable = granted && pass.status === "active";
             // 구매분은 회수가 아니라 환불이다 — 사용자가 돈을 낸 이용권을 돌려주지 않고 뺏을 수
             // 없다. refund_pending 도 포함한다: 환불을 신청했다가 거절돼 멈춰 있는 건을 풀 수
             // 있는 경로가 여기뿐이다(요청 목록은 pending 만 보여준다).
@@ -238,7 +261,7 @@ function HeldPassesPanel({
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-[#4B3D56]">{SOURCE_LABEL[pass.source] ?? pass.source}</span>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{passStatusLabel(pass.status)}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#8D8296]">{passStatusLabel(pass.status, pass.revokedForced)}</span>
                     {refundable && (
                       <button
                         onClick={() => refund(pass)}
@@ -255,6 +278,15 @@ function HeldPassesPanel({
                         className="rounded-full border border-[#E4DDE9] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#B81D6E] disabled:opacity-50"
                       >
                         {revokeBusy === pass.id ? "처리 중..." : "회수"}
+                      </button>
+                    )}
+                    {forceRevocable && (
+                      <button
+                        onClick={() => revoke(pass, true)}
+                        disabled={revokeBusy === pass.id}
+                        className="rounded-full border border-[#E7B7CD] bg-[#FDF2F7] px-2 py-0.5 text-[11px] font-semibold text-[#B81D6E] disabled:opacity-50"
+                      >
+                        {revokeBusy === pass.id ? "처리 중..." : "강제 회수"}
                       </button>
                     )}
                   </div>
@@ -679,9 +711,13 @@ export default function UserDirectoryPage() {
       return;
     }
     setOpenUid(uid);
-    if (!user || overview[uid]) return;
+    if (!user) return;
 
-    setOverviewLoading(uid);
+    // 한 번 읽은 상세를 캐시에서 다시 꺼내 보여주면, 그 사이 사용자가 한 일이 화면에 없다.
+    // 운영자가 리딩 전에 열어둔 목록에는 이용권이 "미사용"으로 남아 있는데 실제로는 사용중
+    // (unused→active)이라, 회수를 눌러도 서버가 409 를 돌려줬다(2026-09-24). 열 때마다 다시
+    // 읽는다. 이미 들고 있는 값이 있으면 스피너로 비우지 않고 그 값을 보여주면서 바꾼다.
+    if (!overview[uid]) setOverviewLoading(uid);
     try {
       const token = await user.getIdToken();
       const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/overview`, {
@@ -802,7 +838,7 @@ export default function UserDirectoryPage() {
                     <span className={entry.status === "suspended" ? "rounded-full bg-[#FFF0F3] px-2.5 py-1 text-xs font-semibold text-[#C5304B]" : "rounded-full bg-[#EEF8F2] px-2.5 py-1 text-xs font-semibold text-[#27754C]"}>
                       {entry.status === "suspended" ? "정지" : "정상"}
                     </span>
-                    {entry.suspendedAt && <p className="mt-1.5 text-[11px] text-[#93899A]">정지 {entry.suspendedAt.replace("T", " ").slice(0, 19)}{entry.suspendedUntil ? ` · 해제 ${shortDate(entry.suspendedUntil)}` : " · 영구"}</p>}
+                    {entry.suspendedAt && <p className="mt-1.5 text-[11px] text-[#93899A]">정지 {shortDate(entry.suspendedAt)}{entry.suspendedUntil ? ` · 해제 ${shortDate(entry.suspendedUntil)}` : " · 영구"}</p>}
                   </td>
                   <td className="px-4 py-4 text-right font-medium tabular-nums text-[#342B3D]">{won(entry.paymentTotalWon)}</td>
                   <td className="px-4 py-4 text-right tabular-nums text-[#817789]">{won(entry.refundTotalWon)}</td>

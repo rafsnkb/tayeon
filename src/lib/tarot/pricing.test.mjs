@@ -7,6 +7,11 @@ import {
   countAllowances,
   countAllowanceForCombo,
   countAllowancesForCombo,
+  rewardAllowanceForCombo,
+  rewardAllowancesForCombo,
+  SPREADS,
+  PAYMENT_BONUS_REWARD_TIERS,
+  REFERRAL_MONTHLY_MIN_WON,
   basisForOneCardCount,
   isHeldPass,
   comboKeyFor,
@@ -99,11 +104,24 @@ test("a fractional remainder with no usable question is exhausted (combo:any)", 
   assert.equal(remainingAfterUse(pass, "one", false, false), 0);
 });
 
-test("cashback is converted to rounded one-card passes", () => {
-  // 원카드 단가 300원 기준(2026-09-24 개정). 27,000원 → 90회, 5,000원 → 16.67 → 17회.
+test("cashback never buys more than the commission behind it", () => {
+  // 원카드 단가 300원 기준(2026-09-24 개정). 27,000원 → 90회.
   assert.equal(rewardPassesForWon(540_000, 0.05), 90);
-  assert.equal(rewardPassesForWon(100_000, 0.05), 17);
+  // 자투리는 버린다 — 5,000원은 16.67회분이지 17회분이 아니다.
+  assert.equal(rewardPassesForWon(100_000, 0.05), 16);
+  // 단가에 못 미치는 커미션은 아예 0회. 올림이면 여기서 공짜 한 회가 생긴다.
   assert.equal(rewardPassesForWon(30_000, 0.01), 1);
+  assert.equal(rewardPassesForWon(29_000, 0.01), 0);
+});
+
+// 0.07 같은 요율은 부동소수점에서 56000.00000000001 로 떨어진다. 반대 방향으로 어긋난 값이
+// 버림과 만나면 한 회가 조용히 사라지므로, 커미션을 원 단위 정수로 먼저 확정한다.
+test("a reward is never lost to floating point drift", () => {
+  for (const rate of [0.03, 0.04, 0.05, 0.07, 0.1]) {
+    for (let won = 100_000; won <= 2_000_000; won += 1_000) {
+      assert.equal(rewardPassesForWon(won, rate), Math.floor(Math.round(won * rate) / 300));
+    }
+  }
 });
 
 test("free rewards do not inherit the published table's hand-tuned cells", () => {
@@ -111,6 +129,78 @@ test("free rewards do not inherit the published table's hand-tuned cells", () =>
   // 무료 리워드는 계산식 그대로 3회여야 한다(round(3000/750) = 4 → 4 × 0.75 = 3).
   assert.equal(countAllowances(3_000, false)["celtic-0-1"], 3);
   assert.equal(countAllowances(3_000, true)["celtic-0-1"], 2);
+});
+
+// 리워드 basis 는 원카드 단가의 배수라, 상품 basis 중 3,000(스타터)과 135,000(얼티밋) 두 곳에
+// 정확히 겹친다. 그 두 지점만 공표표로 빠지면 리워드를 더 받았는데 쓸 수 있는 횟수가 줄어드는
+// 역전이 생긴다 — 무상 지급은 금액과 무관하게 제 규칙만 쓴다(2026-09-24).
+test("a reward never falls through to the purchase table, even at a colliding basis", () => {
+  assert.equal(countAllowanceForCombo(3_000, "one", "tarot-ziwei"), 8); // 공표표(구매분)
+  assert.equal(rewardAllowanceForCombo(3_000, "one", "tarot-ziwei"), 7); // 무상 지급
+});
+
+test("a bigger reward is never worth fewer uses than a smaller one", () => {
+  for (const combo of Object.keys(COMBOS)) {
+    for (const spread of Object.keys(SPREADS)) {
+      let previous = 0;
+      for (let passes = 1; passes <= 500; passes++) {
+        const count = rewardAllowanceForCombo(passes * SPREADS.one.cost, spread, combo);
+        assert.ok(count >= previous, `${combo}/${spread} ${passes}회분에서 ${previous} → ${count} 로 줄었다`);
+        previous = count;
+      }
+    }
+  }
+});
+
+// 같은 스프레드인데 비싼 조합이 싼 조합과 횟수가 같으면 조합을 나눈 의미가 없고, 같은 조합인데
+// 카드가 많은 쪽이 적은 쪽과 같아도 마찬가지다. 버림만으로는 동률이 남아서 따로 강제한다.
+test("a costlier combo or spread always buys strictly fewer uses", () => {
+  const combos = ["tarot", "tarot-saju", "tarot-ziwei", "tarot-saju-ziwei"];
+  const spreads = ["one", "three", "dual", "celtic"];
+  for (let passes = 1; passes <= 500; passes++) {
+    const basis = passes * SPREADS.one.cost;
+    const grid = combos.map((combo) => spreads.map((spread) => rewardAllowanceForCombo(basis, spread, combo)));
+    for (let c = 0; c < combos.length; c++) {
+      for (let s = 0; s < spreads.length; s++) {
+        // 0 은 바닥이다 — 더 내려갈 곳이 없으니 동률을 허용한다.
+        if (s > 0 && grid[c][s] > 0) assert.ok(grid[c][s] < grid[c][s - 1], `${passes}회분 ${combos[c]} ${spreads[s]}`);
+        if (c > 0 && grid[c][s] > 0) assert.ok(grid[c][s] < grid[c - 1][s], `${passes}회분 ${combos[c]} ${spreads[s]}`);
+      }
+    }
+  }
+});
+
+// 반올림이 두 번 겹치면 작은 리워드가 제 가치의 몇 배까지 나갔다(최대 3.98배, 2026-09-24).
+test("a reward is never worth more than the money behind it", () => {
+  for (const [combo, { saju, ziwei }] of Object.entries(COMBOS)) {
+    const multiplier = saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
+    for (const [spread, { cost }] of Object.entries(SPREADS)) {
+      for (let passes = 1; passes <= 500; passes++) {
+        const basis = passes * SPREADS.one.cost;
+        const worth = rewardAllowanceForCombo(basis, spread, combo) * (cost / multiplier);
+        assert.ok(worth <= basis, `${combo}/${spread} ${passes}회분: ${worth}원어치가 ${basis}원을 넘는다`);
+      }
+    }
+  }
+});
+
+test("the agreed reward tables come out exactly", () => {
+  // 2026-09-24 사용자 확정. 보너스 5만원 상당(basis 900)과 12만원 상당(basis 3,600).
+  assert.deepEqual(rewardAllowancesForCombo(900, "tarot"), { one: 3, three: 2, dual: 1, celtic: 0 });
+  assert.deepEqual(rewardAllowancesForCombo(900, "tarot-saju"), { one: 2, three: 1, dual: 0, celtic: 0 });
+  assert.deepEqual(rewardAllowancesForCombo(900, "tarot-ziwei"), { one: 1, three: 0, dual: 0, celtic: 0 });
+  assert.deepEqual(rewardAllowancesForCombo(900, "tarot-saju-ziwei"), { one: 0, three: 0, dual: 0, celtic: 0 });
+  assert.deepEqual(rewardAllowancesForCombo(3_600, "tarot"), { one: 12, three: 8, dual: 6, celtic: 4 });
+  assert.deepEqual(rewardAllowancesForCombo(3_600, "tarot-saju"), { one: 10, three: 6, dual: 5, celtic: 3 });
+  assert.deepEqual(rewardAllowancesForCombo(3_600, "tarot-ziwei"), { one: 9, three: 5, dual: 4, celtic: 2 });
+  assert.deepEqual(rewardAllowancesForCombo(3_600, "tarot-saju-ziwei"), { one: 6, three: 4, dual: 3, celtic: 1 });
+});
+
+// 두 리워드의 진입선이 다르면 안내가 두 배로 복잡해진다. 한쪽만 고치는 걸 막는다.
+test("both rewards start at the same amount", () => {
+  const lowestTier = PAYMENT_BONUS_REWARD_TIERS.at(-1);
+  assert.equal(lowestTier.minWon, REFERRAL_MONTHLY_MIN_WON);
+  assert.equal(REFERRAL_MONTHLY_MIN_WON, 100_000);
 });
 
 test("signup pass guarantees four uses regardless of spread or options", () => {
@@ -161,14 +251,15 @@ test("exhausted or expired status blocks availability regardless of remaining", 
 
 // basisForOneCardCount — "이 조합으로 정확히 N회"라는 약속을 basis 로 되돌리는 역산.
 // 생일 쿠폰(8/6/4회)과 어드민 커스텀 지급이 광고한 횟수를 그대로 주는지가 여기 달려 있다.
-// 예전엔 N × 200(나중엔 N × 300)을 basis 로 썼는데, countAllowance 가 조합 배율을 한 번 더
-// 곱해서 광고의 절반만 나갔다.
+// 예전엔 N × 200(나중엔 N × 300)을 basis 로 썼는데, 조합 배율이 한 번 더 곱해져서 광고의 절반만
+// 나갔다. 되돌린 basis 는 무상 지급 규칙(rewardAllowance*)으로 읽어야 한다 — 생일 쿠폰도 어드민
+// 커스텀 지급도 구매가 아니라 공짜로 주는 것이라 공표표를 타지 않는다(2026-09-24).
 test("a promised count is delivered exactly, whatever the combo", () => {
   for (const combo of Object.keys(COMBOS)) {
     for (let promised = 1; promised <= 60; promised++) {
       const basis = basisForOneCardCount(promised, combo);
       assert.equal(
-        countAllowanceForCombo(basis, "one", combo),
+        rewardAllowanceForCombo(basis, "one", combo),
         promised,
         `${combo} ${promised}회 → basis ${basis}`
       );
@@ -184,9 +275,9 @@ test("the birthday coupon's advertised counts survive the round trip", () => {
     ["tarot-saju-ziwei", 4],
   ]) {
     const basis = basisForOneCardCount(freePasses, combo);
-    assert.equal(countAllowanceForCombo(basis, "one", combo), freePasses);
+    assert.equal(rewardAllowanceForCombo(basis, "one", combo), freePasses);
     // 단가를 그대로 곱하던 옛 계산은 약속보다 적게 준다 — 회귀하면 여기서 걸린다.
-    assert.notEqual(countAllowanceForCombo(freePasses * 300, "one", combo), freePasses);
+    assert.notEqual(rewardAllowanceForCombo(freePasses * 300, "one", combo), freePasses);
   }
 });
 

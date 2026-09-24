@@ -75,7 +75,7 @@ ${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`,
   return (
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="결제 내역" />
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         {entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (

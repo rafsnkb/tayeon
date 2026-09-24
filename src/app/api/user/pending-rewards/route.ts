@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { COMBOS, countAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
+import { COMBOS, rewardAllowancesForCombo, type ComboKey } from "@/lib/tarot/pricing";
 import { USERS, PENDING_REWARDS } from "@/lib/firestore/collections";
 
 /** GET /api/user/pending-rewards — "받은 이용권 내역"(결제 리워드/친구초대 리워드) 목록.
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
           ? Object.fromEntries(
               (Object.keys(COMBOS) as ComboKey[]).map((combo) => [
                 combo,
-                countAllowancesForCombo(data.basis as number, combo),
+                rewardAllowancesForCombo(data.basis as number, combo),
               ])
             )
           : undefined,

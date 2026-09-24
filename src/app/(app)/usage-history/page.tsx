@@ -47,7 +47,7 @@ export default function UsageHistoryPage() {
   return (
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="이용 내역" />
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         {entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (

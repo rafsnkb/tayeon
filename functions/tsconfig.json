@@ -7,6 +7,10 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
+    // 상대 import 를 ".ts" 로 쓰고 컴파일할 때 ".js" 로 바꾼다. tawer/ 의 리포터가 타워
+    // 저장소에서 그대로 복사돼 오는데, 거기선 Node 가 소스를 직접 실행해 검사하기 때문에
+    // 확장자가 필요하다. 이 옵션이 없으면 그 파일들이 여기서 컴파일되지 않는다.
+    "rewriteRelativeImportExtensions": true,
     "skipLibCheck": true,
     "sourceMap": true
   },

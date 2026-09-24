@@ -17,6 +17,22 @@ import { blockIfSuspended } from "@/lib/auth/suspension";
 //
 // customData에 서버가 Firebase ID 토큰으로 검증한 uid를 실어 보낸다 — 결제창 호출 시 이
 // customData를 그대로 포트원에 전달해야 이후 지급 단계에서 "누구의 결제인지"를 신뢰할 수 있다.
+/**
+ * 보유 이용권 때문에 구매를 막을 때의 안내.
+ *
+ * 환불 신청 중인 이용권은 "소진"할 수 있는 게 아니다 — 이미 쓸 수 없는 상태라, 소진하라는
+ * 안내를 받은 사용자는 할 수 있는 일이 하나도 없다(2026-09-24). 기다려야 한다는 걸 그대로
+ * 말해준다. isHeldPass 가 보유로 세는 상태(unused/active/refund_pending) 중 갈라야 하는 건
+ * 이 하나뿐이다.
+ */
+function blockedByHeldPass(status: unknown, kind: "" | "시간제 ") {
+  const error =
+    status === "refund_pending"
+      ? "환불 진행중인 이용권이 있어 구입할 수 없습니다."
+      : `보유 ${kind}이용권을 소진한 후 새 이용권을 구매해주세요.`;
+  return NextResponse.json({ error, code: status === "refund_pending" ? "REFUND_PENDING" : "PASS_HELD" }, { status: 409 });
+}
+
 export async function POST(req: NextRequest) {
   const uid = await getUidFromRequest(req);
   if (!uid) {
@@ -54,19 +70,17 @@ export async function POST(req: NextRequest) {
     }
     const passes = await userRef.collection(COUNT_PASSES).get();
     // 리워드로 받은 이용권은 여러 개 보유가 정상이라 구매분만 본다.
-    if (passes.docs.some((doc) => {
+    const held = passes.docs.find((doc) => {
       const data = doc.data();
       return data.source === "purchase" && isHeldPass(data);
-    })) {
-      return NextResponse.json({ error: "보유 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
-    }
+    });
+    if (held) return blockedByHeldPass(held.data().status, "");
   }
 
   if (product.type === "timePass") {
     const passes = await userRef.collection(TIME_PASSES).get();
-    if (passes.docs.some((doc) => isHeldPass(doc.data()))) {
-      return NextResponse.json({ error: "보유 시간제 이용권을 소진한 후 새 이용권을 구매해주세요." }, { status: 409 });
-    }
+    const held = passes.docs.find((doc) => isHeldPass(doc.data()));
+    if (held) return blockedByHeldPass(held.data().status, "시간제 ");
   }
 
   const paymentId = randomUUID();

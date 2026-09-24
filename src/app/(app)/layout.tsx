@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { withReturnTo } from "@/lib/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
 import { BrandBi } from "@/components/BrandBi";
@@ -304,7 +305,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             onClick={() => {
               setMenuOpen(false);
-              router.push("/charge");
+              router.push(withReturnTo("/charge", pathname));
             }}
             className={`point-pill flex h-12 w-full shrink-0 items-center justify-center rounded-full text-base font-bold ${
               sidebarCollapsed ? "xl:hidden" : ""

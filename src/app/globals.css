@@ -434,6 +434,22 @@ button.bg-point:disabled {
   line-height: 2rem;
 }
 
+/** 스크롤바가 생겼다 사라질 때 가운데 정렬된 내용이 좌우로 흔들리지 않게 한다.
+ *
+ *  앱 셸의 본문(`xl:overflow-y-auto` 컨테이너)은 내용이 길면 스크롤바가 붙고 짧으면 안 붙는다.
+ *  스크롤바가 8px 자리를 실제로 차지하는 방식이라(오버레이가 아니다, 아래 규칙), 같은 화면의
+ *  상태가 바뀌는 것만으로 `mx-auto` 본문이 4px 씩 움직였다 — /charge 의 목록과 구입하기가
+ *  서로 어긋나 보인 원인이다(2026-09-24).
+ *
+ *  `both-edges` 인 이유: `stable` 만 쓰면 스크롤바 쪽에만 자리를 잡아 줘서, 흔들리지는 않지만
+ *  가운데 정렬이 항상 4px 치우친 채로 고정된다.
+ *
+ *  스크롤 컨테이너가 아닌 요소에는 아무 효과가 없어서(명세상 overflow 가 auto/scroll 일 때만
+ *  적용) 모바일 폭에서는 그냥 무시된다. */
+@utility scroll-gutter-stable {
+  scrollbar-gutter: stable both-edges;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;

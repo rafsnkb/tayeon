@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
+import { kstDateTime } from "@/lib/datetime";
 import { AdminPageHeader } from "@/components/AdminPageHeader";
 
 type Reading = { uid: string; nickname: string | null; id: string; roomId: string | null; question: string; interpretation: string; createdAt: string; topic: string | null };
 type Abuse = { uid: string; nickname: string | null; count: number; latestAt: string; latestQuestion: string };
-const date = (value: string) => value.replace("T", " ").slice(0, 19);
+const date = (value: string) => kstDateTime(value);
 
 export default function ModerationPage() {
   const router = useRouter(); const [free, setFree] = useState<Reading[]>([]); const [abuse, setAbuse] = useState<Abuse[]>([]); const [tab, setTab] = useState<"risk" | "free">("risk"); const [loading, setLoading] = useState(true);

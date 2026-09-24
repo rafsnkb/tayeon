@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { withReturnTo } from "@/lib/navigation";
 import Link from "next/link";
 import { useRooms, type TimePass } from "@/lib/tarot/RoomsContext";
 import { availableCount, COMBOS, SPREADS, type SpreadKey } from "@/lib/tarot/pricing";
@@ -681,7 +682,7 @@ function TarotChat() {
           }}
           onGoCharge={() => {
             setPassUsageOpen(false);
-            router.push("/charge?tab=time");
+            router.push(withReturnTo("/charge?tab=time", pathname));
           }}
           onClose={() => setPassUsageOpen(false)}
         />
@@ -718,7 +719,7 @@ function TarotChat() {
           }}
           onPurchase={() => {
             setPurchaseTicketOpen(false);
-            router.push("/charge");
+            router.push(withReturnTo("/charge", pathname));
           }}
         />
       )}

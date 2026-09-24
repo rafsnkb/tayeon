@@ -127,3 +127,27 @@ env:
     value: "tayeon@rafraum.com"
     availability:
       - RUNTIME
+
+  # 어드민(별도 백엔드)이 이 앱의 /api/internal/notify 를 부를 때 쓰는 공유 비밀. 양쪽 값이
+  # 같아야 하고, functions 의 hourlyRefundAutoApprove 도 같은 값으로 어드민을 부른다.
+  # 없으면 그 경로가 503 이라 환불 알림이 조용히 사라진다.
+  - variable: INTERNAL_API_SECRET
+    secret: INTERNAL_API_SECRET
+    availability:
+      - RUNTIME
+  # 운영 알림 주 채널. 한도도 만료도 없어서 일상 알림은 전부 여기로 가고, 메일은 예외 상황용이다
+  # (src/lib/notify/owner.ts). 둘 다 없으면 warn/urgent 알림이 메일로만 나간다.
+  - variable: DISCORD_WEBHOOK_URL
+    secret: DISCORD_WEBHOOK_URL
+    availability:
+      - RUNTIME
+  # 고객센터 문의 전용 채널. 환불과 문의가 한 채널에 섞이면 둘 다 놓친다.
+  - variable: DISCORD_SUPPORT_WEBHOOK_URL
+    secret: DISCORD_SUPPORT_WEBHOOK_URL
+    availability:
+      - RUNTIME
+  # 알림 본문의 "어드민에서 처리" 링크가 가리킬 주소(src/lib/company.ts). 없으면 링크가 빠진다.
+  - variable: ADMIN_BASE_URL
+    value: "https://tayeon-admin--tayeon-d5149.asia-east1.hosted.app"
+    availability:
+      - RUNTIME

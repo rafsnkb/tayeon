@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatDateTime } from "@/lib/util/formatDate";
 import { useRouter } from "next/navigation";
+import { withReturnTo } from "@/lib/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { useRooms } from "@/lib/tarot/RoomsContext";
@@ -153,7 +154,7 @@ export default function MyPage() {
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="마이 페이지" />
 
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <Section title="계정">
             <div className="flex items-center gap-3 py-4">
@@ -181,7 +182,7 @@ export default function MyPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => router.push("/charge")}
+                  onClick={() => router.push(withReturnTo("/charge", "/me"))}
                   className="shrink-0 whitespace-nowrap rounded-full bg-point px-4 py-1.5 text-sm font-semibold text-white"
                 >
                   구입
@@ -207,7 +208,7 @@ export default function MyPage() {
           </Section>
 
           <Section title="이용권 구입">
-            <ListRow icon={<CartIcon className="h-5 w-5" />} label="이용권 구입" onClick={() => router.push("/charge")} />
+            <ListRow icon={<CartIcon className="h-5 w-5" />} label="이용권 구입" onClick={() => router.push(withReturnTo("/charge", "/me"))} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
             <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="받은 이용권 내역" onClick={() => router.push("/received-passes")} />
           </Section>

@@ -41,6 +41,9 @@ function toPassItem(id: string, data: Record<string, unknown>, type: PassSourceT
     // 구매분을 환불하려면 결제 건을 알아야 한다. 이용권 문서가 이미 들고 있다.
     paymentId: typeof data.paymentId === "string" ? data.paymentId : null,
     status: typeof data.status === "string" ? data.status : "unknown",
+    // 강제 회수(사용중인 이용권을 거둬들인 건)는 목록에서 일반 회수와 구분해서 보여준다 —
+    // 사용자가 쓰고 있던 걸 뺏은 기록이라 문의가 들어왔을 때 제일 먼저 찾게 되는 값이다.
+    revokedForced: data.revokedForced === true,
     combo: typeof data.combo === "string" ? data.combo : null,
     minutes: typeof data.minutes === "number" ? data.minutes : null,
     remainingCount: remainingCount(data),

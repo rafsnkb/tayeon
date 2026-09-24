@@ -6,7 +6,7 @@ import {
   COMBOS,
   isComboKey,
   COUNT_PASS_VALIDITY_MONTHS,
-  countAllowancesForCombo,
+  rewardAllowancesForCombo,
   basisForOneCardCount,
 } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (new Date(data.claimWindowExpiresAt).getTime() <= Date.now()) throw new Error("EXPIRED");
       const birthdayOption = Array.isArray(data.options) ? data.options.find((option: { combo?: string }) => option.combo === combo) : null;
       // 생일 쿠폰은 조합별로 "정확히 N회"를 약속한다(8/6/4). 예전엔 freePasses × 200 을 basis 로
-      // 썼는데, 그러면 countAllowancesForCombo 가 조합 배율을 한 번 더 곱해서 광고의 절반(4/3/2)만
+      // 썼는데, 그러면 조합 배율이 한 번 더 곱해져서 광고의 절반(4/3/2)만
       // 나갔다 — 단가가 200 이던 시절에도 틀렸던 계산이다(2026-09-24). 역산해서 잡는다.
       const basis = birthdayOption ? basisForOneCardCount(Number(birthdayOption.freePasses), combo) : data.basis;
       if (!Number.isFinite(basis) || basis <= 0) throw new Error("INVALID_REWARD");
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         remaining: 1,
         usedCount: 0,
         combo,
-        allowances: countAllowancesForCombo(basis, combo),
+        allowances: rewardAllowancesForCombo(basis, combo),
         status: "unused",
         createdAt: now,
         expiresAt: addMonthsClamped(now, COUNT_PASS_VALIDITY_MONTHS),

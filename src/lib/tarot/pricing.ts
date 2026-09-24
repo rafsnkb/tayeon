@@ -53,6 +53,11 @@ export const REFERRAL_SIGNUP_FREE_PASSES = 5;
 export const REFERRAL_SIGNUP_FRIEND_CAP = 5;
 export const REFERRAL_MONTHLY_COMMISSION_RATE = 0.05;
 
+/** 친구 결제 리워드 최소 기준 — 추천인의 친구들이 그 달에 합쳐서 이 금액 이상 결제해야 지급한다.
+ *  미달이면 그 달은 지급하지 않는다(다음 달로 이월되지 않는다). 보너스 리워드의 최저 구간과
+ *  같은 금액으로 맞춘다 — 두 리워드의 진입선이 다르면 안내가 두 배로 복잡해진다(2026-09-24). */
+export const REFERRAL_MONTHLY_MIN_WON = 100_000;
+
 // 첫 카카오 가입 보상은 스프레드/옵션 조합과 무관하게 정확히 4회를 쓸 수 있는 체험 이용권이다.
 // 남은 권리를 옵션 변경에 따라 환산하는 유료 이용권과 달리, 모든 조합을 같은 4회로 고정한다.
 // 유일하게 combo:"any"(조합 고정 없음)로 발급되는 이용권 — 온보딩 특성상 아직 조합을 골라본 적
@@ -76,13 +81,14 @@ export function signupFreePassAllowances(): Record<string, number> {
 // 기획표 그대로: 결제금액이 해당 구간(minWon) 이상이면 전체 금액에 그 구간 요율을 적용한다
 // (누진세처럼 구간별로 쪼개 계산하지 않는 단일 구간 조회 — 내림차순으로 첫 매치).
 // 2026-09-18: 하위 2단계(1%/0.5%) 제거 — 5만원 미만 결제는 리워드 미지급으로 정리.
+// 2026-09-24: 5만원/1.5% 구간도 제거해 진입선을 10만원으로 올렸다. 금액이 작을수록 횟수 환산에서
+// 남는 자투리 비중이 커져 리워드가 제 가치보다 후해지는데, 그 구간이 딱 거기였다.
 export const PAYMENT_BONUS_REWARD_TIERS = [
   { minWon: 1_000_000, rate: 0.1 },
   { minWon: 800_000, rate: 0.07 },
   { minWon: 400_000, rate: 0.05 },
   { minWon: 200_000, rate: 0.04 },
   { minWon: 100_000, rate: 0.03 },
-  { minWon: 50_000, rate: 0.015 },
 ] as const;
 
 export function bonusRewardRateForWon(totalWon: number): number {
@@ -91,10 +97,17 @@ export function bonusRewardRateForWon(totalWon: number): number {
 }
 
 export function rewardPassesForWon(totalWon: number, rate: number): number {
-  // 원카드 1회 단가(SPREADS.one.cost) 상당을 1회로 환산하며, 표에 표시되는 횟수처럼 반올림으로
-  // 지급한다. 2026-09-24 단가가 200→300으로 오르면서 같은 금액에 대한 페이백 회수도 그만큼
-  // 줄어든다 — 요율(%)이 아니라 금액 기준 페이백이므로 이게 일관된 동작이다.
-  return Math.round((totalWon * rate) / SPREADS.one.cost);
+  // 원카드 1회 단가(SPREADS.one.cost) 상당을 1회로 환산한다. 2026-09-24 단가가 200→300으로
+  // 오르면서 같은 금액에 대한 페이백 회수도 그만큼 줄어든다 — 요율(%)이 아니라 금액 기준
+  // 페이백이므로 이게 일관된 동작이다.
+  //
+  // 커미션은 돈이라 원 단위 정수로 먼저 확정한다. 0.07 같은 요율은 부동소수점에서
+  // 56000.00000000001 처럼 떨어지는데, 반대로 어긋나는 값이 생기면 버림과 만나 한 회를 잃는다.
+  const commissionWon = Math.round(totalWon * rate);
+  // 반올림이 아니라 버림이다. 올려 주면 지급하는 이용권이 리워드로 받은 금액보다 비싸진다 —
+  // 단가에 모자라는 자투리를 한 회로 쳐 주는 셈이고, 금액이 작을수록 그 비중이 컸다
+  // (2026-09-24). 지급 횟수를 버림으로 바꾼 rewardAllowanceForCombo 와 같은 이유·같은 규칙이다.
+  return Math.floor(commissionWon / SPREADS.one.cost);
 }
 
 // 코인 경로(SAJU_ADD_ON_COST / ZIWEI_ADD_ON_COST / COMPATIBILITY_ADD_ON_COST)는 2026-09-24
@@ -234,6 +247,56 @@ function comboMultiplier(combo: ComboKey): number {
   return saju && ziwei ? 0.5 : saju ? 0.85 : ziwei ? 0.75 : 1;
 }
 
+/** 조합을 "싼 것 → 비싼 것" 순으로 늘어놓은 것. 배율 내림차순(1 / 0.85 / 0.75 / 0.5)이자 COMBOS
+ *  선언 순서다 — 아래 무상 지급표가 이 순서로 한 칸씩 깎아 내려간다. */
+const COMBO_ORDER = ["tarot", "tarot-saju", "tarot-ziwei", "tarot-saju-ziwei"] as const satisfies readonly ComboKey[];
+
+/**
+ * 무상 지급(리워드·운영자 커스텀 지급) 이용권의 16칸 표. 구매분과 **규칙이 다르다**.
+ *
+ * 구매는 공표 가격표(PUBLISHED_COUNT_TABLE)가 진실이고, 무상 지급은 이 함수가 진실이다.
+ * 두 가지가 다르다:
+ *
+ * 1. **반올림이 아니라 버림.** 구매 공식은 basis÷단가에서 한 번, ×조합배율에서 또 한 번
+ *    반올림한다. 올림이 겹치면 작은 리워드가 제 가치보다 훨씬 많이 나갔다 — 5만원 결제
+ *    보너스(750원)가 3,000원짜리 스타터 한 장 값을 줬다(최대 3.98배, 2026-09-24). 버리면
+ *    어떤 금액에서도 basis 가치를 넘지 않는다.
+ * 2. **같은 스프레드에서 조합이 비싸질수록, 같은 조합에서 카드가 많아질수록 최소 1회는 준다.**
+ *    버림만으로는 동률이 남는다(basis 3,600 에서 켈틱+사주와 켈틱+자미두수가 나란히 3회).
+ *    비싼 조합이 싼 조합과 같은 횟수를 주면 조합을 나눈 의미가 없다.
+ *
+ * 공표표를 타지 않는 것도 의도다. 리워드 basis 는 300의 배수라 상품 basis 중 3,000(스타터)과
+ * 135,000(얼티밋) 두 곳에만 걸리는데, 그 두 지점만 공표표로 빠지는 바람에 **리워드를 더 받았는데
+ * 쓸 수 있는 횟수가 줄어드는** 역전이 있었다(basis 3,000 → 3,300 에서 쓰리카드 3칸이 감소).
+ * 게다가 상품 가격표를 개정할 때마다 리워드 지급량이 딸려 움직였다.
+ */
+function rewardGrid(basis: number): number[][] {
+  const grid: number[][] = [];
+  for (let c = 0; c < COMBO_ORDER.length; c++) {
+    const mult = comboMultiplier(COMBO_ORDER[c]);
+    const row: number[] = [];
+    for (let s = 0; s < SPREAD_ORDER.length; s++) {
+      let count = Math.floor(Math.floor(basis / SPREADS[SPREAD_ORDER[s]].cost) * mult);
+      // 0 에서 멈춘다 — 음수로 내려가거나 "0 보다 하나 적은 값"을 만들지 않는다.
+      if (s > 0) count = Math.min(count, Math.max(0, row[s - 1] - 1));
+      if (c > 0) count = Math.min(count, Math.max(0, grid[c - 1][s] - 1));
+      row.push(count);
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+export function rewardAllowanceForCombo(basis: number, spread: SpreadKey, combo: ComboKey): number {
+  return rewardGrid(basis)[COMBO_ORDER.indexOf(combo)][SPREAD_ORDER.indexOf(spread)];
+}
+
+/** 조합이 고정된 무상 이용권의 4-엔트리 표 — countAllowancesForCombo 의 무상 지급판. */
+export function rewardAllowancesForCombo(basis: number, combo: ComboKey): Record<string, number> {
+  const row = rewardGrid(basis)[COMBO_ORDER.indexOf(combo)];
+  return Object.fromEntries(SPREAD_ORDER.map((spread, index) => [spread, row[index]]));
+}
+
 /**
  * "이 조합으로 정확히 N회"를 약속한 리워드(생일 쿠폰, 어드민 커스텀 지급)가 실제로 N회를
  * 주도록 basis를 되돌려 준다.
@@ -256,7 +319,7 @@ export function basisForOneCardCount(freePasses: number, combo: ComboKey): numbe
     for (const base of delta === 0 ? [start] : [start - delta, start + delta]) {
       if (base < 1) continue;
       const basis = base * SPREADS.one.cost;
-      if (countAllowanceForCombo(basis, "one", combo) === target) return basis;
+      if (rewardAllowanceForCombo(basis, "one", combo) === target) return basis;
     }
   }
   return start * SPREADS.one.cost;

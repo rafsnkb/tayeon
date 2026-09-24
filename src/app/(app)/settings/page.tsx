@@ -9,6 +9,7 @@ import { JASI_RULE_SHORT_LABEL, JASI_RULE_DESCRIPTION, type JasiRule } from "@/l
 import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import ConfirmModal from "@/components/ConfirmModal";
+import InfoModal from "@/components/InfoModal";
 import { CheckIcon } from "../tarot/icons";
 
 const PORTRAITS: Record<ToneKey, string> = {
@@ -87,6 +88,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // 피그마의 "저장하기" 버튼은 아무것도 안 바꾸면 비활성 상태 — 처음 불러온 값을 저장해뒀다가
   // 현재 값과 비교해서 뭔가 바뀐 경우에만 버튼을 활성화한다(2026-09-14).
   const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
@@ -145,10 +147,19 @@ export default function SettingsPage() {
     setDeleting(true);
     try {
       const idToken = await user.getIdToken();
-      await fetch("/api/user/delete", {
+      const response = await fetch("/api/user/delete", {
         method: "POST",
         headers: { Authorization: `Bearer ${idToken}` },
       });
+      // 응답을 보지 않고 로그아웃까지 해버리면, 서버가 막아도(환불 처리 중 409) 사용자는
+      // 로그아웃돼서 메인으로 튕기고 "탈퇴됐다"고 믿는다. 계정은 그대로 살아 있는데 다시
+      // 들어와 보기 전까지는 알 길이 없다(2026-09-24).
+      if (!response.ok) {
+        const failed = (await response.json().catch(() => ({}))) as { error?: string };
+        setDeleteConfirmOpen(false);
+        setDeleteError(failed.error ?? "탈퇴 처리에 실패했어요. 잠시 후 다시 시도해주세요.");
+        return;
+      }
       await signOut(auth);
       // 로그아웃과 같은 규칙 — 탈퇴한 사람도 로그인 카드가 아니라 메인 화면에서 나간다.
       router.replace("/");
@@ -160,7 +171,7 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="설정" />
-      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto">
+      <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <SectionPanel title="상담 설정">
             <div>
@@ -299,6 +310,7 @@ export default function SettingsPage() {
           onClose={() => setDeleteConfirmOpen(false)}
         />
       )}
+      {deleteError && <InfoModal title={deleteError} tone="error" onClose={() => setDeleteError(null)} />}
     </div>
   );
 }

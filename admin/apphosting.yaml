@@ -59,3 +59,34 @@ env:
     value: "1.25"
     availability:
       - RUNTIME
+
+  # 포트원 V2 API Secret — 환불 실행(admin/src/lib/refundExecute.ts)이 결제를 재조회하고 취소할 때
+  # 쓴다. 본체 apphosting.yaml 과 **같은 시크릿**을 참조한다. 없으면 어드민은 떠도 환불 승인이
+  # 전부 실패한다(포트원 SDK 가 "doesn't start with PortOne" 으로 거부).
+  - variable: PORTONE_API_SECRET
+    secret: PORTONE_API_SECRET
+    availability:
+      - RUNTIME
+  # 본체의 /api/internal/notify 를 부를 때 쓰는 공유 비밀. 본체 apphosting.yaml 과 같은 값이어야
+  # 하고, functions 의 hourlyRefundAutoApprove 가 이 어드민을 부를 때도 같은 값을 쓴다.
+  - variable: INTERNAL_API_SECRET
+    secret: INTERNAL_API_SECRET
+    availability:
+      - RUNTIME
+  # 알림을 밀어 넣을 본체 주소(admin/src/lib/notifyOwner.ts). 커스텀 도메인 기준.
+  - variable: TAYEON_BASE_URL
+    value: "https://tayeon.kr"
+    availability:
+      - RUNTIME
+  # 자동 승인 알림의 "어드민에서 처리" 링크가 가리킬 자기 주소.
+  - variable: ADMIN_BASE_URL
+    value: "https://tayeon-admin--tayeon-d5149.asia-east1.hosted.app"
+    availability:
+      - RUNTIME
+  # 환불 자동 승인 — "on" 일 때만 실제로 결제를 취소한다. 그 외의 값은 전부 드라이런(판정과
+  # 알림까지만). 사람 확인 없이 돈을 움직이기 시작하는 스위치라, 며칠 돌려 판정이 믿을 만한지
+  # 본 뒤에 켠다(2026-09-24 합의). 기본값에 기대지 않고 꺼져 있음을 설정에 드러내 둔다.
+  - variable: REFUND_AUTO_APPROVE
+    value: "off"
+    availability:
+      - RUNTIME

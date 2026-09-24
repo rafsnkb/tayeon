@@ -5,6 +5,7 @@ import { executeRefund } from "@/lib/refundExecute";
 import { notifyOwner } from "@/lib/notifyOwner";
 import { addBusinessDays, refundDue } from "@/lib/refundDue";
 import { assessRefundRisk } from "@/lib/refundRisk";
+import { constantTimeEquals } from "@/lib/constantTime";
 
 /** 사람이 손대지 않으면 자동 승인되기까지의 영업일. 법정 기한(3영업일)보다 짧아야 의미가 있다. */
 const AUTO_APPROVE_BUSINESS_DAYS = 2;
@@ -26,7 +27,7 @@ const BATCH_LIMIT = 20;
 export async function POST(req: NextRequest) {
   const secret = process.env.INTERNAL_API_SECRET;
   if (!secret) return NextResponse.json({ error: "not_configured" }, { status: 503 });
-  if (req.headers.get("x-internal-secret") !== secret) {
+  if (!constantTimeEquals(req.headers.get("x-internal-secret"), secret)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
   const dryRun = process.env.REFUND_AUTO_APPROVE !== "on";

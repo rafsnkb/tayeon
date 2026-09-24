@@ -4,8 +4,8 @@ import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import {
   COMBOS,
   SPREADS,
-  countAllowancesForCombo,
-  countAllowanceForCombo,
+  rewardAllowancesForCombo,
+  rewardAllowanceForCombo,
   type ComboKey,
 } from "@/lib/tarot/pricing";
 import { USERS, PENDING_REWARDS, COUNT_PASSES } from "@/lib/firestore/collections";
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
       comboAllowances:
         status === "pending" || status === "claimed"
           ? (Object.fromEntries(
-              (Object.keys(COMBOS) as ComboKey[]).map((combo) => [combo, countAllowancesForCombo(data.basis, combo)])
+              (Object.keys(COMBOS) as ComboKey[]).map((combo) => [combo, rewardAllowancesForCombo(data.basis, combo)])
             ) as Record<ComboKey, Record<string, number>>)
           : undefined,
     };
@@ -95,14 +95,14 @@ export async function GET(req: NextRequest) {
       // 예전엔 basis/200 이라 원카드 단가가 300 이 된 뒤로 실제보다 많은 횟수를 표기했고,
       // 조합 배율도 반영되지 않았다(타로+사주 지급인데 타로 기준 횟수를 보여줌). 아래 표
       // (comboAllowances)와 같은 함수로 뽑아서 두 값이 어긋날 수 없게 한다(2026-09-24).
-      freePasses: countAllowanceForCombo(basis, "one", combo),
+      freePasses: rewardAllowanceForCombo(basis, "one", combo),
       basis,
       createdAt: data.createdAt,
       claimWindowExpiresAt: null,
       claimedAt: data.createdAt,
       claimedCombo: combo,
       comboAllowances: Object.fromEntries(
-        (Object.keys(COMBOS) as ComboKey[]).map((c) => [c, countAllowancesForCombo(basis, c)])
+        (Object.keys(COMBOS) as ComboKey[]).map((c) => [c, rewardAllowancesForCombo(basis, c)])
       ) as Record<ComboKey, Record<string, number>>,
     };
   });
