@@ -14,7 +14,8 @@ import {
   TIME_PASS_VALIDITY_MONTHS,
   formatMonths,
   HELD_PASS_STATUSES,
-  COMBO_ORDER} from "@/lib/tarot/pricing";
+  COMBO_ORDER,
+} from "@/lib/tarot/pricing";
 import { countPackageArt, timePassArt } from "@/lib/tarot/passTiers";
 import { ComboAllowanceList } from "@/components/ComboAllowanceCard";
 import PassArtCard, { PassArtHero } from "@/components/PassArtCard";
@@ -40,11 +41,11 @@ const timePassName = (minutes: number) => `${minutes}분 무제한 이용권`;
 const timePassCaption = (combo: ComboKey) =>
   combo === "tarot" ? "타로 전용" : `${COMBOS[combo].label} 무제한`;
 
-function formatWon(won: number) {
-  return `₩${won.toLocaleString("ko-KR")}`;
-}
-
-
+/** 목록 카드는 원화 기호(목업 Buy_CountPass), 하단 결제 영역은 "원"(목업 Buy_*_Purchase)이다.
+ *  같은 화면에서 표기가 갈리는 건 목업이 그렇기 때문이다 — 맞추려다 한쪽이 틀리지 않게 둘 다
+ *  여기에 둔다. */
+const formatWon = (won: number) => `₩${won.toLocaleString("ko-KR")}`;
+const formatWonSuffix = (won: number) => `${won.toLocaleString("ko-KR")}원`;
 
 const TIME_DURATIONS: TimeDuration[] = [15, 30, 60];
 
@@ -260,7 +261,11 @@ export default function ChargePage() {
           {!selected && tab === "time" && (
             <div className="grid grid-cols-2 gap-2.5">
               {COMBO_ORDER.map((combo) => {
-                const pkg = TIME_PASS_PACKAGES.find((p) => p.combo === combo && p.minutes === timeDuration)!;
+                const pkg = TIME_PASS_PACKAGES.find((p) => p.combo === combo && p.minutes === timeDuration);
+                // 상품표에는 12종(3 시간 × 4 조합)이 다 있어야 한다. 없더라도 그 칸만 비우고
+                // 나머지는 팔린다 — `!` 로 단정하면 상품 하나가 빠졌을 때 구입 화면 전체가
+                // 흰 화면이 된다.
+                if (!pkg) return null;
                 return (
                   <PassArtCard
                     key={combo}
@@ -326,11 +331,11 @@ export default function ChargePage() {
             <p className="text-base font-bold text-bold-text">결제금액</p>
             <div className="mt-2 flex justify-between text-sm text-icon-muted">
               <span>· 상품금액 (VAT 포함)</span>
-              <span>{price.toLocaleString("ko-KR")}원</span>
+              <span>{formatWonSuffix(price)}</span>
             </div>
             <div className="mt-2 flex justify-between border-t border-border pt-2 text-base font-bold text-bold-text">
               <span>총 결제금액</span>
-              <span>{price.toLocaleString("ko-KR")}원</span>
+              <span>{formatWonSuffix(price)}</span>
             </div>
             <button
               type="button"

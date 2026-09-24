@@ -80,7 +80,7 @@ ds-bundle/
 .impeccable/
 
 # 이용권 상품 원본 아트워크 — 1254px 정사각 18장으로 합쳐 45MB라 저장소에 두지 않는다
-# (사용자 결정, 2026-09-25). web 에 나가는 건 scripts/build-pass-art.js 가 만든
+# (사용자 결정, 2026-09-25). web 에 나가는 건 scripts/build-pass-art.cjs 가 만든
 # public/pass/*.webp 뿐이고 그쪽은 커밋된다. 원본이 없으면 그 스크립트만 못 돌린다.
 asset/texture/prizebg_tier_*.jpg
 asset/texture/timepass_*.png

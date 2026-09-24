@@ -44,6 +44,23 @@ export type ActiveCountPass = {
   productId?: string;
 };
 
+/** `/api/user/me` 응답 중 이 컨텍스트가 쓰는 부분만. 라우트 반환값 전체를 베껴 오면 한쪽만
+ *  고쳐져 어긋나므로, 쓰는 필드만 적고 나머지는 무시한다. */
+type MeResponse = {
+  nickname: string | null;
+  profileImage?: string | null;
+  email?: string | null;
+  countPasses?: CountPass[];
+  activeCountPass?: ActiveCountPass | null;
+  /** 서버가 내린 "생년월일 정보가 갖춰졌는가" 판정(isValidBirthInfo). */
+  birthInfoComplete?: boolean;
+  birthInfo?: { timeUnknown?: boolean } | null;
+  partner?: { nickname?: string | null; birthTime?: string | null } | null;
+  activeTimePass?: ActiveTimePass | null;
+  timePasses?: TimePass[];
+  hasUnreadNotifications?: boolean;
+};
+
 type RoomsContextValue = {
   user: User | null;
   nickname: string | null;
@@ -125,12 +142,10 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
 
   const selectRoom = useCallback((roomId: string | null) => setActiveRoomId(roomId), []);
 
-  const refreshMe = useCallback(async () => {
-    if (!user) return;
-    const idToken = await user.getIdToken();
-    const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
-    if (!res.ok) return;
-    const data = await res.json();
+  /** `/api/user/me` 응답을 상태에 푼다. 처음 로그인할 때와 `refreshMe()` 때 **같은 열세 줄**이
+   *  두 벌로 복사돼 있었다. 실제로 2026-09-25 에 판정 한 줄(`birthInfoComplete`)을 바꾸면서
+   *  두 곳을 모두 고쳐야 했고, 한쪽만 고쳤다면 새로고침 전후로 화면이 달라졌을 것이다. */
+  const applyMe = useCallback((data: MeResponse) => {
     setNickname(data.nickname);
     setProfileImage(data.profileImage ?? null);
     setEmail(data.email ?? null);
@@ -145,7 +160,15 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     setActiveTimePass(data.activeTimePass ?? null);
     setTimePasses(data.timePasses ?? []);
     setHasUnreadNotifications(Boolean(data.hasUnreadNotifications));
-  }, [user]);
+  }, []);
+
+  const refreshMe = useCallback(async () => {
+    if (!user) return;
+    const idToken = await user.getIdToken();
+    const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
+    if (!res.ok) return;
+    applyMe(await res.json());
+  }, [user, applyMe]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
@@ -184,19 +207,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       }
 
       if (meRes.ok) {
-        const data = await meRes.json();
-        setNickname(data.nickname);
-        setProfileImage(data.profileImage ?? null);
-        setEmail(data.email ?? null);
-        setCountPasses(data.countPasses ?? []);
-        setActiveCountPass(data.activeCountPass ?? null);
-        setHasBirthInfo(Boolean(data.birthInfoComplete));
-        setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
-        setHasPartner(Boolean(data.partner?.nickname));
-        setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
-        setActiveTimePass(data.activeTimePass ?? null);
-        setTimePasses(data.timePasses ?? []);
-        setHasUnreadNotifications(Boolean(data.hasUnreadNotifications));
+        applyMe(await meRes.json());
       }
 
       // 실패 응답을 방으로 착각하지 않도록 두 요청 모두 ok를 본다. 예전엔 POST 결과를
@@ -235,7 +246,9 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
       // 진입 즉시 마지막 방이 열린 것처럼 되어, "진입은 항상 메인"이라는 전제가 깨진다.
       setLoaded(true);
     });
-  }, []);
+    // applyMe 는 useCallback([]) 이라 신원이 고정이다 — 넣어도 이 effect 는 여전히 한 번만
+    // 돈다(onAuthStateChanged 구독을 다시 걸면 안 된다).
+  }, [applyMe]);
 
   // 관리자 지급처럼 다른 화면에서 바뀌는 이용권은 로그인 시 한 번만 읽으면 열린 채팅 화면에
   // 반영되지 않는다. Firestore 클라이언트 읽기 권한은 열지 않은 상태라, 기존의 인증된 BFF

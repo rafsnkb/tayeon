@@ -46,7 +46,7 @@ export const TIME_COMBO_TIER: Record<ComboKey, PassTier> = {
  *  그림이 들어간다.
  *
  *  원본은 `asset/texture/` 의 1254px 정사각(합쳐 45MB)이라 그대로 web 에 못 올린다 —
- *  `scripts/build-pass-art.js` 가 `public/pass/` 에 **두 크기**로 만든다: 히어로용 1254px
+ *  `scripts/build-pass-art.cjs` 가 `public/pass/` 에 **두 크기**로 만든다: 히어로용 1254px
  *  (`.webp`)와 목록 카드용 552px(`-card.webp`). 목록은 한 화면에 6장이 깔려서 히어로 크기를
  *  쓰면 그 화면만 1.2MB가 된다.
  *
