@@ -41,20 +41,6 @@ export const TIME_COMBO_TIER: Record<ComboKey, PassTier> = {
   "tarot-saju-ziwei": TIER.coral,
 };
 
-/** 횟수제 상품별 등급. 목업에서 테두리가 가격대별로 2개씩 짝지어 올라간다 — 텍스처 등급이
- *  갈리는 경계와 정확히 같다.
- *
- *  예전엔 `COUNT_PACKAGES` 와 같은 순서의 배열에 인덱스로 맞춰 뒀는데, 상품이 하나 늘거나
- *  순서가 바뀌면 조용히 어긋난다. 상품 id 는 결제 기록과 묶인 고정값이라 그쪽에 붙인다. */
-const COUNT_PACKAGE_TIER: Record<string, PassTier> = {
-  "count-starter": TIER.teal,
-  "count-basic": TIER.blue,
-  "count-standard": TIER.blue,
-  "count-plus": TIER.violet,
-  "count-premium": TIER.violet,
-  "count-ultimate": TIER.coral,
-};
-
 /** 상품 한 종류마다 그림이 따로 있다(목업 Buy_CountPass / Buy_TimePass, 2026-09-25).
  *  예전 카드는 등급 텍스처 4장을 여럿이 나눠 썼는데, 새 목업은 2열 그리드의 카드마다 고유한
  *  그림이 들어간다.
@@ -88,17 +74,11 @@ export function timePassArt(minutes: number, combo: ComboKey): string {
   return `/pass/time-${minutes}-${TIME_COMBO_INDEX[combo] ?? 1}.webp`;
 }
 
-/** 등급을 못 찾으면 가장 낮은 등급으로 떨어뜨린다 — 상품이 새로 생겼을 때 화면이 깨지는
- *  것보다 색 하나가 밋밋한 편이 낫다. */
-export function countPackageTier(productId: string): PassTier {
-  return COUNT_PACKAGE_TIER[productId] ?? TIER.teal;
-}
-
-// 위 표가 상품 목록과 어긋나면 개발 중에 바로 알 수 있게 해 둔다 — 색이 하나 빠져도 화면은
+// 위 표가 상품 목록과 어긋나면 개발 중에 바로 알 수 있게 해 둔다 — 그림이 하나 빠져도 화면은
 // 그럭저럭 그려지기 때문에 눈으로는 늦게 발견된다.
 if (process.env.NODE_ENV !== "production") {
-  const missing = COUNT_PACKAGES.filter((pkg) => !(pkg.id in COUNT_PACKAGE_TIER)).map((pkg) => pkg.id);
+  const missing = COUNT_PACKAGES.filter((pkg) => !(pkg.id in COUNT_PACKAGE_ART)).map((pkg) => pkg.id);
   if (missing.length > 0) {
-    console.warn(`[passTiers] 등급 색이 없는 횟수제 상품: ${missing.join(", ")}`);
+    console.warn(`[passTiers] 그림이 없는 횟수제 상품: ${missing.join(", ")}`);
   }
 }
