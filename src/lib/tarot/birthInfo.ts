@@ -78,7 +78,7 @@ export function toCalendarMode(
  *
  *  라우트마다 `if (!body.birthDate)` 로 빈 값만 막고 형식은 보지 않았다. 화면이 보내는 값만
  *  믿는 구조라, 실제로 입력 휠이 `"1996--NaN"` 을 만들면(윤달이 없는 해를 "음력(윤달)"로
- *  고른 경우) 그대로 저장됐다 — 그 값은 사주 계산과 생일 쿠폰(`birthdayMMDD`)까지 흘러간다.
+ *  고른 경우) 그대로 저장됐다 — 그 값은 사주 계산과 생일 기념 무료 이용권(`birthdayMMDD`)까지 흘러간다.
  *  휠은 고쳤지만(2026-09-25) 형식 검사는 서버에 있어야 한다. */
 export function isBirthDateString(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

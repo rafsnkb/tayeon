@@ -35,7 +35,7 @@ export function dayCount(year: number, month: number, mode: CalendarMode): numbe
  * 그냥 이어 붙이면 안 된다. 앞 칸을 고친 뒤에는 뒤 칸이 그 달에 없는 날일 수 있고(1 월 31 일에서
  * 2 월로 옮기면 31 일), 윤달이 없는 해를 "음력(윤달)" 로 고르면 **고를 달 자체가 없다**.
  * 예전에는 그 경우 `Number("")` 가 그대로 흘러 `"1996--NaN"` 이 저장됐다 — 서버도 형식을
- * 보지 않아서(2026-09-25) 그대로 남고, 사주 계산과 생일 쿠폰이 그 값을 받았다.
+ * 보지 않아서(2026-09-25) 그대로 남고, 사주 계산과 생일 기념 무료 이용권이 그 값을 받았다.
  */
 export function toBirthDate(
   year: number,

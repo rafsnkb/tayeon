@@ -31,16 +31,16 @@ import {
   supplyWon,
 } from "./shared/rewardRules.ts";
 
-// 생일 쿠폰 수령 시 고를 수 있는 조합과 무료 횟수. 예전에는 이 표가 이 파일과
+// 생일 기념 무료 이용권 수령 시 고를 수 있는 조합과 무료 횟수. 예전에는 이 표가 이 파일과
 // src/lib/rewards/birthday.ts 양쪽에 그대로 복제돼 있었는데, 후자는 호출하는 곳이 없는 죽은
-// 코드였다(2026-09-21 삭제). 지금은 생일 쿠폰을 발급하는 곳이 이 스케줄 함수 하나뿐이다.
+// 코드였다(2026-09-21 삭제). 지금은 생일 기념 무료 이용권을 발급하는 곳이 이 스케줄 함수 하나뿐이다.
 const BIRTHDAY_COUPON_OPTIONS = [
   { combo: "tarot-saju", freePasses: 8 },
   { combo: "tarot-ziwei", freePasses: 6 },
   { combo: "tarot-saju-ziwei", freePasses: 4 },
 ];
 
-/** 매일 KST 00:10에 저장된 생년월일과 일치하는 사용자에게 생일 쿠폰을 1회 발급한다. */
+/** 매일 KST 00:10에 저장된 생년월일과 일치하는 사용자에게 생일 기념 무료 이용권을 1회 발급한다. */
 export const dailyBirthdayCouponPayout = onSchedule(
   { schedule: "10 0 * * *", timeZone: "Asia/Seoul", region: "asia-east1" },
   async () => {

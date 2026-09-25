@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       ...(profileImage !== null ? { profileImage } : {}),
       ...(email !== null ? { email } : {}),
       ...(birthday !== null ? { kakaoBirthday: birthday, kakaoBirthyear: birthyear, kakaoBirthdayType: profile.kakao_account?.birthday_type ?? null, kakaoIsLeapMonth: profile.kakao_account?.is_leap_month ?? null } : {}),
-      // 생일 쿠폰 배치가 동등 쿼리로 찾을 수 있게 정규화한 값을 같이 심는다. 카카오 생일은
+      // 생일 기념 무료 이용권 배치가 동등 쿼리로 찾을 수 있게 정규화한 값을 같이 심는다. 카카오 생일은
       // birthInfo보다 우선하므로, 값이 있으면 기존 birthInfo 기반 값을 덮어써도 된다.
       ...(birthday !== null ? { birthdayMMDD: normalizeBirthdayMMDD(birthday, null) } : {}),
       ...(referredBy ? { referredBy } : {}),

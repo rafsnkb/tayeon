@@ -51,7 +51,7 @@ export const PAYMENT_BONUS_REWARD_TIERS = [
  *  다시 할 것. */
 export const REWARD_PAYOUT_DAY_OF_MONTH = 10;
 
-/** 받은 이용권(결제 리워드/친구초대 리워드/생일 쿠폰)의 수령 가능 기간 — 지급일로부터 이 기간
+/** 받은 이용권(결제 리워드/친구초대 리워드/생일 기념 무료 이용권)의 수령 가능 기간 — 지급일로부터 이 기간
  *  내 미수령 시 소멸. */
 export const PENDING_REWARD_CLAIM_WINDOW_MONTHS = 1;
 
@@ -95,7 +95,7 @@ export function rewardPassesForWon(supplyWonAmount: number, rate: number): numbe
 
 /** ISO 날짜에 개월 수를 더하되, 말일을 넘어가지 않게 클램프한다(예: 1월 31일 + 1개월 = 2월 28/29일).
  *  이용권 유효기간(fulfill.ts, referral/code.ts)과 받은 이용권 수령 가능 기간(pending-rewards,
- *  functions 의 정산·생일 쿠폰)이 공용으로 쓴다. */
+ *  functions 의 정산·생일 기념 무료 이용권)이 공용으로 쓴다. */
 export function addMonthsClamped(iso: string, months: number): string {
   const date = new Date(iso);
   const day = date.getUTCDate();
