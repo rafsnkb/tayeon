@@ -147,5 +147,56 @@ test("거부 로그에는 paymentId 를 뺀 판단 근거만 담긴다", () => {
   // 로그 출력은 호출부(fulfillPayment)가 하고, 순수 함수는 내용만 넘긴다.
   const r = 통과({ ...정상결제, amount: { total: 1 } });
   assert.equal(r.log.message, "금액 불일치");
-  assert.deepEqual(r.log.detail, { paid: 1, currency: "KRW", expected: 3000 });
+  // fromIntent 는 "정가로 봤는지 기록으로 봤는지" 를 로그에서 바로 가리기 위한 것이다(2026-09-25).
+  assert.deepEqual(r.log.detail, { paid: 1, currency: "KRW", expected: 3000, fromIntent: false });
+});
+
+// ── 주문 내역(paymentIntents) 대조 ────────────────────────────────────────────
+//
+// 2026-09-25 신설. 할인쿠폰을 붙이려면 "이 결제는 얼마여야 하는가"의 기준이 상품표 정가에서
+// prepare 가 적어 둔 기록으로 옮겨가야 한다. 정가로 대조하면 할인 결제가 전부 위조로 보이고,
+// 그렇다고 대조를 풀면 100 원을 결제해 11 만원 상품을 받는 구멍이 된다.
+
+const 주문내역 = { uid: "user-1", productId: "count-starter", amountWon: 3000 };
+const 기록있음 = (intent) => ({ ...개발환경, intent });
+
+test("주문 내역이 있으면 그 금액으로 대조한다 — 할인가 결제가 통과한다", () => {
+  // 정가 3000 인 상품을 쿠폰으로 2100 에 판 상황.
+  const r = 통과({ ...정상결제, amount: { total: 2100 } }, 기록있음({ ...주문내역, amountWon: 2100 }));
+  assert.equal(r.ok, true);
+  assert.equal(r.paidWon, 2100, "실제 승인 금액을 돌려줘야 결제 문서에 정가 대신 이 값을 남길 수 있다");
+});
+
+test("주문 내역이 있으면 정가로 결제해도 거부한다 — 기준은 어디까지나 기록이다", () => {
+  const r = 통과({ ...정상결제, amount: { total: 3000 } }, 기록있음({ ...주문내역, amountWon: 2100 }));
+  assert.equal(r.ok, false);
+  assert.equal(r.outcome.reason, "결제 금액이 상품 가격과 일치하지 않아요.");
+});
+
+test("할인 기록이 있어도 그보다 적게 내면 거부한다 (100원 결제 구멍 방지)", () => {
+  const r = 통과({ ...정상결제, amount: { total: 100 } }, 기록있음({ ...주문내역, amountWon: 2100 }));
+  assert.equal(r.ok, false);
+  assert.equal(r.outcome.autoCancel, true);
+});
+
+test("주문 내역이 없으면 옛 방식(정가 대조)으로 내려간다", () => {
+  assert.equal(통과({ ...정상결제, amount: { total: 3000 } }, 기록있음(null)).ok, true);
+  assert.equal(통과({ ...정상결제, amount: { total: 2100 } }, 기록있음(null)).ok, false);
+});
+
+test("주문 내역과 uid 가 다르면 거부하되 결제를 취소하지는 않는다", () => {
+  // 취소하면 남의 결제를 취소시키는 통로가 된다 — 기존 uid 불일치 관문과 같은 이유.
+  const r = 통과(정상결제, 기록있음({ ...주문내역, uid: "user-2" }));
+  assert.equal(r.ok, false);
+  assert.equal(r.outcome.autoCancel, false);
+});
+
+test("주문 내역과 상품이 다르면 거부한다 (customData 위조)", () => {
+  const r = 통과(정상결제, 기록있음({ ...주문내역, productId: "count-basic" }));
+  assert.equal(r.ok, false);
+  assert.equal(r.outcome.autoCancel, true);
+});
+
+test("정상 결제도 실제 승인 금액을 paidWon 으로 돌려준다", () => {
+  assert.equal(통과().paidWon, 3000);
 });

@@ -19,7 +19,7 @@ import {
   HELD_PASS_STATUSES,
   isHeldPass,
 } from "@/lib/tarot/pricing";
-import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
+import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES, PAYMENT_INTENTS, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
 import { notifyOwner } from "@/lib/notify/owner";
 
 /** 운영자가 환불을 검토할 때 필요한 결제수단만 보관한다. 카드 전체 번호·계좌번호는 저장하지 않는다. */
@@ -127,10 +127,31 @@ export async function fulfillPayment(
     return { kind: "not_paid", status: String(payment.status) };
   }
 
+  // prepare 가 적어 둔 주문 내역 — "이 결제는 얼마여야 하는가"의 근거다. 없을 수도 있다
+  // (이 기능 배포 전에 시작된 결제, 옛 코인 상품). 그 경우 검증이 옛 방식인 정가 대조로
+  // 내려간다. 조회 실패와 "원래 없음"을 구분하지 않는 이유는, 구분해 봐야 할 수 있는 일이
+  // 같기 때문이다 — 어느 쪽이든 정가 대조가 유일하게 남은 안전한 기준이다.
+  const intentSnap = await adminDb
+    .collection(PAYMENT_INTENTS)
+    .doc(paymentId)
+    .get()
+    .catch((error) => {
+      console.error("[payment] 주문 내역 조회 실패 — 정가 대조로 내려간다", paymentId, error);
+      return null;
+    });
+  const intentData = intentSnap?.exists ? intentSnap.data() : null;
+  const intent =
+    intentData && typeof intentData.uid === "string" && typeof intentData.productId === "string" && typeof intentData.amountWon === "number"
+      ? { uid: intentData.uid, productId: intentData.productId, amountWon: intentData.amountWon }
+      : null;
+  // 이 결제에 쓰인 할인쿠폰. 지급이 확정될 때 같은 트랜잭션에서 소진한다.
+  const couponCode = typeof intentData?.couponCode === "string" && intentData.couponCode ? intentData.couponCode : null;
+
   const checked = validatePaidPayment(payment, {
     expectedUid,
     isProduction: process.env.NODE_ENV === "production",
     legacyCoinPaidBefore: process.env.LEGACY_COIN_PAID_BEFORE,
+    intent,
   });
   if (!checked.ok) {
     // 로그는 순수 함수 밖에서 찍는다 — 판정 자체는 validatePayment.ts 가, 관측은 여기가 맡는다.
@@ -140,16 +161,36 @@ export async function fulfillPayment(
     }
     return checked.outcome;
   }
-  const { uid, product, combo } = checked;
+  const { uid, product, combo, paidWon } = checked;
 
   const userRef = adminDb.collection(USERS).doc(uid);
   const paymentRef = userRef.collection(PAYMENTS).doc(paymentId);
 
-  const outcome = await adminDb.runTransaction(async (tx): Promise<"already" | "duplicate" | "granted"> => {
+  const couponRef = couponCode ? userRef.collection(USER_DISCOUNT_COUPONS).doc(couponCode) : null;
+
+  const outcome = await adminDb.runTransaction(async (tx): Promise<"already" | "duplicate" | "coupon_conflict" | "granted"> => {
     const paymentSnap = await tx.get(paymentRef);
     if (paymentSnap.exists) {
-      // 멱등성: 콜백/웹훅 중 먼저 도착한 쪽이 이미 처리했다면 스킵.
+      // 멱등성: 콜백/웹훅 중 먼저 도착한 쪽이 이미 처리했다면 스킵. 쿠폰 소진도 여기서 함께
+      // 막힌다 — 웹훅 재시도가 같은 쿠폰을 두 번 소진하는 일이 없다.
       return "already";
+    }
+
+    // 쿠폰 소진은 지급과 **한 트랜잭션**이어야 한다. 결제창을 두 개 띄워 같은 쿠폰으로 둘 다
+    // 결제하면 prepare 는 양쪽 모두에 할인을 적어 주는데(그 시점엔 아직 안 쓴 쿠폰이다),
+    // 먼저 도착한 쪽이 소진하고 나면 나머지는 받을 자격이 없던 할인이 된다. 그 건은 지급하지
+    // 않고 돈을 돌려준다 — 보유 제한(duplicate)과 같은 처리다.
+    const couponSnap = couponRef ? await tx.get(couponRef) : null;
+    if (couponRef && couponSnap) {
+      const couponData = couponSnap.data();
+      if (!couponSnap.exists) {
+        console.error("[coupon] 주문에 적힌 쿠폰이 없다 — 지급하지 않는다", paymentId, couponCode);
+        return "coupon_conflict";
+      }
+      if (couponData?.status === "used" && couponData?.usedPaymentId !== paymentId) {
+        console.error("[coupon] 이미 소진된 쿠폰으로 들어온 결제", paymentId, couponCode, couponData?.usedPaymentId);
+        return "coupon_conflict";
+      }
     }
 
     // 약관상 구매한 횟수제ㆍ시간제 이용권은 각각 1개까지만 보유할 수 있다. prepare에서 한 번
@@ -178,7 +219,10 @@ export async function fulfillPayment(
           status: "duplicate_cancelled",
           productId: product.productId,
           productType: product.type,
-          priceWon: product.priceWon,
+          // priceWon 은 **실제로 승인된 금액**이다 — 정가가 아니다(2026-09-25). 환불 자동승인이
+          // 포트원 실결제액과 이 값을 대조하고, 리워드 합산도 이 값을 쓴다. 정가는 listPriceWon.
+          priceWon: paidWon,
+          listPriceWon: product.priceWon,
           // 서버가 정한 주문명을 쓴다. payment.orderName 은 결제창을 띄울 때 브라우저가 넘긴
           // 값이라 사용자가 바꿀 수 있고, 그게 어드민 화면과 알림에 "상품"으로 그대로 표시된다
           // (2026-09-24). 금액·상품은 이미 productId 로 검증했으므로 이름도 그쪽을 따른다.
@@ -205,8 +249,17 @@ export async function fulfillPayment(
       status: "fulfilled",
       productId: product.productId,
       productType: product.type,
-      priceWon: product.priceWon,
+      // 실결제액(할인 적용 후). 정가는 listPriceWon — 위 duplicate 분기 주석 참고.
+      priceWon: paidWon,
+      listPriceWon: product.priceWon,
       orderName: product.orderName,
+      // 환불 시 쿠폰을 되돌리려면 "이 결제가 어떤 쿠폰을 썼는지"가 결제 문서에 있어야 한다.
+      // 환불 경로가 둘(어드민 refundExecute / 취소 웹훅 revoke)인데 둘 다 결제 문서는 읽으므로,
+      // 주문 내역(paymentIntents)까지 따라가지 않아도 되도록 여기 복사해 둔다.
+      couponCode,
+      // 쿠폰함이 "이 쿠폰을 어디에 썼는지"를 보여주려면 조합까지 필요하다. 이용권 문서에도
+      // 있지만, 그걸 읽으려면 결제 → 이용권으로 한 번 더 타고 가야 한다(2026-09-25).
+      combo,
       coins: product.type === "coin" ? product.coins : null,
       countPassId: countPassRef?.id ?? null,
       countBasis: product.type === "countPass" ? product.basis : null,
@@ -231,7 +284,8 @@ export async function fulfillPayment(
         combo,
         allowances: countAllowancesForCombo(product.basis, combo),
         status: "unused",
-        priceWon: product.priceWon,
+        priceWon: paidWon,
+        listPriceWon: product.priceWon,
         paymentId,
         createdAt: issuedAt.toISOString(),
         expiresAt: countPassExpiresAt,
@@ -241,7 +295,8 @@ export async function fulfillPayment(
         productId: product.productId,
         minutes: product.minutes,
         combo: product.combo,
-        priceWon: product.priceWon,
+        priceWon: paidWon,
+        listPriceWon: product.priceWon,
         status: "unused",
         startedAt: null,
         expiresAt: null,
@@ -249,6 +304,10 @@ export async function fulfillPayment(
         paymentId,
         createdAt: new Date().toISOString(),
       });
+    }
+
+    if (couponRef) {
+      tx.update(couponRef, { status: "used", usedPaymentId: paymentId, usedAt: new Date().toISOString() });
     }
 
     return "granted";

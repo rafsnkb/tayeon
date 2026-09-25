@@ -1,0 +1,117 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  normalizeCouponCode,
+  isCouponUsable,
+  pickBestCoupon,
+  discountedAmount,
+  couponShelfState,
+  MIN_CHARGE_WON,
+  EXPIRED_COUPON_RETENTION_DAYS,
+} from "@/lib/payment/discountCoupon.ts";
+
+// 2026-09-25 신설. 할인 계산이 화면과 서버에서 갈리면 "표시된 금액과 청구된 금액이 다르다"가
+// 되고, 그건 사용자가 결제창에서야 발견한다. 여기서 고정해 두고 양쪽이 이 함수만 쓴다.
+
+test("코드는 대문자·공백 제거로 정규화된다 — 붙여넣기 실수를 없는 코드로 만들지 않는다", () => {
+  assert.equal(normalizeCouponCode("  launch30 "), "LAUNCH30");
+  assert.equal(normalizeCouponCode("LAUNCH30"), "LAUNCH30");
+});
+
+test("코드 형식을 벗어나면 거른다", () => {
+  assert.equal(normalizeCouponCode("abc"), null, "4자 미만");
+  assert.equal(normalizeCouponCode("A".repeat(21)), null, "20자 초과");
+  assert.equal(normalizeCouponCode("LAUNCH-30"), null, "허용하지 않는 문자");
+  assert.equal(normalizeCouponCode(""), null);
+  assert.equal(normalizeCouponCode(undefined), null);
+  assert.equal(normalizeCouponCode(1234), null);
+});
+
+const 쿠폰 = {
+  code: "LAUNCH30",
+  discountRate: 0.3,
+  startsAt: "2026-10-01T00:00:00.000Z",
+  endsAt: "2026-10-07T23:59:59.000Z",
+  status: "unused",
+};
+
+test("유효기간 안의 미사용 쿠폰만 쓸 수 있다", () => {
+  assert.equal(isCouponUsable(쿠폰, "2026-10-03T00:00:00.000Z"), true);
+  assert.equal(isCouponUsable(쿠폰, "2026-09-30T23:59:59.000Z"), false, "시작 전");
+  assert.equal(isCouponUsable(쿠폰, "2026-10-08T00:00:00.000Z"), false, "만료 후");
+  assert.equal(isCouponUsable({ ...쿠폰, status: "used" }, "2026-10-03T00:00:00.000Z"), false);
+});
+
+test("날짜가 깨져 있으면 쓸 수 없는 것으로 본다 — 못 읽는 기간을 통과시키지 않는다", () => {
+  assert.equal(isCouponUsable({ ...쿠폰, endsAt: "" }, "2026-10-03T00:00:00.000Z"), false);
+  assert.equal(isCouponUsable(쿠폰, "언제"), false);
+});
+
+test("보유분이 없거나 전부 기간 밖이면 고르지 않는다", () => {
+  assert.equal(pickBestCoupon([], "2026-10-03T00:00:00.000Z"), null);
+  assert.equal(pickBestCoupon([쿠폰], "2026-11-01T00:00:00.000Z"), null);
+});
+
+test("겹쳐 버린 경우에는 할인율이 가장 높은 것을 고른다 (발급 실수 대비)", () => {
+  const 큰할인 = { ...쿠폰, code: "BIG50", discountRate: 0.5 };
+  const picked = pickBestCoupon([쿠폰, 큰할인], "2026-10-03T00:00:00.000Z");
+  assert.equal(picked.code, "BIG50");
+});
+
+test("정률 할인이 적용된다", () => {
+  assert.deepEqual(discountedAmount(3000, 0.3), { amountWon: 2100, discountWon: 900 });
+  assert.deepEqual(discountedAmount(110000, 0.5), { amountWon: 55000, discountWon: 55000 });
+  assert.deepEqual(discountedAmount(5900, 0.1), { amountWon: 5310, discountWon: 590 });
+});
+
+test("청구액은 카드사 최소 결제금액 아래로 내려가지 않는다", () => {
+  const r = discountedAmount(3000, 0.99);
+  assert.equal(r.amountWon, MIN_CHARGE_WON);
+  assert.equal(r.discountWon, 3000 - MIN_CHARGE_WON);
+});
+
+test("할인율이 없거나 0 이하면 정가 그대로다", () => {
+  assert.deepEqual(discountedAmount(3000, 0), { amountWon: 3000, discountWon: 0 });
+  assert.deepEqual(discountedAmount(3000, -0.5), { amountWon: 3000, discountWon: 0 });
+  assert.deepEqual(discountedAmount(3000, Number.NaN), { amountWon: 3000, discountWon: 0 });
+});
+
+test("깎인 금액과 청구액을 더하면 항상 정가다", () => {
+  for (const price of [3000, 5900, 12900, 35000, 110000]) {
+    for (const rate of [0.05, 0.1, 0.3, 0.33, 0.5, 0.7]) {
+      const { amountWon, discountWon } = discountedAmount(price, rate);
+      assert.equal(amountWon + discountWon, price, `${price} / ${rate}`);
+      assert.ok(amountWon >= MIN_CHARGE_WON, `${price} / ${rate} 최소금액`);
+    }
+  }
+});
+
+// ── 쿠폰함 노출 규칙 (사용자 결정, 2026-09-25) ──────────────────────────────
+// 사용 가능: 유효기간 동안 / 사용 완료: 무기한 / 기간 만료: 30 일 뒤 삭제
+
+const 하루 = 24 * 60 * 60 * 1000;
+const 만료후 = (일수) => new Date(Date.parse(쿠폰.endsAt) + 일수 * 하루).toISOString();
+
+test("유효기간 안이면 사용 가능으로 남는다", () => {
+  assert.equal(couponShelfState(쿠폰, "2026-10-03T00:00:00.000Z"), "usable");
+});
+
+test("시작 전이면 예정 상태다 (어드민이 미리 지급한 경우)", () => {
+  assert.equal(couponShelfState(쿠폰, "2026-09-25T00:00:00.000Z"), "scheduled");
+});
+
+test("사용 완료는 기간과 무관하게 무기한 남는다 — 결제와 묶여 있다", () => {
+  const 쓴쿠폰 = { ...쿠폰, status: "used" };
+  assert.equal(couponShelfState(쓴쿠폰, "2026-10-03T00:00:00.000Z"), "used");
+  assert.equal(couponShelfState(쓴쿠폰, 만료후(9999)), "used", "몇 년이 지나도 남는다");
+});
+
+test("만료된 미사용 쿠폰은 보관 기간 동안만 쿠폰함에 남는다", () => {
+  assert.equal(couponShelfState(쿠폰, 만료후(1)), "expired");
+  assert.equal(couponShelfState(쿠폰, 만료후(EXPIRED_COUPON_RETENTION_DAYS)), "expired", "마지막 날은 아직 남는다");
+  assert.equal(couponShelfState(쿠폰, 만료후(EXPIRED_COUPON_RETENTION_DAYS + 1)), "purgeable");
+});
+
+test("날짜를 못 읽으면 지우지 않는다 — 읽지 못한다고 사용자 것을 없애지 않는다", () => {
+  assert.equal(couponShelfState({ ...쿠폰, endsAt: "" }, "2026-10-03T00:00:00.000Z"), "expired");
+});

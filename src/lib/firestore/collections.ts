@@ -21,6 +21,24 @@ export const OWNER_ALERTS = "ownerAlerts";
 /** 아이디/비밀번호 로그인(심사용 계정 하나뿐)의 시도 횟수 — 무제한 대입을 막는다.
  *  문서 id는 요청자 IP의 해시라 원본 IP는 저장하지 않는다. TTL 정책 대상. */
 export const LOGIN_ATTEMPTS = "loginAttempts";
+/** 결제창을 열기 직전에 prepare 가 적어 두는 **주문 내역**(문서 id = paymentId).
+ *
+ *  "이 결제는 얼마여야 하는가"의 유일한 근거다. 예전에는 아무것도 저장하지 않고 지급 시점에
+ *  productId 로 상품표 정가를 다시 꺼내 대조했는데, 그러면 **정가가 아닌 금액은 전부 위조로
+ *  보인다** — 할인쿠폰이 붙는 순간 정상 결제가 거부된다. 그렇다고 대조를 풀면 100 원을 결제해
+ *  11 만원 상품을 받는 구멍이 되므로, 기대 금액을 서버가 미리 적어 두고 그것과 대조한다.
+ *
+ *  paymentId 는 서버가 randomUUID 로 채번하므로 남이 맞힐 수 없다. TTL 정책 대상. */
+export const PAYMENT_INTENTS = "paymentIntents";
+/** 운영자가 발급하는 **할인쿠폰**(문서 id = 코드 자체, 대문자 정규화).
+ *
+ *  생일 기념 무료 이용권(`BIRTHDAY_COUPON_GRANTS`)과는 다른 것이다 — 그쪽은 "무료 이용권 지급"이고
+ *  이쪽은 "구매 금액 할인"이다. 이름이 겹치니 코드에서는 반드시 discount 를 붙여 부른다.
+ *
+ *  유효기간은 **쿠폰의 것**이지 사용자별로 따로 도는 시계가 아니다. 그리고 기간이 겹치게
+ *  발급하지 않는 것이 운영 원칙이라(어드민이 막는다), 어느 시점에도 한 사용자가 **쓸 수 있는
+ *  쿠폰은 최대 한 장**이 된다 — "여러 장 중 무엇을 적용하나" 라는 문제가 설계에서 사라진다. */
+export const DISCOUNT_COUPONS = "discountCoupons";
 
 /** users/{uid} 서브컬렉션. */
 export const PAYMENTS = "payments";
@@ -28,7 +46,18 @@ export const COUNT_PASSES = "countPasses";
 export const TIME_PASSES = "timePasses";
 export const ROOMS = "rooms";
 export const PENDING_REWARDS = "pendingRewards";
+/** **"생일 기념 무료 이용권"** 지급 원장(중복 지급 방지 키).
+ *
+ *  이름이 `birthdayCoupon*` 인 것은 옛 명칭("생일 쿠폰")의 흔적이다 — 2026-09-25 에 할인쿠폰이
+ *  생기면서 "쿠폰"이 두 가지를 뜻하게 돼 사용자에게 보이는 말만 바꿨다. 컬렉션 이름과 함수
+ *  이름(`dailyBirthdayCouponPayout`)은 **그대로 둔다**: 이미 쌓인 문서의 경로이고, 함수 이름을
+ *  바꾸면 배포 때 새 함수가 생기고 옛 함수가 남는다. 화면·약관에는 새 이름만 쓴다. */
 export const BIRTHDAY_COUPON_GRANTS = "birthdayCouponGrants";
+/** 사용자가 **등록한** 할인쿠폰(문서 id = 코드). 최상위 `DISCOUNT_COUPONS` 의 조건을 등록
+ *  시점에 복사해 둔다 — 구매할 때 최상위를 다시 읽지 않아도 되고, 발급 뒤 조건을 고쳐도 이미
+ *  받은 사람의 조건이 소급해 바뀌지 않는다. 문서가 있다는 것 자체가 "이미 등록함"이라,
+ *  같은 코드 재등록은 이 문서의 존재만으로 걸러진다. */
+export const USER_DISCOUNT_COUPONS = "discountCoupons";
 
 /** users/{uid}/rooms/{roomId} 서브컬렉션. */
 export const READINGS = "readings";

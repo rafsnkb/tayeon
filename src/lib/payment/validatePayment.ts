@@ -39,8 +39,20 @@ export type PaymentRejection =
 export type ValidationLog = { message: string; detail?: Record<string, unknown> };
 
 export type PaymentValidation =
-  | { ok: true; uid: string; product: ResolvedProduct; combo: ComboKey | null }
+  /** paidWon 은 **실제로 승인된 금액**이다(정가가 아니라). 할인 결제를 정가로 기록하면
+   *  환불 자동승인이 포트원 실결제액과 대조해 전부 막고, 리워드도 실제 받은 돈보다 많이
+   *  나간다 — 호출부는 이 값을 결제 문서에 남긴다. */
+  | { ok: true; uid: string; product: ResolvedProduct; combo: ComboKey | null; paidWon: number }
   | { ok: false; outcome: PaymentRejection; log?: ValidationLog };
+
+/** prepare 가 결제창을 열기 직전에 적어 둔 주문 내역(paymentIntents/{paymentId}).
+ *  fulfill 이 읽어서 넘긴다 — 이 함수는 순수하게 유지하려고 직접 조회하지 않는다. */
+export type PaymentIntent = {
+  uid: string;
+  productId: string;
+  /** 실제로 청구하기로 한 금액. 할인쿠폰이 붙으면 정가보다 작다. */
+  amountWon: number;
+};
 
 export type ValidateOptions = {
   /** 지정하면 customData.uid 가 이 값과 다를 때 거부한다(본인 결제 확인용). */
@@ -50,6 +62,12 @@ export type ValidateOptions = {
   isProduction: boolean;
   /** 코인 상품 판매 종료 시각(ISO). 원본의 `process.env.LEGACY_COIN_PAID_BEFORE`. */
   legacyCoinPaidBefore?: string;
+  /** prepare 가 남긴 주문 내역. **있으면 금액 대조의 기준이 상품표 정가가 아니라 이 기록이 된다.**
+   *
+   *  없으면 옛 방식(정가 대조)으로 내려간다 — 이 기능이 배포되기 전에 시작된 결제와 코인 같은
+   *  옛 상품 때문이다. 할인 결제는 반드시 기록이 있으므로(prepare 가 await 로 먼저 쓴다),
+   *  기록이 없는 건은 정가여야 맞다. 즉 폴백이 할인 구멍이 되지는 않는다. */
+  intent?: PaymentIntent | null;
 };
 
 export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOptions): PaymentValidation {
@@ -135,17 +153,49 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
     }
   }
 
-  if (paidTotal !== product.priceWon || payment.currency !== "KRW") {
-    // 실제 승인 금액이 상품 가격표와 다르면 위/변조 시도로 간주하고 지급하지 않는다.
+  // 주문 내역이 있으면 customData 와 어긋나지 않는지 먼저 본다. customData 는 결국 클라이언트가
+  // 왕복시키는 값이고, 주문 내역은 서버가 결제창을 열기 전에 적어 둔 값이라 이쪽이 진실이다.
+  //
+  // uid 가 어긋날 때 autoCancel 을 켜지 않는 이유는 위 uid 불일치 관문과 같다 — 그 결제의 진짜
+  // 주인은 주문 내역 쪽 uid 이고, 여기서 취소해 버리면 남의 결제를 취소시키는 통로가 된다.
+  if (opts.intent && opts.intent.uid !== uid) {
+    return {
+      ok: false,
+      outcome: { kind: "rejected", reason: "본인의 결제 건이 아니에요.", autoCancel: false },
+      log: { message: "주문 내역과 uid 불일치", detail: { intentUid: opts.intent.uid, actual: uid } },
+    };
+  }
+  if (opts.intent && opts.intent.productId !== product.productId) {
+    return {
+      ok: false,
+      outcome: { kind: "rejected", reason: "주문 정보가 일치하지 않아요.", autoCancel: true },
+      log: {
+        message: "주문 내역과 상품 불일치",
+        detail: { intentProductId: opts.intent.productId, actual: product.productId },
+      },
+    };
+  }
+
+  // 기대 금액은 **주문 내역이 있으면 그쪽**이다. 상품표 정가로 대조하면 할인쿠폰이 붙은 정상
+  // 결제가 전부 위조로 보인다. 그렇다고 대조를 푸는 건 100 원 결제로 11 만원 상품을 받는
+  // 구멍이라, 기준을 "서버가 미리 적어 둔 금액"으로 옮기는 것이다.
+  const expectedWon = opts.intent ? opts.intent.amountWon : product.priceWon;
+  if (paidTotal !== expectedWon || payment.currency !== "KRW") {
+    // 실제 승인 금액이 기대 금액과 다르면 위/변조 시도로 간주하고 지급하지 않는다.
     return {
       ok: false,
       outcome: { kind: "rejected", reason: "결제 금액이 상품 가격과 일치하지 않아요.", autoCancel: true },
       log: {
         message: "금액 불일치",
-        detail: { paid: payment.amount?.total, currency: payment.currency, expected: product.priceWon },
+        detail: {
+          paid: payment.amount?.total,
+          currency: payment.currency,
+          expected: expectedWon,
+          fromIntent: Boolean(opts.intent),
+        },
       },
     };
   }
 
-  return { ok: true, uid, product, combo };
+  return { ok: true, uid, product, combo, paidWon: paidTotal };
 }

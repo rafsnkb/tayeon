@@ -5,7 +5,8 @@ import { resolveProduct } from "@/lib/payment/products";
 import { adminDb } from "@/lib/firebase/admin";
 import { COMBOS, isComboKey, isHeldPass } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
-import { USERS, COUNT_PASSES, TIME_PASSES } from "@/lib/firestore/collections";
+import { USERS, COUNT_PASSES, TIME_PASSES, PAYMENT_INTENTS, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
+import { pickBestCoupon, discountedAmount, type HeldDiscountCoupon } from "@/lib/payment/discountCoupon";
 import { blockIfSuspended } from "@/lib/auth/suspension";
 
 // 결제창(PortOne.requestPayment)을 열기 직전에 프론트가 호출하는 엔드포인트.
@@ -45,7 +46,13 @@ export async function POST(req: NextRequest) {
   const suspended = await blockIfSuspended(userRef, userData, "정지 중에는 결제할 수 없어요.");
   if (suspended) return suspended;
 
-  const { productId, combo } = (await req.json()) as { productId?: string; combo?: string };
+  // useCoupon:false 는 "이번 결제에는 쿠폰을 쓰지 않겠다"는 뜻이다. 쿠폰은 1 회용이라 자동으로
+  // 적용해 버리면 3,000 원 상품에 30% 쿠폰이 소진되고(900 원 할인) 11 만원 상품에 쓸 기회가
+  // 사라진다 — 사용자가 스스로 막을 수 있어야 한다(2026-09-25 사용자 결정).
+  //
+  // 클라이언트가 보내는 것은 **쓸지 말지**뿐이다. 어떤 쿠폰을 쓸지도, 얼마를 깎을지도 서버가
+  // 정한다 — 그쪽을 믿으면 금액을 조작할 수 있다.
+  const { productId, combo, useCoupon } = (await req.json()) as { productId?: string; combo?: string; useCoupon?: boolean };
   const product = resolveProduct(productId);
   if (!product || product.type === "coin") {
     return NextResponse.json({ error: "존재하지 않는 상품이에요." }, { status: 400 });
@@ -83,12 +90,69 @@ export async function POST(req: NextRequest) {
     if (held) return blockedByHeldPass(held.data().status, "시간제 ");
   }
 
+  // 보유 중인 할인쿠폰 가운데 지금 쓸 수 있는 것을 **서버가** 고른다. 클라이언트는 어떤 쿠폰을
+  // 쓸지도, 얼마를 깎을지도 보내지 않는다 — 보내 봐야 읽지 않는다.
+  //
+  // 기간이 겹치게 발급하지 않는 것이 운영 원칙이라 후보는 보통 0 또는 1 개다(pickBestCoupon 주석).
+  // 쿼리는 status 로만 추리고 기간은 코드에서 본다 — Firestore 복합 조건은 색인이 필요한데,
+  // 한 사람이 가진 쿠폰 수는 많아야 몇 개라 전부 읽어도 부담이 없다.
+  const nowIso = new Date().toISOString();
+  const heldCoupons: HeldDiscountCoupon[] = useCoupon === false ? [] : await userRef
+    .collection(USER_DISCOUNT_COUPONS)
+    .where("status", "==", "unused")
+    .get()
+    .then((snap) =>
+      snap.docs.flatMap((doc) => {
+        const data = doc.data();
+        if (typeof data.discountRate !== "number" || typeof data.startsAt !== "string" || typeof data.endsAt !== "string") {
+          console.error("[coupon] 형식이 깨진 보유 쿠폰 — 무시한다", uid, doc.id);
+          return [];
+        }
+        return [{ code: doc.id, discountRate: data.discountRate, startsAt: data.startsAt, endsAt: data.endsAt, status: "unused" as const }];
+      })
+    )
+    .catch((error) => {
+      // 쿠폰 조회 실패로 구매 자체를 막지는 않는다 — 정가로 진행된다. 할인을 못 받은 사용자는
+      // 다시 시도하면 되지만, 여기서 500 을 내면 쿠폰이 없는 사람까지 결제를 못 한다.
+      console.error("[coupon] 보유 쿠폰 조회 실패 — 정가로 진행한다", uid, error);
+      return [];
+    });
+  const coupon = pickBestCoupon(heldCoupons, nowIso);
+  const { amountWon, discountWon } = coupon
+    ? discountedAmount(product.priceWon, coupon.discountRate)
+    : { amountWon: product.priceWon, discountWon: 0 };
+
   const paymentId = randomUUID();
+
+  // 이 주문이 "얼마여야 하는가"를 서버에 적어 둔다 — 지급 시점(validatePaidPayment)이 상품표
+  // 정가가 아니라 이 기록과 대조한다. 지금은 정가와 같은 값이지만, 할인쿠폰이 붙으면 할인된
+  // 금액이 여기 들어간다. 할인액은 **서버가 계산해서 여기 적는 것**이고, 클라이언트가 보낸
+  // 금액은 어느 단계에서도 믿지 않는다.
+  //
+  // 결제창을 열기 전에 반드시 써 둬야 한다(await). 기록이 없으면 검증이 옛 방식(정가 대조)으로
+  // 내려가므로, 할인 결제가 정가 대조에 걸려 거부된다.
+  await adminDb.collection(PAYMENT_INTENTS).doc(paymentId).set({
+    uid,
+    productId: product.productId,
+    productType: product.type,
+    combo: product.type === "countPass" ? combo : null,
+    /** 할인 전 정가. 기록·표시용이며 대조에는 쓰지 않는다. */
+    listPriceWon: product.priceWon,
+    /** 실제로 청구할 금액 — 대조의 기준. */
+    amountWon,
+    // 어떤 쿠폰으로 깎았는지. 지급이 확정될 때 fulfill 이 이 쿠폰을 소진하고, 환불되면
+    // 되돌린다. 여기 안 적어 두면 지급 시점에 "이 할인이 어디서 왔는지" 알 방법이 없다.
+    couponCode: coupon?.code ?? null,
+    couponDiscountRate: coupon?.discountRate ?? null,
+    discountWon,
+    orderName: product.orderName,
+    createdAt: nowIso,
+  });
 
   return NextResponse.json({
     paymentId,
     orderName: product.orderName,
-    totalAmount: product.priceWon,
+    totalAmount: amountWon,
     currency: "KRW",
     customData: {
       uid,

@@ -48,6 +48,8 @@ export async function executeRefund(input: {
     countPassId: string | null;
     timePassId: string | null;
     paidAt: string;
+    /** 이 결제에 쓴 할인쿠폰 코드(없으면 null). 환불 시 되돌린다 — 아래 "쿠폰 복원" 참고. */
+    couponCode?: string | null;
   };
   const request = requestSnap.data();
   const pendingRequest = requestSnap.exists && request?.status === "pending" ? request : null;
@@ -129,10 +131,15 @@ export async function executeRefund(input: {
 
   await adminDb.runTransaction(async (tx) => {
     // Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다 먼저 와야 한다 — 읽기를 여기서 끝낸다.
-    const [refundRequestSnap, userSnap, txPassSnap] = await Promise.all([
+    // 이 결제에 할인쿠폰을 썼다면 되돌려 준다. 컬렉션 이름은 본체(src/lib/firestore/collections.ts
+    // 의 USER_DISCOUNT_COUPONS)와 같아야 한다 — admin 은 별도 앱이라 상수를 공유하지 않는다.
+    const couponCode = typeof payment.couponCode === "string" && payment.couponCode ? payment.couponCode : null;
+    const couponRef = couponCode ? userRef.collection("discountCoupons").doc(couponCode) : null;
+    const [refundRequestSnap, userSnap, txPassSnap, couponSnap] = await Promise.all([
       tx.get(refundRequestRef),
       tx.get(userRef),
       tx.get(passRef),
+      couponRef ? tx.get(couponRef) : Promise.resolve(null),
     ]);
     // 위 상태 검사와 여기 사이에는 포트원 취소(네트워크)와 Auth 조회가 끼어 있어서 수백
     // 밀리초가 지난다. 그 사이에 사용자가 시간제 이용권을 활성화하면 "돈은 돌려받고 이용권도
@@ -159,6 +166,15 @@ export async function executeRefund(input: {
       passStatusAtRefund: touchedStatus,
     });
     tx.update(passRef, { status: "refunded" });
+
+    // 쿠폰 복원 — 환불했다고 쿠폰까지 잃게 하면 청약철회에 불이익을 붙이는 셈이 된다
+    // (전자상거래법 제18조⑨·제35조, 대법원 2018다287034). 조건 없이 되돌린다: 유효기간은
+    // 쿠폰의 것이라 이미 지났으면 되돌려도 어차피 못 쓴다.
+    // 같은 처리가 본체의 취소 웹훅 경로(src/lib/payment/revoke.ts)에도 있다 — 환불 경로가 둘이라
+    // 양쪽에 넣어야 한다. 한쪽만 고치면 그 경로로 환불한 사람만 쿠폰을 잃는다.
+    if (couponRef && couponSnap?.exists) {
+      tx.update(couponRef, { status: "unused", usedPaymentId: null, usedAt: null, restoredAt: now });
+    }
 
     // 사용자 문서의 활성 포인터가 방금 회수한 이용권을 가리키고 있으면 같이 끊는다.
     // 안 끊으면 시간제는 activeTimePass.expiresAt 이 남아 있는 동안 계속 무제한으로 쓸 수

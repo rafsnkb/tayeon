@@ -10,7 +10,7 @@
 // 상태만 근거로 회수한다.
 import { adminDb } from "@/lib/firebase/admin";
 import { portone } from "@/lib/payment/portone";
-import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES } from "@/lib/firestore/collections";
+import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
 
 export type RevokeOutcome =
   | { kind: "revoked"; uid: string; passStatusBefore: string | null }
@@ -77,6 +77,7 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
       productType?: "coin" | "countPass" | "timePass";
       countPassId?: string | null;
       timePassId?: string | null;
+      couponCode?: string | null;
     };
     if (paymentData.status === "refunded") {
       return { kind: "already_revoked" };
@@ -97,6 +98,11 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
     const passRef = passCollection && passId ? userRef.collection(passCollection).doc(passId) : null;
     const passSnap = passRef ? await tx.get(passRef) : null;
     const userSnap = await tx.get(userRef);
+    // 이 결제에 쿠폰을 썼다면 되돌려 준다 — 아래 "쿠폰 복원" 주석 참고.
+    const couponRef = paymentData.couponCode
+      ? userRef.collection(USER_DISCOUNT_COUPONS).doc(paymentData.couponCode)
+      : null;
+    const couponSnap = couponRef ? await tx.get(couponRef) : null;
 
     let passStatusBefore: string | null = null;
     if (passRef && passSnap?.exists) {
@@ -114,6 +120,13 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
     }
     if (passId && userData?.activeTimePass?.passId === passId) {
       tx.update(userRef, { activeTimePass: null });
+    }
+
+    // 쿠폰 복원 — 환불했다고 쿠폰까지 잃게 하면 청약철회에 불이익을 붙이는 셈이 된다
+    // (전자상거래법 제18조⑨·제35조, 대법원 2018다287034). 조건 없이 되돌린다: 유효기간은
+    // 쿠폰의 것이라 이미 지났으면 되돌려도 어차피 못 쓰고, 그 판정은 사용 시점이 한다.
+    if (couponRef && couponSnap?.exists) {
+      tx.update(couponRef, { status: "unused", usedPaymentId: null, usedAt: null, restoredAt: now });
     }
 
     tx.update(paymentRef, {
