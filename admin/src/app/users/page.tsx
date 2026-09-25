@@ -40,30 +40,53 @@ type PassItem = {
   paymentId: string | null;
 };
 
-/** 이용권·결제 상태를 운영자가 읽는 말로 바꾼다. 사용자 화면(purchase-history 의 badgeLabel)과
- *  같은 낱말을 쓴다 — 운영자와 사용자가 다른 이름으로 같은 상태를 부르면 문의 응대가 어긋난다.
- *
- *  표에 없는 값은 **원문 그대로** 보여준다. 새 상태가 생겼을 때 "알 수 없음"으로 뭉뚱그리면
- *  화면에서는 멀쩡해 보이고 원인만 숨는다. */
-const PASS_STATUS_LABEL: Record<string, string> = {
-  unused: "미사용",
-  active: "사용중",
-  exhausted: "사용완료",
-  expired: "기간만료",
-  refunded: "환불완료",
-  revoked: "회수됨",
-  refund_pending: "환불 대기중",
-  unknown: "상태 없음",
-};
-const PAYMENT_STATUS_LABEL: Record<string, string> = {
-  fulfilled: "지급완료",
-  refunded: "환불완료",
-  duplicate_cancelled: "중복 취소",
-};
+/** 이용권·결제 상태를 운영자가 읽는 말로 바꾼다. 사용자 화면(purchase-history 의 badgeLabel)과
+
+ *  같은 낱말을 쓴다 — 운영자와 사용자가 다른 이름으로 같은 상태를 부르면 문의 응대가 어긋난다.
+
+ *
+
+ *  표에 없는 값은 **원문 그대로** 보여준다. 새 상태가 생겼을 때 "알 수 없음"으로 뭉뚱그리면
+
+ *  화면에서는 멀쩡해 보이고 원인만 숨는다. */
+
+const PASS_STATUS_LABEL: Record<string, string> = {
+
+  unused: "미사용",
+
+  active: "사용중",
+
+  exhausted: "사용완료",
+
+  expired: "기간만료",
+
+  refunded: "환불완료",
+
+  revoked: "회수됨",
+
+  refund_pending: "환불 대기중",
+
+  unknown: "상태 없음",
+
+};
+
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+
+  fulfilled: "지급완료",
+
+  refunded: "환불완료",
+
+  duplicate_cancelled: "중복 취소",
+
+};
+
 const passStatusLabel = (status: string, forced?: boolean) =>
-  status === "revoked" && forced ? "강제 회수됨" : PASS_STATUS_LABEL[status] ?? status;
-const paymentStatusLabel = (status: string) => PAYMENT_STATUS_LABEL[status] ?? status;
-
+  status === "revoked" && forced ? "강제 회수됨" : PASS_STATUS_LABEL[status] ?? status;
+
+const paymentStatusLabel = (status: string) => PAYMENT_STATUS_LABEL[status] ?? status;
+
+
+
 type ReviewReading = {
   roomId: string;
   readingId: string;
@@ -93,7 +116,7 @@ const SOURCE_LABEL: Record<string, string> = {
   "referral-signup": "친구초대 가입 리워드",
   "referral-payout": "친구 결제 리워드",
   "signup-free": "최초 가입 이용권",
-  birthday: "생일 쿠폰",
+  birthday: "생일 기념 무료 이용권",
 };
 
 const COMBO_LABEL: Record<string, string> = {
@@ -386,6 +409,48 @@ function TimePassGrantControls({ uid }: { uid: string }) {
   return <div className="flex flex-wrap items-center gap-2"><select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-64 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]">{TIME_PASS_PACKAGES.map((pkg) => <option key={pkg.id} value={pkg.id}>{COMBO_LABEL[pkg.combo]} {pkg.minutes}분 · {pkg.priceWon.toLocaleString("ko-KR")}원</option>)}</select><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유 (선택)" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "시간제 지급"}</button>{message && <p className="text-xs text-[#B81D6E]">{message}</p>}</div>;
 }
 
+/** 할인쿠폰 직접 지급. 이미 발급된 코드를 그 사람 쿠폰함에 넣어 주는 것이라, 이용권 지급이
+ *  상품표에서 고르는 것과 같은 모양이다 — 여기서 새 쿠폰을 만들지는 않는다(기간이 겹치면
+ *  "쓸 수 있는 쿠폰은 한 장" 전제가 깨진다. 쿠폰 발급은 /discount-coupons 에서 한다). */
+function DiscountCouponGrantControls({ uid }: { uid: string }) {
+  const [coupons, setCoupons] = useState<Array<{ code: string; name: string; discountPercent: number; state: string }>>([]);
+  const [code, setCode] = useState("");
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const admin = auth.currentUser; if (!admin) return;
+      const token = await admin.getIdToken();
+      const response = await fetch("/api/admin/discount-coupons", { headers: { authorization: `Bearer ${token}` } });
+      const body = await response.json().catch(() => ({}));
+      if (cancelled || !response.ok) return;
+      // 이미 끝났거나 중지된 쿠폰은 지급해 봐야 쓸 수 없다 — 고를 수 없게 한다.
+      const usable = (body.coupons ?? []).filter((c: { state: string }) => c.state === "active" || c.state === "scheduled" || c.state === "soldOut");
+      setCoupons(usable);
+      if (usable.length > 0) setCode(usable[0].code);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function grant() {
+    const admin = auth.currentUser; if (!admin || !code) return;
+    setBusy(true); setMessage(null);
+    try {
+      const token = await admin.getIdToken();
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/grant-discount-coupon`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ code, reason }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) return setMessage(body.error ?? "쿠폰 지급에 실패했습니다.");
+      setMessage(`${body.name || body.code} 쿠폰을 지급했습니다.`); setReason("");
+    } finally { setBusy(false); }
+  }
+
+  if (coupons.length === 0) return <p className="text-xs text-[#8D8296]">지급할 수 있는 쿠폰이 없습니다. 쿠폰 화면에서 먼저 발급하세요.</p>;
+  return <div className="flex flex-wrap items-center gap-2"><select value={code} onChange={(e) => setCode(e.target.value)} className="max-w-72 rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]">{coupons.map((c) => <option key={c.code} value={c.code}>{c.name || c.code} · {c.discountPercent}%{c.state === "soldOut" ? " (마감)" : c.state === "scheduled" ? " (시작 전)" : ""}</option>)}</select><input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="지급 사유 (필수)" className="rounded-xl border border-[#E4DDE9] bg-white px-3 py-2 text-xs outline-none focus:border-[#C46799]" /><button disabled={busy} onClick={grant} className="rounded-xl bg-[#3B2D47] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? "지급 중..." : "쿠폰 지급"}</button>{message && <p className="text-xs text-[#B81D6E]">{message}</p>}</div>;
+}
+
 type ContextReading = {
   readingId: string;
   question: string;
@@ -602,6 +667,7 @@ function UserOverviewPanel({
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">횟수제 이용권 지급</h3><p className="mt-1 text-xs text-[#8D8296]">자미두수 포함 조합은 태어난 시간이 등록된 사용자에게만 지급할 수 있습니다.</p></div><CountPassGrantControls uid={uid} /></section>
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">시간제 이용권 지급</h3><p className="mt-1 text-xs text-[#8D8296]">12종 상품 중 선택해 지급합니다. 자미두수 포함 상품은 태어난 시간이 필요합니다.</p></div><TimePassGrantControls uid={uid} /></section>
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">할인쿠폰 지급</h3><p className="mt-1 text-xs text-[#8D8296]">발급된 쿠폰을 이 사용자 쿠폰함에 직접 넣습니다. 선착순이 마감됐어도 지급됩니다.</p></div><DiscountCouponGrantControls uid={uid} /></section>
       </div>
       <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#EEE8F1] bg-white p-4"><div><h3 className="text-sm font-semibold text-[#45394F]">계정 정지</h3><p className="mt-1 text-xs text-[#8D8296]">로그인·기록 열람은 유지되며, 리딩·결제·보상 수령만 제한됩니다.</p></div><SuspensionControls uid={uid} suspended={suspended} /></section>
       {modalReading && (

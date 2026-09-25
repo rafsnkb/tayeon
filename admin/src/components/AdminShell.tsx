@@ -9,6 +9,7 @@ const navigation = [
   { href: "/moderation", label: "검토" },
   { href: "/refund-requests", label: "환불" },
   { href: "/analytics", label: "분석" },
+  { href: "/discount-coupons", label: "쿠폰" },
   { href: "/notices", label: "공지" },
   { href: "/retained-data", label: "보관" },
 ];

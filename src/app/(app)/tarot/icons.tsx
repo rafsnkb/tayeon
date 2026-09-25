@@ -157,6 +157,16 @@ export function ChevronLeftIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** 접기/펼치기용. 좌우 셰브론과 같은 획(2px, 둥근 끝)이되 가로로 누운 규격이라 viewBox 가
+ *  뒤집혀 있다 — 같은 아이콘을 rotate 로 돌려 쓰면 획 끝이 미세하게 어긋난다. */
+export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="16" height="8" viewBox="0 0 16 8" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M1 1L8 7L15 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function SearchIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>

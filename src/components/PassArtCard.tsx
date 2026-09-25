@@ -23,18 +23,38 @@ function highlightPercent(text: string) {
   );
 }
 
+/** 할인이 걸린 카드의 가격 줄(목업 Buy_TimePass_*, 2026-09-25).
+ *
+ *  `50% ₩4,450` 한 줄 + 아래에 정가를 취소선으로. 할인율만 포인트색이고 실제 낼 금액은 본문
+ *  색 그대로다 — 눈이 먼저 닿아야 하는 건 "얼마를 내는가"이고, 몇 %인지는 그 이유다. */
+function PriceLines({ price, discount }: { price: string; discount?: { percent: number; listPrice: string } }) {
+  if (!discount) return <p className="mt-5 text-base font-bold text-bold-text">{price}</p>;
+  return (
+    <div className="mt-3">
+      <p className="text-base font-bold text-bold-text">
+        <span className="text-point-text">{discount.percent}%</span> {price}
+      </p>
+      <p className="text-sm font-semibold text-icon-muted line-through">{discount.listPrice}</p>
+    </div>
+  );
+}
+
 export default function PassArtCard({
   art,
   name,
   caption,
   price,
+  discount,
   onClick,
   disabled,
 }: {
   art: string;
   name: string;
   caption: string;
+  /** 실제로 낼 금액. 할인이 걸리면 할인가다. */
   price: string;
+  /** 있으면 정가를 취소선으로 함께 보여준다. */
+  discount?: { percent: number; listPrice: string };
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -51,7 +71,7 @@ export default function PassArtCard({
       <div className="relative mt-auto px-2 pb-2 text-center">
         <p className="truncate text-lg font-bold text-bold-text">{name}</p>
         <p className="mt-0.5 truncate text-xs font-semibold text-icon-muted">{highlightPercent(caption)}</p>
-        <p className="mt-5 text-base font-bold text-bold-text">{price}</p>
+        <PriceLines price={price} discount={discount} />
       </div>
     </button>
   );

@@ -23,6 +23,7 @@ import {
   InvitePersonIcon,
   CartIcon,
   CardIcon,
+  TicketIcon,
   ListIcon,
   IdCardIcon,
   PersonIcon,
@@ -225,6 +226,7 @@ export default function MyPage() {
             <ListRow icon={<CartIcon className="h-5 w-5" />} label="횟수제 · 시간제 이용권 구입" onClick={() => router.push(withReturnTo("/charge", "/me"))} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
             <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="내 보유 이용권" onClick={() => router.push("/my-passes")} />
+            <ListRow icon={<TicketIcon className="h-4 w-5" />} label="쿠폰함" onClick={() => router.push("/coupons")} />
           </Section>
 
           <Section title="프로필">

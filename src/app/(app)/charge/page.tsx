@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { pickBestCoupon, discountedAmount } from "@/lib/payment/discountCoupon";
 import PortOne, { PaymentPayMethod } from "@portone/browser-sdk/v2";
 import {
   COUNT_PACKAGES,
@@ -52,6 +53,11 @@ const TIME_DURATIONS: TimeDuration[] = [15, 30, 60];
 /** 피그마 "Screen / Buy - Coin"·"Buy - CountPurchase". 포트원 V2 결제창을 직접 호출해 횟수제·
  * 시간제 이용권을 구매한다. 횟수제는 2026-09-18부터 구매 시점에 조합(타로전용/+사주/+자미두수/
  * +사주자미두수) 하나를 반드시 골라야 하고, 그 조합으로 완전히 고정된 이용권이 발급된다. */
+/** 화면에 쓸 "지금 적용될 쿠폰". 서버(`prepare`)가 쓰는 것과 **같은 순수 함수**로 고른다 —
+ *  화면이 따로 계산하면 표시가와 청구가가 갈린다. 서버는 결제 직전에 다시 판정하므로 이건
+ *  어디까지나 표시용이고, 신뢰의 근원이 아니다. */
+type UsableCoupon = { code: string; name: string; discountRate: number; startsAt: string; endsAt: string };
+
 export default function ChargePage() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => (searchParams.get("tab") === "time" ? "time" : "count"));
@@ -67,6 +73,10 @@ export default function ChargePage() {
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [noBirthTimeOpen, setNoBirthTimeOpen] = useState(false);
   const [suspension, setSuspension] = useState<SuspensionInfo | null>(null);
+  const [coupon, setCoupon] = useState<UsableCoupon | null>(null);
+  // 쿠폰은 1 회용이라 자동 적용이 늘 이득은 아니다 — 3,000 원짜리에 30% 를 태우면 900 원 깎고
+  // 사라진다. 이번 결제에는 쓰지 않도록 끌 수 있게 한다(2026-09-25 사용자 결정).
+  const [useCoupon, setUseCoupon] = useState(true);
   const { user, email, nickname, refreshMe, countPasses, timePasses, activeTimePass, hasBirthInfo, myTimeUnknown } = useRooms();
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
   const heldCountPass = countPasses.find(
@@ -74,9 +84,39 @@ export default function ChargePage() {
   );
   const hasCountPass = Boolean(heldCountPass);
   const hasTimePassHeld = timePasses.length > 0 || activeTimePass !== null;
-  const price = selected?.pkg.priceWon ?? 0;
+  const listPrice = selected?.pkg.priceWon ?? 0;
+  const appliedCoupon = useCoupon ? coupon : null;
+  const { amountWon: price, discountWon } = appliedCoupon
+    ? discountedAmount(listPrice, appliedCoupon.discountRate)
+    : { amountWon: listPrice, discountWon: 0 };
+  /** 목록 카드에 붙일 할인 정보. 상품마다 정가가 달라 금액은 카드에서 각자 계산한다. */
+  const cardDiscount = (won: number) =>
+    appliedCoupon
+      ? {
+          percent: Math.round(appliedCoupon.discountRate * 100),
+          listPrice: formatWon(won),
+          price: formatWon(discountedAmount(won, appliedCoupon.discountRate).amountWon),
+        }
+      : null;
   // 상세 화면에서 "구입할 수 없음"을 판정하는 쪽이 탭마다 다르다.
   const blocked = selected?.kind === "time" ? hasTimePassHeld : hasCountPass;
+
+  // 보유 쿠폰을 읽어 "지금 적용될 것"을 하나 고른다. 서버가 결제 직전에 같은 함수로 다시
+  // 판정하므로, 여기서 틀려도 청구 금액이 틀리지는 않는다 — 다만 표시가 어긋나면 사용자가
+  // 결제창에서야 다른 금액을 보게 되니 같은 규칙을 쓴다.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void (async () => {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/user/discount-coupons", { headers: { Authorization: `Bearer ${idToken}` } });
+      if (!res.ok || cancelled) return;
+      const body = await res.json();
+      const held = (body.coupons ?? []).map((c: UsableCoupon & { status: string }) => ({ ...c, status: c.status }));
+      if (!cancelled) setCoupon(pickBestCoupon(held, new Date().toISOString()) as UsableCoupon | null);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   function selectCombo(combo: ComboKey) {
     if (COMBOS[combo].ziwei && !hasBirthTime) {
@@ -98,7 +138,8 @@ export default function ChargePage() {
       const prepareRes = await fetch("/api/payment/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ productId, combo }),
+        // 쿠폰을 쓸지 말지만 보낸다 — 어떤 쿠폰을 쓸지도 얼마를 깎을지도 서버가 정한다.
+        body: JSON.stringify({ productId, combo, useCoupon }),
       });
       if (!prepareRes.ok) {
         const failed = await prepareRes.json().catch(() => ({}));
@@ -250,7 +291,8 @@ export default function ChargePage() {
                   art={countPackageArt(pkg.id, "card")}
                   name={`${pkg.name} 이용권`}
                   caption={pkg.bonus}
-                  price={formatWon(pkg.priceWon)}
+                  price={cardDiscount(pkg.priceWon)?.price ?? formatWon(pkg.priceWon)}
+                  discount={cardDiscount(pkg.priceWon) ?? undefined}
                   disabled={purchasingId !== null}
                   onClick={() => setSelected({ kind: "count", pkg })}
                 />
@@ -272,7 +314,8 @@ export default function ChargePage() {
                     art={timePassArt(timeDuration, combo, "card")}
                     name={timePassName(timeDuration)}
                     caption={timePassCaption(combo)}
-                    price={formatWon(pkg.priceWon)}
+                    price={cardDiscount(pkg.priceWon)?.price ?? formatWon(pkg.priceWon)}
+                    discount={cardDiscount(pkg.priceWon) ?? undefined}
                     disabled={purchasingId !== null || hasTimePassHeld}
                     onClick={() => {
                       if (COMBOS[combo].ziwei && !hasBirthTime) {
@@ -331,12 +374,33 @@ export default function ChargePage() {
             <p className="text-base font-bold text-bold-text">결제금액</p>
             <div className="mt-2 flex justify-between text-sm text-icon-muted">
               <span>· 상품금액 (VAT 포함)</span>
-              <span>{formatWonSuffix(price)}</span>
+              <span>{formatWonSuffix(listPrice)}</span>
             </div>
+            {appliedCoupon && (
+              <div className="mt-2 flex justify-between gap-3 text-sm text-icon-muted">
+                {/* 쿠폰 이름을 그대로 쓴다 — "할인 -12,450원"만 있으면 어느 쿠폰이 붙었는지
+                    알 수 없고, 쿠폰함과 대조도 안 된다. */}
+                <span className="truncate">· {appliedCoupon.name || appliedCoupon.code}</span>
+                <span className="shrink-0">-{formatWonSuffix(discountWon)}</span>
+              </div>
+            )}
             <div className="mt-2 flex justify-between border-t border-border pt-2 text-base font-bold text-bold-text">
               <span>총 결제금액</span>
               <span>{formatWonSuffix(price)}</span>
             </div>
+            {coupon && (
+              /* 쿠폰이 있을 때만 보인다 — 없으면 끌 것도 없다. 체크를 풀면 정가로 돌아가고
+                 쿠폰은 다음 구매를 위해 남는다. */
+              <label className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-icon-muted">
+                <input
+                  type="checkbox"
+                  checked={!useCoupon}
+                  onChange={(e) => setUseCoupon(!e.target.checked)}
+                  className="h-4 w-4 accent-[var(--point)]"
+                />
+                이번 결제에는 쿠폰을 사용하지 않기
+              </label>
+            )}
             <button
               type="button"
               onClick={() =>
