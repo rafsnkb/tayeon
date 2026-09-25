@@ -1,6 +1,6 @@
 "use client";
 
-import { CloseIcon } from "@/app/(app)/tarot/icons";
+import ModalShell, { ModalButton } from "@/components/ModalShell";
 import { formatDateTime } from "@/lib/util/formatDate";
 
 export type SuspensionInfo = { reason: string | null; suspendedUntil: string | null };
@@ -17,44 +17,26 @@ export function parseSuspensionError(body: unknown): SuspensionInfo | null {
   };
 }
 
-/** 피그마 "SuspensionPopup" — 정지 중 사용자가 리딩/결제/보상수령/시간제 활성화를 시도했을 때. */
+/** 정지 중 사용자가 리딩/결제/보상수령/시간제 활성화를 시도했을 때. 사용자가 지금 할 수 있는
+ *  일이 없는 순수 알림형이라 버튼은 "확인" 하나다. */
 export default function SuspensionModal({ info, onClose }: { info: SuspensionInfo; onClose: () => void }) {
   return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-bold-text">이용 불가</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
+    <ModalShell title="이용 불가" onClose={onClose} footer={<ModalButton onClick={onClose}>확인</ModalButton>}>
+      <p>이용 정지 기간에는 해당 기능을 사용할 수 없습니다.</p>
+      {/* 사유와 종료일은 사용자가 문의할 때 그대로 읽어 전달하는 값이라, 본문 색(약한 회색)이
+          아니라 제목 색으로 한 단계 올려 둔다. */}
+      <div className="mt-5 flex flex-col gap-4">
+        <div>
+          <p>이용 정지 사유</p>
+          <p className="mt-1 text-base font-bold text-bold-text">{info.reason ?? "약관 위반"}</p>
         </div>
-        <p className="mb-6 text-center text-sm font-semibold text-icon-muted">
-          이용 정지 기간에는 해당 기능을 사용할 수 없습니다.
-        </p>
-        <div className="mb-7 flex flex-col items-center gap-4">
-          <div className="text-center">
-            <p className="text-sm text-icon-muted">이용 정지 사유</p>
-            <p className="mt-1 text-base font-bold text-bold-text">{info.reason ?? "약관 위반"}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-icon-muted">이용 정지 종료일</p>
-            <p className="mt-1 text-base font-bold text-bold-text">
-              {info.suspendedUntil ? formatDateTime(info.suspendedUntil) : "영구"}
-            </p>
-          </div>
+        <div>
+          <p>이용 정지 종료일</p>
+          <p className="mt-1 text-base font-bold text-bold-text">
+            {info.suspendedUntil ? formatDateTime(info.suspendedUntil) : "영구"}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="h-12 w-full rounded-2xl bg-point text-base font-semibold text-white"
-        >
-          확인
-        </button>
       </div>
-    </div>
+    </ModalShell>
   );
 }

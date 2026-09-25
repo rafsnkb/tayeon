@@ -1,14 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CloseIcon } from "@/app/(app)/tarot/icons";
+import ModalShell, { ModalButton } from "@/components/ModalShell";
 
-/** 피그마 "Buy - CountPurchase_NoBirthTimePopup" — 자미두수가 포함된 조합(구매/수령)을 골랐는데
- * 태어난 시간이 없거나 "모름"인 경우. `/charge`(횟수제·시간제 조합 선택)와
- * `/received-passes`(리워드 조합 선택) 양쪽에서 공용으로 쓴다.
+/** 자미두수가 포함된 조합(구매/수령)을 골랐는데 태어난 시간이 없거나 "모름"인 경우.
+ *  `/charge`(구매)와 `/received-passes`(리워드 수령) 양쪽에서 공용으로 쓴다.
  *
- * 제목은 부르는 쪽이 정한다. 한동안 "상품 구매 불가"로 박혀 있었는데, 리워드 수령은 돈을 내는
- * 일이 아니라 이미 받은 것을 꺼내는 일이라 그 문장이 사실과 달랐다(2026-09-25). */
+ *  버튼이 하나인 알림형이다 — 예전엔 "닫기"와 "입력하러 가기" 둘이었는데, 닫기는 X 와 같은
+ *  일이라 목업 폼으로 오면서 자연스럽게 X 로 흡수됐다. 남는 버튼은 사용자가 실제로 해야 할
+ *  일 하나뿐이다.
+ *
+ *  제목은 부르는 쪽이 정한다. 한동안 "상품 구매 불가"로 박혀 있었는데, 리워드 수령은 돈을
+ *  내는 일이 아니라 이미 받은 것을 꺼내는 일이라 그 문장이 사실과 달랐다(2026-09-25). */
 export default function NoBirthTimePopup({
   onClose,
   title = "상품 구매 불가",
@@ -18,38 +21,14 @@ export default function NoBirthTimePopup({
 }) {
   const router = useRouter();
   return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-bold-text">{title}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="mb-7 whitespace-pre-line text-center text-sm font-semibold text-icon-muted">
-          {"[내 프로필 정보]에 태어난 시간이 없으면\n자미두수 기능을 사용할 수 없습니다."}
-        </p>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-12 flex-1 rounded-2xl bg-chip-fill text-base font-semibold text-white"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/me/profile")}
-            className="h-12 flex-1 rounded-2xl bg-point text-base font-semibold text-white"
-          >
-            입력하러 이동
-          </button>
-        </div>
-      </div>
-    </div>
+    <ModalShell
+      title={title}
+      onClose={onClose}
+      footer={<ModalButton onClick={() => router.push("/me/profile")}>태어난 시간 입력하기</ModalButton>}
+    >
+      <p className="whitespace-pre-line">
+        {"자미두수는 태어난 시간이 있어야 계산할 수 있어요.\n내 프로필에서 입력한 뒤 다시 시도해주세요."}
+      </p>
+    </ModalShell>
   );
 }

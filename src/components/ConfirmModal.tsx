@@ -1,7 +1,10 @@
-import { CloseIcon } from "@/app/(app)/tarot/icons";
+import ModalShell, { ModalButton, ModalButtonRow } from "@/components/ModalShell";
 
-/** 피그마 "Screen / DeleteAccount"·"Screen / LogoutModal" 공용 패턴 — 제목+설명+취소/확인
- * 버튼(확인 쪽은 urgent 빨강)의 중앙 정렬 확인 모달. */
+/** 제목 + 설명 + 취소/확인. 회원탈퇴·로그아웃처럼 **되돌릴 수 없는** 액션을 묻는다.
+ *
+ * 껍데기는 알림형 모달과 똑같은 ModalShell 이고, 다른 것은 하단 버튼 줄 하나뿐이다 —
+ * 확인을 X 하나로 취소하게 만들면 20px 아이콘이 유일한 탈출구가 되고 큰 버튼이 곧 파괴
+ * 액션이 된다. 확인 버튼 색은 경고의 뜻이라 --urgent 를 유지한다(2026-09-25 사용자 결정). */
 export default function ConfirmModal({
   title,
   description,
@@ -18,39 +21,18 @@ export default function ConfirmModal({
   busy?: boolean;
 }) {
   return (
-    <div data-modal-overlay="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-sm rounded-[28px] border border-border bg-topbar p-5 pt-7"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-9 flex items-center justify-between">
-          <div className="w-5" />
-          <p className="flex-1 text-center text-lg font-bold text-bold-text">{title}</p>
-          <button type="button" onClick={onClose} aria-label="닫기" className="text-bold-text">
-            <CloseIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="mb-7 whitespace-pre-line text-center text-sm font-semibold text-icon-muted">
-          {description}
-        </p>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-12 flex-1 rounded-2xl bg-chip-fill text-base font-semibold text-white"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={busy}
-            className="h-12 flex-1 rounded-2xl bg-urgent text-base font-semibold text-white disabled:opacity-60"
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ModalShell
+      title={title}
+      onClose={onClose}
+      closeLabel="취소"
+      footer={
+        <ModalButtonRow>
+          <ModalButton tone="neutral" onClick={onClose}>취소</ModalButton>
+          <ModalButton tone="danger" onClick={onConfirm} disabled={busy}>{confirmLabel}</ModalButton>
+        </ModalButtonRow>
+      }
+    >
+      <p className="whitespace-pre-line">{description}</p>
+    </ModalShell>
   );
 }
