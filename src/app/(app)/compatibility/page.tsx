@@ -1,22 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRooms, type Partner } from "@/lib/tarot/RoomsContext";
 import { BirthDateField, BirthTimeField, BirthTimeNotice, FieldLabel, ToggleGroup } from "@/components/FormControls";
 import { toCalendarMode, type CalendarMode } from "@/lib/tarot/birthInfo";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import SubPageTopBar from "@/components/SubPageTopBar";
 import InfoModal from "@/components/InfoModal";
-
-type Partner = {
-  nickname: string;
-  birthDate: string | null;
-  birthTime: string | null;
-  gender: "male" | "female" | "unspecified";
-  calendarType: "solar" | "lunar";
-  isLeapMonth?: boolean;
-  birthPlace?: string | null;
-};
 
 type ProfileSnapshot = {
   nickname: string;
@@ -28,64 +19,60 @@ type ProfileSnapshot = {
   birthPlace: string;
 };
 
+const EMPTY_PARTNER: ProfileSnapshot = {
+  nickname: "",
+  calendarMode: "solar",
+  birthDate: "",
+  birthTime: "",
+  timeUnknown: false,
+  gender: "unspecified",
+  birthPlace: "",
+};
+
 /** 피그마 "Screen / PartnerProfile" — MyProfile과 거의 같은 레이아웃이지만 닉네임만 필수, 나머지는
  * 전부 선택 입력. 기존엔 저장 후 "보기 모드"로 바뀌는 UI였는데, 피그마는 항상 폼을 보여주고 기존
  * 값으로 미리 채워두는 방식이라 그에 맞춰 단순화함. "초기화" 버튼은 목업에 없어 제거함(2026-09-19). */
 export default function CompatibilityPage() {
+  const { partner } = useRooms();
+  /** 컨텍스트의 partner 를 폼이 쓰는 모양으로 편다. 저장된 상대가 없으면 빈 폼이 맞다. */
+  const initial: ProfileSnapshot = partner
+    ? {
+        nickname: partner.nickname,
+        calendarMode: toCalendarMode(partner.calendarType, partner.isLeapMonth),
+        birthDate: partner.birthDate ?? "",
+        birthTime: partner.birthTime ?? "",
+        timeUnknown: !partner.birthTime,
+        gender: partner.gender,
+        birthPlace: partner.birthPlace ?? "",
+      }
+    : EMPTY_PARTNER;
+
   const [user, setUser] = useState<User | null>(null);
-  const [nickname, setNickname] = useState("");
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("solar");
-  const [birthDate, setBirthDate] = useState("");
-  const [birthTime, setBirthTime] = useState("");
-  const [timeUnknown, setTimeUnknown] = useState(false);
-  const [gender, setGender] = useState<Partner["gender"]>("unspecified");
-  const [birthPlace, setBirthPlace] = useState("");
+  // 전부 lazy 초기화다 — 함수를 넘기면 **마운트 때 한 번만** 평가된다. 그냥 값을 넘기면
+  // 10 초 폴링이 partner 를 갱신할 때마다 initial 이 새로 계산되긴 하지만 state 는 안 바뀐다.
+  // 함수 형태로 두는 건 의도를 못박기 위해서다: 이 폼의 출처는 "마운트 시점의 저장값"이다.
+  const [nickname, setNickname] = useState(() => initial.nickname);
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>(() => initial.calendarMode);
+  const [birthDate, setBirthDate] = useState(() => initial.birthDate);
+  const [birthTime, setBirthTime] = useState(() => initial.birthTime);
+  const [timeUnknown, setTimeUnknown] = useState(() => initial.timeUnknown);
+  const [gender, setGender] = useState<Partner["gender"]>(() => initial.gender);
+  const [birthPlace, setBirthPlace] = useState(() => initial.birthPlace);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedOpen, setSavedOpen] = useState(false);
-  const [snapshot, setSnapshot] = useState<ProfileSnapshot>({
-    nickname: "",
-    calendarMode: "solar",
-    birthDate: "",
-    birthTime: "",
-    timeUnknown: false,
-    gender: "unspecified",
-    birthPlace: "",
-  });
+  const [snapshot, setSnapshot] = useState<ProfileSnapshot>(() => initial);
 
-  useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
-      if (!u) return;
-      setUser(u);
-      const idToken = await u.getIdToken();
-      const res = await fetch("/api/user/partner", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const partner = data.partner as Partner | null;
-        if (partner) {
-          const loaded: ProfileSnapshot = {
-            nickname: partner.nickname,
-            calendarMode: toCalendarMode(partner.calendarType, partner.isLeapMonth),
-            birthDate: partner.birthDate ?? "",
-            birthTime: partner.birthTime ?? "",
-            timeUnknown: !partner.birthTime,
-            gender: partner.gender,
-            birthPlace: partner.birthPlace ?? "",
-          };
-          setNickname(loaded.nickname);
-          setCalendarMode(loaded.calendarMode);
-          setBirthDate(loaded.birthDate);
-          setBirthTime(loaded.birthTime);
-          setTimeUnknown(loaded.timeUnknown);
-          setGender(loaded.gender);
-          setBirthPlace(loaded.birthPlace);
-          setSnapshot(loaded);
-        }
-      }
-    });
-  }, []);
+  // 상대 정보는 **진입 시점에 이미 컨텍스트에 있다**(2026-09-26). `/api/user/me` 가 partner 를
+  // 통째로 내려주고, (app) 레이아웃이 그 응답이 오기 전엔 이 화면을 아예 렌더하지 않는다.
+  // 그래서 여기서는 조회도, 로딩 상태도, 실패 처리도 필요 없다 — lazy 초기화로 첫 렌더부터
+  // 저장값이 들어가 있다. 예전엔 `/api/user/partner` 를 따로 불러서 (1) 같은 데이터를 두 번
+  // 받고 (2) 그 사이 이미 입력해 둔 사람에게도 빈 폼이 보였다가 채워졌으며 (3) 그때 타이핑한
+  // 값을 뒤늦게 도착한 응답이 덮어썼다.
+  //
+  // 10 초 폴링으로 partner 가 갱신돼도 이 폼은 다시 읽지 않는다(lazy 초기화는 마운트 때 한 번).
+  // 편집 중에 값이 발밑에서 바뀌지 않아야 하므로 그게 맞다.
+  useEffect(() => onAuthStateChanged(auth, setUser), []);
 
   const isDirty =
     nickname !== snapshot.nickname ||

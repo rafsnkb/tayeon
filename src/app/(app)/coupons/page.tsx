@@ -38,7 +38,7 @@ type Tab = "list" | "apply";
 
 export default function CouponsPage() {
   const router = useRouter();
-  const { user, authChecked } = useRooms();
+  const { user, authChecked, refreshMe } = useRooms();
   const [tab, setTab] = useState<Tab>("list");
   const [coupons, setCoupons] = useState<Coupon[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -78,7 +78,11 @@ export default function CouponsPage() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return setError(body.error ?? "쿠폰을 등록하지 못했어요.");
       setCode("");
-      await load();
+      // 이 화면의 목록만 다시 읽으면 안 된다(2026-09-26). 구입 화면이 쓰는 건 컨텍스트의
+      // `activeCoupon` 이고, 그건 `/api/user/me` 에서 온다 — 여기서 갱신하지 않으면 바로
+      // 아래 "사용하기" 로 /charge 에 갔을 때 **방금 등록한 쿠폰이 없는 것처럼 정가**가 뜬다.
+      // 10 초 폴링이 언젠가 고쳐 주지만, 그게 "등록 직후"라는 가장 나쁜 타이밍에 걸린다.
+      await Promise.all([load(), refreshMe()]);
       setDone("쿠폰을 등록했어요.");
     } finally {
       setSubmitting(false);

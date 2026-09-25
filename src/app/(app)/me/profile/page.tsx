@@ -37,6 +37,15 @@ export default function MyProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedOpen, setSavedOpen] = useState(false);
+  /** 저장된 프로필이 도착했는가. 폼을 그려도 되는 시점을 가르는 용도다(2026-09-25) —
+   *  아래 state 초기값이 전부 빈 값/기본값이라, 조회가 끝나기 전에 그리면 **이미 입력해 둔
+   *  사람에게도 빈 폼**이 보였다가 채워진다. 그 사이에 손댄 값은 도착한 응답이 덮어쓴다. */
+  const [loaded, setLoaded] = useState(false);
+  /** 조회가 실패했는가. 여기서 빈 폼을 보여주면 안 된다(2026-09-26) — snapshot 이 전부 빈
+   *  값이라 한 글자만 쳐도 isDirty 가 켜지고, 저장하면 **멀쩡한 프로필이 빈 값으로 덮인다**.
+   *  (2026-09-25 에 이 자리 주석은 "실패해도 true 로 둔다"고 적었지만 실제로 그렇게 동작한
+   *  적이 없다 — `!res.ok` 도 throw 도 setLoaded 에 닿지 못했다. 의도와 코드가 어긋나 있었다.) */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [snapshot, setSnapshot] = useState<ProfileSnapshot>({
     nickname: "",
     calendarMode: "solar",
@@ -53,9 +62,16 @@ export default function MyProfilePage() {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) return;
       setUser(u);
+      // getIdToken·fetch·json 은 전부 던진다. 던지면 이 async 콜백이 reject 되고 파이어베이스는
+      // 잡아주지 않아 setLoaded(true) 에 못 닿는다 — 화면이 "불러오는 중..."으로 굳는다.
+      try {
       const idToken = await u.getIdToken();
       const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
-      if (res.ok) {
+      if (!res.ok) {
+        setLoadFailed(true);
+        return;
+      }
+      {
         const data = await res.json();
         const nextNickname = data.nickname ?? "";
         setNickname(nextNickname);
@@ -84,6 +100,10 @@ export default function MyProfilePage() {
         } else {
           setSnapshot((prev) => ({ ...prev, nickname: nextNickname }));
         }
+      }
+      setLoaded(true);
+      } catch {
+        setLoadFailed(true);
       }
     });
   }, []);
@@ -141,6 +161,15 @@ export default function MyProfilePage() {
     <form onSubmit={handleSave} className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="내 프로필 관리" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
+        {loadFailed ? (
+          <p className="pt-8 text-center text-sm leading-relaxed text-icon-muted">
+            프로필을 불러오지 못했어요.
+            <br />
+            지금 저장하면 기존 정보가 지워질 수 있어 화면을 열지 않았어요.
+          </p>
+        ) : !loaded ? (
+          <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
+        ) : (
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
             <FieldLabel required>닉네임 (변경 가능)</FieldLabel>
@@ -206,6 +235,7 @@ export default function MyProfilePage() {
 
           {error && <p className="text-sm text-urgent">{error}</p>}
         </div>
+        )}
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
         <button

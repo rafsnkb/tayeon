@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { withReturnTo } from "@/lib/navigation";
 import { onOpenMenu } from "@/lib/ui/menuBus";
 import { RoomsProvider, useRooms } from "@/lib/tarot/RoomsContext";
+import { DEFAULT_ROOM_TITLE } from "@/lib/tarot/room";
 import { BrandBi } from "@/components/BrandBi";
 import TestAccountLogin from "@/components/TestAccountLogin";
 import { kakaoAuthorizeUrl } from "@/components/LoginPanel";
@@ -43,7 +44,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     rooms,
     activeRoomId,
     selectRoom,
+    createRoom,
     authChecked,
+    loaded,
+    meFailed,
   } = useRooms();
   const [menuOpen, setMenuOpen] = useState(false);
   // 데스크탑(lg+)에서만 의미 있는 상시 사이드바 접기 상태 — hori.chat 참조(2026-09-14).
@@ -74,12 +78,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => onOpenMenu(() => setMenuOpen(true)), []);
 
-  // "새 대화"는 더 이상 빈 방을 만들지 않는다 — 메인으로 보내고, 방은 **첫 질문을 보낼 때**
-  // 만들어진다(TarotScreen.handleSubmit). 예전엔 이 버튼이 곧바로 방을 하나 만들어서, 말을
-  // 걸지 않고 나가면 "새 대화" 제목의 빈 방만 목록에 쌓였다. 방 개수 상한 모달(RoomLimitModal)도
-  // 실제 생성 시점으로 같이 옮겼다.
-  function handleNewRoom() {
+  /* "새 대화"는 방을 만들어서 그리로 들어간다 — 그래야 상담사 인사말이 뜬다(2026-09-26).
+   *
+   * 한동안은 방을 만들지 않고 메인으로만 보냈다. 말을 걸지 않고 나가면 "새 대화" 제목의 빈 방이
+   * 목록에 쌓였기 때문인데, 그 대가로 **버튼을 눌러도 아무 일도 안 일어나는** 화면이 됐다.
+   *
+   * 빈 방이 쌓이던 문제는 방을 안 만드는 대신 **이미 있는 빈 방을 다시 쓰는** 것으로 푼다. 한 번도
+   * 쓰지 않은 방은 제목이 기본값 그대로라 그걸로 알아본다(대화방 탑바도 같은 기준을 쓴다). 그러면
+   * 버튼을 열 번 눌러도 빈 방은 하나를 넘지 않는다.
+   *
+   * 방 개수 상한에 걸리면 조용히 메인으로 보낸다 — 여기서 상한 모달까지 띄우면 "새 대화"를 누른
+   * 사람에게 지우기를 강요하는 흐름이 된다. 첫 질문을 보내는 시점에 TarotScreen 이 제대로 묻는다. */
+  async function handleNewRoom() {
     setMenuOpen(false);
+    const empty = rooms.find((room) => room.title === DEFAULT_ROOM_TITLE);
+    if (empty) {
+      selectRoom(empty.id);
+      router.push(`/tarot/${empty.id}`);
+      return;
+    }
+    try {
+      const created = await createRoom();
+      if (created) {
+        router.push(`/tarot/${created.id}`);
+        return;
+      }
+    } catch {
+      // 상한 초과·네트워크 오류 — 메인으로 떨어뜨린다.
+    }
     router.push("/");
   }
 
@@ -91,6 +117,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!authChecked) return null;
   if (!user && !isChatRoute) return null;
+  // 서브페이지는 `/api/user/me` 가 도착하기 전에는 아예 그리지 않는다(2026-09-25).
+  //
+  // authChecked 는 "파이어베이스가 로그인 여부를 알려줬다"까지고, 계정에 딸린 값(쿠폰,
+  // 보유 이용권, 생년월일시)은 그 뒤 fetch 로 온다. 그동안 컨텍스트는 전부 초기값 —
+  // activeCoupon=null, countPasses=[], hasBirthInfo=false — 이라 서브페이지가 "없다"를
+  // 사실로 알고 한 번 그린다. 앱 안에서 이동할 때는 이미 채워져 있어 안 보이지만,
+  // 새로고침·URL 직접 진입·결제 실패 후 재진입에서는 매번 보인다:
+  //  - /charge 는 열두 장이 정가로 떴다가 할인가로 바뀌며 가격 줄이 한 줄 늘어난다
+  //    (사용자 리포트 "진입 때 쿠폰 보유 여부를 미리 계산하는 게 아니야?" 의 나머지 절반).
+  //  - /charge·/received-passes 는 생년월일시를 넣어둔 사람에게도 자미두수 조합을 누르면
+  //    NoBirthTimePopup 을 띄운다.
+  // 값마다 가드를 다는 대신 진입 자체를 늦춘다 — 서브페이지는 전부 로그인 전용이고, 어차피
+  // 새로고침 직후엔 이미 빈 화면이라 한 왕복이 더 붙을 뿐이다. 대화 화면(isChatRoute)은
+  // 비로그인도 머무는 곳이라 여기서 막을 수 없어, 필요한 자리마다 개별로 가드한다.
+  if (!isChatRoute && !loaded) return null;
+  // `loaded` 만으로는 부족하다(2026-09-26). 저건 "me 요청이 끝났다"라서 401·5xx 에도 열린다 —
+  // 그러면 위에서 막으려던 바로 그 상태(컨텍스트 전부 초기값)로 화면이 열린다. /charge 에서는
+  // 그게 돈 문제가 된다: 쿠폰이 null 이라 끄기 토글이 안 그려지고, useCoupon 은 기본값 true 로
+  // 전송되어 서버가 1 회용 쿠폰을 소진한다. 화면은 정가라고 말한 채로.
+  //
+  // 그래서 빈 화면 대신 **실패를 말한다**. 자동 복구도 열어 둔다 — RoomsContext 의 10 초 주기
+  // refreshMe 가 성공하면 meFailed 가 풀려 이 화면이 알아서 사라진다.
+  if (!isChatRoute && meFailed) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-bg p-8 text-center">
+        <p className="text-base font-semibold text-bold-text">정보를 불러오지 못했어요.</p>
+        {/* 여기는 /charge 부터 /settings 까지 서브페이지 전부가 지나는 자리라 금액을 특정해
+            말하지 않는다. 이유는 하나로 묶인다 — 계정 정보가 없으면 어느 화면이든 잘못된 값을
+            보여주게 된다. */}
+        <p className="text-sm font-semibold text-icon-muted">
+          잘못된 정보가 보일 수 있어 화면을 열지 않았어요.
+          <br />
+          잠시 후 자동으로 다시 시도합니다.
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="mt-2 h-12 rounded-full bg-chip-soft px-6 text-base font-semibold text-chip-soft-text"
+        >
+          메인으로
+        </button>
+      </div>
+    );
+  }
 
   // 서브페이지(/me, /settings, /charge 등)는 사이드바 없이 단순 중앙정렬 — hori.chat의 /terms,
   // /support와 동일한 원칙(위 isMainRoute 주석 참고). 사이드바+플렉스로 관련 복잡한 폭 계산이
@@ -221,7 +291,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-y-auto px-4 pb-2 pt-3">
           <div className={sidebarCollapsed ? "xl:hidden" : ""}>
             <p className="text-sm font-semibold text-placeholder">최근 대화</p>
+            {/* 대화 화면은 109줄 게이트가 비껴가므로(비로그인도 머무는 곳이라) 여기선 rooms 가
+                [] 인 채로 한 번 그려진다 — 제목만 있고 행이 하나도 없는 목록은 "이 계정엔 대화가
+                없다"는 말이라, 쌓인 대화가 있는 사람에게 거짓이다(2026-09-26). 로드 전에는
+                목록 자리를 그대로 비워 두고 아무 말도 하지 않는다. */}
             <div className="mt-[14px] flex flex-col gap-1">
+              {!loaded && <p className="px-[18px] py-3 text-sm text-placeholder">불러오는 중...</p>}
               {rooms.map((room) => (
                 <button
                   key={room.id}
@@ -293,7 +368,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <BellIcon className="h-5 w-5" />
               {/* 실측 12x12, 원의 우상단 끝에 딱 붙는다. */}
-              {hasUnreadNotifications && (
+              {/* 초기값 false 는 "새 알림 없음"이라는 단언이다 — 로드 전엔 말하지 않는다. */}
+              {loaded && hasUnreadNotifications && (
                 <span className="absolute right-0 top-0 h-3 w-3 rounded-full bg-point" />
               )}
             </button>

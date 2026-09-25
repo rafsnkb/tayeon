@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
+import { DEFAULT_ROOM_TITLE } from "@/lib/tarot/room";
 import { ROOM_LIMIT } from "@/lib/tarot/limits";
 import { USERS, ROOMS } from "@/lib/firestore/collections";
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date().toISOString();
-  const roomRef = await roomsRef.add({ title: "새 대화", createdAt: now, updatedAt: now });
+  const roomRef = await roomsRef.add({ title: DEFAULT_ROOM_TITLE, createdAt: now, updatedAt: now });
 
-  return NextResponse.json({ id: roomRef.id, title: "새 대화", updatedAt: now });
+  return NextResponse.json({ id: roomRef.id, title: DEFAULT_ROOM_TITLE, updatedAt: now });
 }

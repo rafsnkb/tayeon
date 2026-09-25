@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BackIcon, CheckIcon, CloseIcon } from "@/app/(app)/tarot/icons";
 import { auth } from "@/lib/firebase/client";
 import { MAX_SUPPORT_ATTACHMENTS, MAX_SUPPORT_ATTACHMENT_BYTES } from "@/lib/support/constants";
@@ -36,30 +36,38 @@ export default function SupportCenter({ faqs }: { faqs: Faq[] }) {
 
   useEffect(() => () => attachmentsRef.current.forEach((attachment) => URL.revokeObjectURL(attachment.url)), []);
 
-  useEffect(() => {
+  // 복원은 **페인트 전에** 끝내야 한다(2026-09-26). 예전엔 setTimeout(…, 0) 이라 매크로태스크,
+  // 즉 브라우저가 한 번 그린 **뒤에** 값이 들어갔다. /privacy 를 보고 돌아온 사람이 자기가 쓴
+  // 문의가 빈 칸으로 한 프레임 떴다가 채워지는 걸 본다 — "내가 쓴 게 날아갔다"로 읽히는 자리다.
+  // useLayoutEffect 는 ref 가 붙은 뒤 + 페인트 전에 돌아서 두 조건을 모두 만족한다
+  // (원래 주석이 setTimeout 을 쓴 이유가 "form ref 확정 뒤"였는데, 그건 layout effect 로 충분하다).
+  //
+  // sessionStorage 를 lazy state 초기화로 읽지 않는 이유: 이 컴포넌트는 서버에서도 렌더되므로
+  // 서버(값 없음)와 클라이언트(값 있음)의 defaultValue 가 갈려 하이드레이션이 어긋난다.
+  useLayoutEffect(() => {
     if (tabFromUrl !== "inquiry" || activeTab !== "inquiry" || restoredFromUrlRef.current) return;
-    // URL로 문의 탭이 이미 렌더링된 다음 실행한다. setTimeout은 브라우저가 form ref를
-    // 확정한 뒤 상태를 갱신해 React의 동기 effect 상태 변경도 피한다.
-    const timer = window.setTimeout(() => {
-      if (restoredFromUrlRef.current) return;
-      restoredFromUrlRef.current = true;
-      const saved = window.sessionStorage.getItem(INQUIRY_DRAFT_KEY);
-      if (!saved) return;
-      try {
-        const draft = JSON.parse(saved) as InquiryDraft;
-        const form = formRef.current;
-        if (!form) return;
-        (form.elements.namedItem("name") as HTMLInputElement).value = draft.name;
-        (form.elements.namedItem("nickname") as HTMLInputElement).value = draft.nickname;
-        (form.elements.namedItem("email") as HTMLInputElement).value = draft.email;
-        (form.elements.namedItem("content") as HTMLTextAreaElement).value = draft.content;
-        setAgreed(draft.agreed);
-        setMessage("입력한 문의 내용이 복원됐어요. 첨부 이미지는 다시 선택해주세요.");
-      } catch {
-        window.sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
+    restoredFromUrlRef.current = true;
+    const saved = window.sessionStorage.getItem(INQUIRY_DRAFT_KEY);
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved) as InquiryDraft;
+      const form = formRef.current;
+      if (!form) return;
+      (form.elements.namedItem("name") as HTMLInputElement).value = draft.name;
+      (form.elements.namedItem("nickname") as HTMLInputElement).value = draft.nickname;
+      (form.elements.namedItem("email") as HTMLInputElement).value = draft.email;
+      (form.elements.namedItem("content") as HTMLTextAreaElement).value = draft.content;
+      // set-state-in-effect 를 여기서만 끈다. 규칙이 막으려는 건 "렌더마다 상태를 다시 맞춰
+      // 연쇄 렌더가 도는 것"인데, 이 복원은 restoredFromUrlRef 로 **세션당 한 번**만 돈다.
+      // 원래 코드가 setTimeout(…, 0) 을 쓴 것도 이 규칙을 피하려던 것이었고, 그 대가가 위에
+      // 적은 "빈 폼이 한 프레임 보이는" 증상이었다. 규칙을 우회하려고 사용자에게 보이는
+      // 깜빡임을 남기는 건 거꾸로다.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAgreed(draft.agreed);
+      setMessage("입력한 문의 내용이 복원됐어요. 첨부 이미지는 다시 선택해주세요.");
+    } catch {
+      window.sessionStorage.removeItem(INQUIRY_DRAFT_KEY);
+    }
   }, [activeTab, tabFromUrl]);
 
   function saveDraft() {

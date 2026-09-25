@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { withReturnTo } from "@/lib/navigation";
 import Link from "next/link";
 import { useRooms, type TimePass } from "@/lib/tarot/RoomsContext";
+import { DEFAULT_ROOM_TITLE } from "@/lib/tarot/room";
 import { availableCount, COMBOS, SPREADS, type SpreadKey } from "@/lib/tarot/pricing";
 import { openMenu } from "@/lib/ui/menuBus";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -30,10 +31,10 @@ import {
   PurchaseTicketModal,
 } from "./passes";
 import {
-  CardImage,
-  CelticCrossLayout,
-  DualPathLayout,
   ReadingLoadingMessage,
+  SpreadCards,
+  TypewriterText,
+  TYPING_SPEED_MS,
   renderInterpretation,
   type ChatMessage,
   type TarotCardInfo,
@@ -45,7 +46,32 @@ import {
   useTypingPlaceholder,
 } from "./composer";
 
-const DEFAULT_ROOM_TITLE = "새 대화";
+
+/** /api/tarot/reading 스트림의 마지막 `done` 이벤트. 예전 비스트리밍 응답 본문과 같은 모양이다. */
+type ReadingDonePayload = {
+  interpretation: string;
+  spread: SpreadKey | null;
+  cards: TarotCardInfo[];
+  includeSaju: boolean;
+  includeZiwei: boolean;
+  includeCompatibility: boolean;
+  partnerNickname: string | null;
+  charged: boolean;
+  countPassApplied?: boolean;
+  sajuFree?: boolean;
+  ziweiFree?: boolean;
+  guidanceOnly?: boolean;
+  flaggedForAbuse?: boolean;
+  timePassApplied?: boolean;
+  suggestions?: string[];
+  roomTitle?: string | null;
+};
+/** 마지막으로 고른 스프레드. 기기별 화면 설정이라 계정이 아니라 브라우저에 둔다 —
+ *  개인정보처리방침이 이미 "다크모드 등 일부 화면 설정값은 localStorage 에 저장된다"고
+ *  고지하고 있어 이 용도는 그 범위 안이다(src/lib/legal/content.ts). */
+const SPREAD_STORAGE_KEY = "tayeon.tarot.spread";
+/** 인사말 말풍선 사이의 쉼. 앞 줄을 다 찍고 이만큼 쉬었다가 다음 줄이 시작한다. */
+const GREETING_LINE_GAP_MS = 400;
 
 function formatRemaining(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -196,6 +222,31 @@ function TarotChat() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => searchParams.get("welcome") === "1");
   const [spread, setSpread] = useState<SpreadKey>("one");
+  const spreadRestoredRef = useRef(false);
+  /** 고른 스프레드를 브라우저에 붙들어 둔다(2026-09-26 사용자 요청).
+   *
+   *  이 화면은 메인↔대화방 사이를 오갈 땐 재마운트되지 않지만, /charge 나 /me 처럼 타로 밖으로
+   *  나갔다 들어오면 새로 마운트된다. 그때 useState 초깃값 "one" 이 다시 깔려서, 켈틱크로스로
+   *  맞춰 둔 사람이 매번 원카드로 되돌아가 있는 걸 본다.
+   *
+   *  lazy 초기화(useState(() => localStorage…))로 읽지 않는 이유는 SupportCenter 의 임시저장과
+   *  같다 — 이 컴포넌트는 서버에서도 렌더되므로 서버(값 없음)와 클라이언트(값 있음)가 갈리면
+   *  하이드레이션이 어긋난다. useLayoutEffect 는 페인트 **전에** 돌아서, 말풍선의 "현재 타로
+   *  모드: 원카드"가 한 프레임 스쳤다 바뀌는 일도 없다. */
+  useLayoutEffect(() => {
+    if (spreadRestoredRef.current) return;
+    spreadRestoredRef.current = true;
+    const saved = window.localStorage.getItem(SPREAD_STORAGE_KEY);
+    // 저장 이후 스프레드 목록이 바뀌었을 수 있다 — SPREADS 에 없는 값이면 버린다.
+    // 이펙트 안 setState 는 이 자리에선 의도한 것이다: localStorage 는 렌더 중에 읽을 수 없고
+    // (하이드레이션), ref 로 한 번만 돌게 막아 두었다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved && saved in SPREADS) setSpread(saved as SpreadKey);
+  }, []);
+  const chooseSpread = (next: SpreadKey) => {
+    setSpread(next);
+    window.localStorage.setItem(SPREAD_STORAGE_KEY, next);
+  };
   const [passUsageOpen, setPassUsageOpen] = useState(false);
   const [includeCompatibility, setIncludeCompatibility] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -205,6 +256,16 @@ function TarotChat() {
   const [startingPass, setStartingPass] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [spreadSheetOpen, setSpreadSheetOpen] = useState(false);
+  /** 스프레드 버튼 위에 뜨는 "현재 타로 모드" 말풍선(2026-09-26 사용자 요청). 아이콘만으로는
+   *  지금 어느 스프레드인지 알 수 없어서, 진입할 때 한 번 이름을 적어 알려준다.
+   *
+   *  **열림/닫힘을 boolean 으로 들면 안 된다.** 메인과 대화방은 같은 화면을 재사용해서
+   *  라우트가 바뀌어도 재마운트되지 않기 때문에(실측 확인), state 를 true 로 시작해 봤자
+   *  한 번 닫으면 다른 방으로 들어가도 다시 뜨지 않는다. 그래서 "어느 방에서 닫았는가"를 들고
+   *  지금 방과 다르면 열린 것으로 본다 — 그러면 메인↔대화방, 방↔방 어느 쪽으로 옮겨도
+   *  "진입 시 한 번"이 저절로 성립한다. 초깃값 `undefined` 는 roomId(문자열 또는 null)와 절대
+   *  같지 않아 첫 진입에서 열린다. */
+  const [hintDismissedFor, setHintDismissedFor] = useState<string | null | undefined>(undefined);
   const [roomInfoOpen, setRoomInfoOpen] = useState(false);
   const [purchaseTicketOpen, setPurchaseTicketOpen] = useState(false);
   const [timePassToUse, setTimePassToUse] = useState<TimePass | null>(null);
@@ -221,6 +282,21 @@ function TarotChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** 마지막 질문 말풍선 — 스크롤을 이 말풍선 윗변에 건다. */
+  const lastUserRef = useRef<HTMLDivElement>(null);
+  /** 대화 위에 떠 있는 상단바. 높이만큼 스크롤을 더 내려야 질문이 바에 안 가린다. */
+  const topBarRef = useRef<HTMLDivElement>(null);
+  /** 그 말풍선을 화면 맨 위로 올릴 수 있도록 아래에 채워 넣는 빈 공간. */
+  const tailSpacerRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
+  /** 스트리밍 중 쌓이는 본문. 델타마다 setState 하면 대화 트리 전체가 다시 그려져서, 여기 모아
+   *  두고 프레임당 한 번만 화면 상태로 넘긴다. */
+  const streamBufferRef = useRef("");
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  /** 서버가 형식이 깨진 답을 다시 만드는 중 — 글이 갑자기 바뀌는 이유를 미리 알려준다. */
+  const [redoing, setRedoing] = useState(false);
+  /** 해석보다 먼저 도착한 카드 그림. */
+  const [streamingCards, setStreamingCards] = useState<{ spread: SpreadKey | null; cards: TarotCardInfo[] } | null>(null);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
   useTypingPlaceholder(questionInputRef);
 
@@ -260,9 +336,48 @@ function TarotChat() {
   const isRoomPending = Boolean(activeRoomId && pendingReadingRoomIds.has(activeRoomId));
   const showLoading = loading || isRoomPending;
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, showLoading]);
+  /* 스크롤 (2026-09-26 전면 수정).
+   *
+   * 동작: **질문을 보내면 그 질문 말풍선이 상단바 바로 아래로 올라가고, 이후 답변은 그 자리에서
+   * 아래로 찍힌다 — 스크롤은 더 움직이지 않는다.** 답변이 2,000자를 넘어서, 끝으로 따라가면
+   * 사용자는 결론부터 읽게 되고 읽던 자리도 계속 빼앗긴다.
+   *
+   * 질문을 화면 맨 위로 올리려면 그 아래에 최소 한 화면만큼의 내용이 있어야 한다. 대화 끝에
+   * 빈 공간(tailSpacer)을 그만큼 깔아 두고, 답변이 자라는 만큼 그 공간을 줄인다. 줄이기만 하고
+   * 스크롤은 건드리지 않으므로 읽던 위치가 흔들리지 않는다.
+   *
+   * 예전엔 맨 끝 sentinel 에 scrollIntoView({block:"end"}) 하나였는데, 그건 sentinel 의 아랫변을
+   * 스크롤 영역 아랫변에 맞춰서 컴포저에 가리지 말라고 준 paddingBottom 을 화면 밖으로 밀어냈다
+   * — 마지막 말풍선이 이용권 바·입력창 뒤로 들어가던 원인이다. */
+  const QUESTION_TOP_GAP = 12;
+  // useLayoutEffect: 빈 공간 높이와 스크롤 위치를 **페인트 전에** 확정한다. useEffect 로 두면
+  // 내용이 바뀐 프레임이 한 번 그려진 뒤에 보정이 들어가서, 그 한 프레임이 튐으로 보인다.
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current;
+    const spacer = tailSpacerRef.current;
+    if (!scroll) return;
+    const grew = messages.length > prevMessageCountRef.current;
+    const askedJustNow = grew && messages[messages.length - 1]?.role === "user";
+    prevMessageCountRef.current = messages.length;
+
+    const anchor = lastUserRef.current;
+    if (spacer && anchor) {
+      // 상단바는 대화 위에 떠 있는 오버레이(absolute h-16)라, 스크롤 영역의 0 지점은 **바 뒤**다.
+      // 바 높이만큼 더 내려야 질문이 바 아래로 나온다 — 높이를 상수로 박지 않고 재는 이유는,
+      // 바가 바뀌면 여기도 같이 틀어지기 때문이다.
+      const topOffset = (topBarRef.current?.offsetHeight ?? 64) + QUESTION_TOP_GAP;
+      // 빈 공간을 0 으로 되돌린 뒤 재야 "지금 부족한 만큼"이 나온다.
+      spacer.style.height = "0px";
+      const top = anchor.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop;
+      const need = scroll.clientHeight - topOffset - (scroll.scrollHeight - top);
+      spacer.style.height = `${Math.max(0, need)}px`;
+      if (askedJustNow) scroll.scrollTop = top - topOffset;
+      return;
+    }
+    // 아직 질문이 하나도 없는 방(인사말만 있는 상태)에서는 빈 공간이 필요 없다.
+    if (spacer) spacer.style.height = "0px";
+    scroll.scrollTop = scroll.scrollHeight;
+  }, [messages, streamingText, showLoading]);
 
   useEffect(() => {
     if (!activeTimePass || new Date(activeTimePass.expiresAt).getTime() <= now) return;
@@ -342,9 +457,19 @@ function TarotChat() {
       return;
     }
 
+    // 응답이 돌아왔을 때 **아직 그 방을 보고 있는지** 확인한다(2026-09-26).
+    //
+    // 이게 없어서 "대화방에서 좌상단 새 대화 → 메인에 이전 대화가 그대로" 버그가 났다. 경로를
+    // `/` 로 바꾸면 이 화면은 먼저 옛 activeRoomId(컨텍스트 값은 selectRoom 이펙트가 돈 뒤에야
+    // null 이 된다)로 한 번 렌더되고, 그 사이에 여기서 **옛 방의 히스토리 조회가 출발한다**.
+    // 그 뒤 activeRoomId 가 null 이 되어 화면이 메인으로 정리돼도, 늦게 도착한 응답이
+    // setMessages 로 옛 대화를 도로 붙여 넣었다. 방 A → 방 B 를 빠르게 눌러도 같은 종류의
+    // 어긋남이 난다(A 의 응답이 늦게 오면 B 화면에 A 의 대화가 뜬다).
+    let cancelled = false;
     (async () => {
       setHistoryLoaded(false);
       const history = await fetchRoomHistory(activeRoomId);
+      if (cancelled) return;
       if (history) {
         const hasOnlyGreeting = history.length > 0 && history.every((message) => message.role === "assistant" && message.isGreeting);
         const shouldAnimateGreeting = hasOnlyGreeting && !greetedRoomIdsRef.current.has(activeRoomId);
@@ -354,12 +479,17 @@ function TarotChat() {
       }
       setHistoryLoaded(true);
     })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeRoomId]);
 
   useEffect(() => {
     if (!greetingAnimationRoomId) return;
-    const timeout = setTimeout(() => setGreetingAnimationRoomId(null), 3600);
+    // 타이핑이 끝나기 전에 이 값이 풀리면 글자가 끝까지 튀어 버린다 — 네 줄을 다 찍는 데 드는
+    // 시간(대략 3.5초)보다 넉넉히 잡는다. 어차피 두 번째 방문은 greetedRoomIdsRef 가 막는다.
+    const timeout = setTimeout(() => setGreetingAnimationRoomId(null), 10_000);
     return () => clearTimeout(timeout);
   }, [greetingAnimationRoomId]);
 
@@ -503,6 +633,9 @@ function TarotChat() {
    *  계산이 그대로 대화방 모드로 넘어간다. */
   function enterRoom(id: string) {
     skipHistoryRoomIdRef.current = id;
+    // 닫아 둔 안내를 새 방으로 이어 준다. 이 경로는 재마운트 없이 roomId 만 바뀌므로, 안 옮기면
+    // 방금 질문을 보낸 사람 눈앞에서 말풍선이 되살아난다.
+    setHintDismissedFor(id);
     selectRoom(id);
     window.history.replaceState(null, "", `/tarot/${id}`);
   }
@@ -547,9 +680,9 @@ function TarotChat() {
           includeCompatibility: effectiveIncludeCompatibility,
         }),
       });
-      const data = await res.json();
-
+      // 스트림이 열리기 전에 걸린 것들(이용권 없음·정지·형식 오류)은 예전처럼 상태코드 + JSON 이다.
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         const suspensionInfo = parseSuspensionError(data);
         if (suspensionInfo) {
           setSuspension(suspensionInfo);
@@ -561,6 +694,73 @@ function TarotChat() {
         ]);
         return;
       }
+
+      /* 여기서부터는 NDJSON 스트림이다 — {"t":"delta"|"done"|"error"} 가 줄 단위로 온다.
+       *
+       * 델타마다 setState 를 때리면 대화 트리 전체가 초당 수십 번 다시 그려진다. ref 에 모아 두고
+       * 프레임당 한 번만 흘려보낸다. */
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("no-stream");
+      const decoder = new TextDecoder();
+      let buffered = "";
+      let data: ReadingDonePayload | null = null;
+      let streamError: string | null = null;
+      let frame = 0;
+      const flushToScreen = () => {
+        frame = 0;
+        setStreamingText(streamBufferRef.current);
+      };
+
+      streamBufferRef.current = "";
+      setStreamingText("");
+      setRedoing(false);
+      setStreamingCards(null);
+
+      readLoop: for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffered += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffered.indexOf("\n")) !== -1) {
+          const line = buffered.slice(0, nl).trim();
+          buffered = buffered.slice(nl + 1);
+          if (!line) continue;
+          const event = JSON.parse(line) as Record<string, unknown>;
+          if (event.t === "cards") {
+            // 카드는 LLM 이전에 확정된다 — 해석 첫 글자보다 먼저 깔린다.
+            setStreamingCards({
+              spread: (event.spread as SpreadKey | null) ?? null,
+              cards: (event.cards as TarotCardInfo[]) ?? [],
+            });
+          } else if (event.t === "delta") {
+            streamBufferRef.current += String(event.v ?? "");
+            if (!frame) frame = requestAnimationFrame(flushToScreen);
+          } else if (event.t === "redo") {
+            // 카드가 빠지는 등 형식이 깨져서 서버가 한 번 더 만드는 중. 다시 만든 쪽이 온전하면
+            // replace 가 오고, 아니면 지금 글이 그대로 남는다.
+            setRedoing(true);
+          } else if (event.t === "replace") {
+            streamBufferRef.current = String(event.v ?? "");
+            setRedoing(false);
+            if (!frame) frame = requestAnimationFrame(flushToScreen);
+          } else if (event.t === "error") {
+            streamError = String(event.error ?? "오류가 발생했어요.");
+            break readLoop;
+          } else if (event.t === "done") {
+            data = event as unknown as ReadingDonePayload;
+            break readLoop;
+          }
+        }
+      }
+      if (frame) cancelAnimationFrame(frame);
+      // 스트리밍 표시를 여기서 끄면 안 된다(2026-09-26). 바로 아래 refreshMe() 를 await 하는 순간
+      // 렌더가 한 번 도는데, 그때는 스트리밍 글이 사라졌고 완성된 메시지는 아직 안 붙은 상태다 —
+      // 답변이 통째로 없어졌다가 다시 나타나면서 스크롤이 튄다. 끄는 건 finally 한 곳에서만 한다.
+      if (streamError) {
+        setMessages((prev) => [...prev, { role: "error", text: streamError }]);
+        return;
+      }
+      if (!data) throw new Error("stream-ended-early");
 
       if (data.countPassApplied) await refreshMe();
       if (data.roomTitle) setRoomTitleLocal(targetRoomId, data.roomTitle);
@@ -613,6 +813,12 @@ function TarotChat() {
         ]);
       }
     } finally {
+      // 완성된 메시지를 붙인 **같은 렌더**에서 스트리밍 표시를 끈다 — 사이에 await 가 없으므로
+      // React 가 한 번에 묶는다. 둘이 갈라지면 답변이 한 프레임 사라졌다 나타난다.
+      streamBufferRef.current = "";
+      setStreamingText(null);
+      setStreamingCards(null);
+      setRedoing(false);
       setLoading(false);
       markReadingDone(targetRoomId);
     }
@@ -662,6 +868,12 @@ function TarotChat() {
   const SpreadIcon = SPREAD_ICONS[spread];
 
   const activeRoom = rooms.find((r) => r.id === activeRoomId);
+  /* 스크롤이 붙잡는 기준점 — **가장 최근 질문 말풍선**이다.
+   *
+   * "마지막 메시지가 질문일 때"로 잡으면 안 된다(2026-09-26 실제로 냈다). 답변이 붙는 순간
+   * 마지막은 답변이 되어 기준점이 사라지고, 그러면 아래 이펙트가 "맨 아래로" 예비 경로를 타서
+   * 읽고 있던 사람을 끝으로 끌고 간다. 답변이 와도 기준점은 그 질문 그대로여야 한다. */
+  const lastQuestionIndex = messages.reduce((found, message, index) => (message.role === "user" ? index : found), -1);
   // 메인(`/`)이냐 대화방(`/tarot/[roomId]`)이냐. 예전엔 "제목이 기본값이고 메시지가 0개인 방"
   // 으로 메인을 흉내냈는데(isBlankRoom), 이제 경로가 직접 말해준다.
   const isMain = roomId === null;
@@ -692,7 +904,7 @@ function TarotChat() {
           spread={spread}
           remainingBySpread={remainingBySpread}
           timePassActive={timePassActive}
-          onSelect={setSpread}
+          onSelect={chooseSpread}
           includeCompatibility={effectiveIncludeCompatibility}
           hasPartner={hasPartner}
           onToggleCompatibility={() => setIncludeCompatibility((v) => !v)}
@@ -742,7 +954,10 @@ function TarotChat() {
         />
       )}
       {suspension && <SuspensionModal info={suspension} onClose={() => setSuspension(null)} />}
-      <div className="app-topbar-glass absolute inset-x-0 top-0 z-20 flex h-16 items-center border-b border-border">
+      <div
+        ref={topBarRef}
+        className="app-topbar-glass absolute inset-x-0 top-0 z-20 flex h-16 items-center border-b border-border"
+      >
         <div className="flex h-full w-full items-center xl:mx-auto xl:max-w-4xl xl:pl-4">
         <button
           type="button"
@@ -751,7 +966,8 @@ function TarotChat() {
           className="relative flex h-16 w-16 shrink-0 items-center justify-center text-icon-muted xl:hidden"
         >
           <MenuIcon className="h-3 w-5" />
-          {hasUnreadNotifications && (
+          {/* 초기값 false 는 "새 알림 없음"이라는 단언이다 — 로드 전엔 아무 말도 하지 않는다. */}
+          {roomsLoaded && hasUnreadNotifications && (
             <span className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-point" />
           )}
         </button>
@@ -780,7 +996,10 @@ function TarotChat() {
               onClick={openMenu}
               className="min-w-0 flex-1 truncate text-center text-base font-semibold text-bold-text"
             >
-              {activeRoom?.title ?? DEFAULT_ROOM_TITLE}
+              {/* 로드 전에 DEFAULT_ROOM_TITLE 로 떨어뜨리면 안 된다(2026-09-26) — `rooms` 가
+                  []  이고 activeRoomId 도 아직 없어서, 제목이 있는 방을 열어도 상단바가 먼저
+                  "새 대화"라고 말한다. 방금 이름을 바꾼 사람에게는 되돌아간 것처럼 보인다. */}
+              {roomsLoaded ? activeRoom?.title ?? DEFAULT_ROOM_TITLE : ""}
             </button>
             {/* 시안(피그마 Redesign)의 상단바는 좌측 메뉴와 우측 더보기 둘뿐이다.
                 여기 있던 "새 대화" 버튼은 메뉴 드로어로만 두고 뺐다(2026-09-23). */}
@@ -850,7 +1069,12 @@ function TarotChat() {
             activeRoomId도 같이 보는 이유: 방이 없으면 히스토리 이펙트가 시작조차 하지 않아
             historyLoaded가 영원히 false다 — 예전엔 그래서 이 줄이 안 사라졌다. 방 목록을
             받는 동안(!roomsLoaded)은 그대로 로딩으로 보여준다. */}
-        {user && (!roomsLoaded || (activeRoomId !== null && !historyLoaded)) && (
+        {/* 한 번도 안 쓴 방(제목이 기본값 그대로)에는 **불러올 이전 대화가 없다** — 서버가 인사말을
+            합성해서 내려줄 뿐이다. 그런데도 이 줄을 띄우면, "새 대화"로 방금 만든 방에서 있지도
+            않은 대화를 찾는 것처럼 보인다(2026-09-26). */}
+        {user &&
+          (!roomsLoaded ||
+            (activeRoomId !== null && !historyLoaded && activeRoom?.title !== DEFAULT_ROOM_TITLE)) && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
         )}
         {/* 메인에서는 숨긴다(2026-09-25). 실패한 건 방 "목록"인데 메인엔 불러올 대화가
@@ -878,7 +1102,11 @@ function TarotChat() {
               // 실측(피그마 New/Chattingroom_*, 2026-09-24): 말풍선 x 104~388, 폭 284.
               // 오른쪽 끝은 대화 영역 패딩(24)에 딱 붙고 폭은 컨텐츠 폭 364의 78%에서 잘린다 —
               // max-w 가 없으면 긴 질문이 좌우를 꽉 채워 "오른쪽 말풍선"으로 안 보인다.
-              <div key={i} className="animate-fade-in max-w-[78%] self-end rounded-2xl bg-point px-4 py-2 text-white">
+              <div
+                key={i}
+                ref={i === lastQuestionIndex ? lastUserRef : undefined}
+                className="animate-fade-in max-w-[78%] self-end rounded-2xl bg-point px-4 py-2 text-white"
+              >
                 {msg.text}
               </div>
             );
@@ -890,15 +1118,25 @@ function TarotChat() {
               </div>
             );
           }
-          const greetingIndex = msg.isGreeting
-            ? messages.slice(0, i).filter((message) => message.role === "assistant" && message.isGreeting).length
-            : 0;
           const animateGreeting = msg.isGreeting && greetingAnimationRoomId === activeRoomId;
+          /* 인사말은 앞 줄이 다 찍힌 다음 줄이 시작한다 — 앞 줄들의 글자 수로 시작 시각을 누적한다.
+             예전엔 말풍선마다 1초씩 고정으로 밀었는데, 줄 길이가 제각각이라 짧은 줄 뒤에는 뜸이
+             남고 긴 줄 뒤에는 겹쳤다. */
+          const greetingDelayMs = msg.isGreeting
+            ? messages
+                .slice(0, i)
+                .filter((message) => message.role === "assistant" && message.isGreeting)
+                .reduce((acc, message) => acc + message.text.length * TYPING_SPEED_MS + GREETING_LINE_GAP_MS, 0)
+            : 0;
           return (
             <div
               key={i}
               className="animate-fade-in flex w-full flex-col items-start"
-              style={animateGreeting ? { animationDelay: `${greetingIndex}s`, animationFillMode: "backwards" } : undefined}
+              style={
+                animateGreeting
+                  ? { animationDelay: `${greetingDelayMs}ms`, animationFillMode: "backwards" }
+                  : undefined
+              }
             >
               {/* AI 답변에는 **말풍선 면이 없다**(피그마 New/Chattingroom_*, 2026-09-24 실측:
                   답변 영역의 x 40/200/360 전부 순수 배경색). 사용자 말풍선만 코랄 면을 갖고,
@@ -906,44 +1144,38 @@ function TarotChat() {
                   글자 기둥이 x 40.3~288.7 이라 패딩 16이 그대로 있고 폭은 사용자 말풍선과
                   같은 78%다. */}
               <div className="max-w-[78%] px-4 py-3">
-              {msg.cards.some((c) => c.id) && (
-                <div className="mb-2 flex justify-center">
-                  {msg.spread === "celtic" && msg.cards.length === 10 ? (
-                    <CelticCrossLayout cards={msg.cards} />
-                  ) : msg.spread === "dual" && msg.cards.length === 5 ? (
-                    <DualPathLayout cards={msg.cards} />
-                  ) : (
-                    <div className="flex gap-2">
-                      {msg.cards.map((c, j) => (
-                        <div key={j} className="max-w-40 flex-1">
-                          <CardImage card={c} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <SpreadCards spread={msg.spread} cards={msg.cards} />
               {msg.cards.length > 0 && msg.spread && (
-                <div className="mb-1 flex flex-col items-center gap-1">
-                  <span className="rounded-full border border-border px-3 py-1 text-base font-semibold text-text">
-                    {SPREADS[msg.spread].label}
-                  </span>
-                  <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
-                    {msg.cards.map((c, j) => (
-                      <span key={j} className="rounded-full bg-text px-3 py-1 font-semibold text-surface">
-                        {c.nameKo}
-                        {c.reversed ? "(역)" : ""}
-                      </span>
-                    ))}
-                    {msg.includeSaju && <span>· 사주</span>}
-                    {msg.includeZiwei && <span>· 자미두수</span>}
-                    {msg.includeCompatibility && (
-                      <span>· 궁합{msg.partnerNickname ? `(${msg.partnerNickname})` : ""}</span>
-                    )}
-                  </div>
+                /* 이 줄은 "무엇으로 본 리딩인가"만 알려준다 — 스프레드와 함께 켠 옵션을 같은 칩으로
+                   나란히 놓는다(2026-09-26 사용자 지시). 예전엔 뽑힌 카드 이름을 칩으로 죽 늘어놨는데,
+                   해석 본문이 "뽑힌 카드 목록"을 이미 글로 적어 줘서 같은 내용이 두 번 나왔다.
+                   토큰도 이때 함께 정리했다: border-border 테두리는 다크에서 배경과 거의 같아 안
+                   보였고, bg-text 칩은 혼자 라이트 모드처럼 떴다. */
+                <div className="mb-1 flex flex-wrap items-center justify-center gap-2">
+                  {[
+                    SPREADS[msg.spread].label,
+                    ...(msg.includeSaju ? ["사주"] : []),
+                    ...(msg.includeZiwei ? ["자미두수"] : []),
+                    ...(msg.includeCompatibility
+                      ? [`궁합${msg.partnerNickname ? ` · ${msg.partnerNickname}` : ""}`]
+                      : []),
+                  ].map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full bg-chip-soft px-3 py-1 text-base font-semibold text-chip-soft-text"
+                    >
+                      {label}
+                    </span>
+                  ))}
                 </div>
               )}
-              <div className="whitespace-pre-wrap">{renderInterpretation(msg.text)}</div>
+              <div className="whitespace-pre-wrap">
+                {animateGreeting ? (
+                  <TypewriterText text={msg.text} startDelayMs={greetingDelayMs} />
+                ) : (
+                  renderInterpretation(msg.text)
+                )}
+              </div>
               </div>
               {!msg.isGreeting && !msg.charged && !msg.guidanceOnly && (
                 <div className="mt-1 w-full text-xs">
@@ -1002,7 +1234,25 @@ function TarotChat() {
             </div>
           );
         })}
-        {showLoading && <ReadingLoadingMessage />}
+        {/* 스트리밍 중인 본문. 첫 글자가 닿기 전까지만 "카드를 섞고 있습니다..." 를 보여준다. */}
+        {(streamingCards || (streamingText !== null && streamingText.length > 0)) && (
+          <div className="flex w-full flex-col items-start">
+            {streamingCards && (
+              <div className="w-full max-w-[78%] px-4 pt-3">
+                <SpreadCards spread={streamingCards.spread} cards={streamingCards.cards} stagger />
+              </div>
+            )}
+            <div className="whitespace-pre-wrap px-4 text-text">{renderInterpretation(streamingText ?? "")}</div>
+            {redoing && (
+              <p aria-live="polite" className="mt-2 text-sm text-icon-muted">
+                빠진 카드가 있어 해석을 다시 정리하고 있어요...
+              </p>
+            )}
+          </div>
+        )}
+        {showLoading && (streamingText === null || streamingText.length === 0) && <ReadingLoadingMessage />}
+        {/* 질문 말풍선을 화면 맨 위까지 밀어 올리기 위한 빈 공간 — 높이는 위 스크롤 이펙트가 잰다. */}
+        <div ref={tailSpacerRef} aria-hidden className="shrink-0" />
         <div ref={messagesEndRef} />
         </div>
       </div>
@@ -1018,7 +1268,13 @@ function TarotChat() {
             시간제 쪽으로 바뀐다 — 실제 차감 우선순위와 같은 순서다. */}
         {/* 메인에는 이용권 바가 없다(피그마 New/Main_*) — 아직 어느 방에서 뭘 쓸지 정해지기
             전이라 보여줄 잔량도 없다. */}
-        {isMain ? null : timePassActive && activeTimePass ? (
+        {/* 로드 전에는 바 **자리만** 비워 둔다(2026-09-26). 초기값이 null/[] 이라 그냥 두면
+            "이용권 없음"으로 렌더돼 바가 사라졌다가 나타나고, 그때마다 컴포저가 40px
+            (h-8 + mb-2) 튄다. 대화방까지 온 사람은 대개 이용권 보유자라, 자리를 비워 두는
+            쪽이 튀는 사람 수가 적다. */}
+        {isMain ? null : !roomsLoaded ? (
+          <div className="mb-2 h-8" />
+        ) : timePassActive && activeTimePass ? (
           <PassBar
             label={`${activeTimePass.minutes}분 ${COMBOS[activeTimePass.combo].label}`}
             value={`남은 시간: ${formatRemaining(new Date(activeTimePass.expiresAt).getTime() - now)}`}
@@ -1038,18 +1294,56 @@ function TarotChat() {
             value={`남은 사용량: ${(activeCountPass.remaining * 100).toFixed(1)}%`}
             onOpen={() => setPassUsageOpen(true)}
           />
-        ) : null}
+        ) : (
+          /* 이용권이 없을 때도 바를 띄운다(2026-09-26 사용자 요청). 예전엔 여기서 null 을
+             돌려 바가 통째로 사라지고 안내는 화면 맨 아래 "보유 이용권 없음" 한 줄이었는데,
+             정작 이용권 얘기를 하는 자리는 입력창 바로 위다. 덤으로 바가 사라졌다 나타나며
+             컴포저가 40px 튀던 것도 같이 없어진다. */
+          <PassBar label="보유 이용권이 없습니다." onOpen={() => setPassUsageOpen(true)} />
+        )}
 
         {/* 시안(피그마 Redesign)의 MessageBox 는 382x57 한 줄이다 — 칩·입력·보내기가
             같은 줄에 선다. 예전엔 입력칸 아래에 버튼 줄이 따로 있어 두 줄이었다.
             여러 줄로 늘어나면 버튼은 바닥에 붙는다(items-end). */}
         <form
           onSubmit={handleSubmit}
-          className="flex items-end gap-2 rounded-[28px] border border-border bg-surface p-2"
+          className="relative flex items-end gap-2 rounded-[28px] border border-border bg-surface p-2"
         >
+          {/* 스프레드 버튼을 가리키는 말풍선. 버튼 **안**에 넣을 수 없다 — 닫기 X 가 버튼이라
+              button 중첩이 된다. 그래서 form 을 기준으로 띄우고 left-2 로 버튼(p-2 안쪽)에 맞춘다.
+              꼬리는 같은 면색 사각형을 45도 돌려 알약 아래에 반쯤 걸친 것이다.
+
+              면색은 **내 질문 말풍선과 같은 것**을 쓴다(bg-point + 흰 글자, 2026-09-26 사용자
+              지시) — 토큰이라 다크/라이트가 각각 따라온다. 그라데이션·글로우는 button.bg-point
+              규칙이라 div 인 여기에는 안 걸리고, 대화의 질문 말풍선(div.bg-point)과 같은 평면이다. */}
+          {hintDismissedFor !== roomId && (
+            <div
+              role="status"
+              className="absolute bottom-full left-2 z-10 -mb-1 flex h-8 items-center gap-1 rounded-full bg-point pl-3 pr-1 text-xs font-semibold text-white"
+            >
+              <span className="whitespace-nowrap">현재 타로 모드: {INPUT_MODE_SPREAD_LABEL[spread]}</span>
+              <button
+                type="button"
+                onClick={() => setHintDismissedFor(roomId)}
+                aria-label="현재 타로 모드 안내 닫기"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+              >
+                <CloseIcon className="h-3 w-3" />
+              </button>
+              <span
+                aria-hidden
+                className="absolute -bottom-1.5 left-4 h-2.5 w-2.5 rotate-45 bg-point"
+              />
+            </div>
+          )}
           <button
             type="button"
-            onClick={() => setSpreadSheetOpen(true)}
+            onClick={() => {
+              // 시트를 열었다는 건 스프레드를 직접 확인하러 갔다는 뜻이라, 안내는 할 일을
+              // 다 했다(2026-09-26 사용자 지시). 게다가 말풍선이 가리키던 버튼을 누른 것이다.
+              setHintDismissedFor(roomId);
+              setSpreadSheetOpen(true);
+            }}
             aria-label={inputModeLabel}
             className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
           >
@@ -1079,6 +1373,9 @@ function TarotChat() {
               }
             }}
             onFocus={() => {
+              // 입력을 시작하면 안내는 할 일을 다 했다. 아래 조기 return 들보다 먼저 닫는다 —
+              // 로그인·이용권 모달이 뜨는 경우에도 그 뒤에 말풍선이 남아 있을 이유가 없다.
+              setHintDismissedFor(roomId);
               if (!user) {
                 questionInputRef.current?.blur();
                 setLoginModalOpen(true);
@@ -1104,11 +1401,18 @@ function TarotChat() {
         </form>
 
         {/* 생년월일시·궁합 상대·보유 이용권은 전부 계정에 딸린 안내라 비로그인에는 띄우지
-            않는다 — 링크를 눌러봤자 /login으로 튕긴다. */}
+            않는다 — 링크를 눌러봤자 /login으로 튕긴다.
+
+            셋 다 roomsLoaded 를 같이 본다(2026-09-25). 전부 "없을 때" 뜨는 안내인데 세 값의
+            초기값이 없음(false/null)이라, `/api/user/me` 가 오기 전 수백 ms 동안 **이미 다
+            갖춘 사람에게도** 세 줄이 떴다가 사라진다 — 컴포저 아래가 세 줄만큼 밀렸다 돌아온다.
+            서브페이지는 레이아웃에서 통째로 늦추지만(app/layout.tsx) 여기는 비로그인도
+            머무는 화면이라 그럴 수 없어 자리마다 건다. noUsableTicket 이 이미 같은 이유로
+            roomsLoaded 를 보고 있다. */}
         {user && (
         <div className="flex flex-col items-start gap-1 px-1 pt-1.5 text-xs">
           <div className="flex flex-col gap-0.5">
-            {!hasBirthInfo && (
+            {roomsLoaded && !hasBirthInfo && (
               <p className="text-placeholder">
                 <Link href="/me" className="text-point-text underline">
                   내 정보
@@ -1116,7 +1420,7 @@ function TarotChat() {
                 에서 생년월일시를 입력하면 사주/자미두수도 함께 볼 수 있어요.
               </p>
             )}
-            {!hasPartner && (
+            {roomsLoaded && !hasPartner && (
               <p className="text-placeholder">
                 <Link href="/compatibility" className="text-point-text underline">
                   궁합 상대 정보
@@ -1125,10 +1429,8 @@ function TarotChat() {
               </p>
             )}
           </div>
-          {/* 보유 이용권 표시는 컴포저 위 PassBar 로 옮겼다. 여기엔 아무것도 없을 때만 남긴다. */}
-          {!timePassActive && !activeCountPass && (
-            <span className="whitespace-nowrap text-icon-muted">보유 이용권 없음</span>
-          )}
+          {/* 보유 이용권 표시는 전부 컴포저 위 PassBar 로 옮겼다 — 없을 때의 안내도 거기 있다
+              (2026-09-26). 화면 맨 아래는 이용권 얘기를 읽는 자리가 아니다. */}
         </div>
         )}
         {/* 사업자정보는 **메인에만** 둔다(피그마 New/Main_*, 2026-09-24). 전자상거래법

@@ -82,10 +82,25 @@ export async function chargeActiveCountPass(
 ): Promise<void> {
   const snap = await tx.get(passRef);
   const pass = snap.data() as CountPassBalance | undefined;
-  if (!pass || availableCount(pass, spread, saju, ziwei) < 1) {
+  if (!pass) throw new Error("COUNT_PASS_UNAVAILABLE");
+
+  /* 고정 조합 이용권은 **자기 조합으로만** 차감된다(2026-09-26).
+   *
+   * 호출부는 "모델이 사주/자미두수를 실제로 다뤘는가"를 본 뒤 못 다룬 항목을 빼고 넘긴다. 잔량
+   * 칸이 (스프레드×사주×자미두수)로 쪼개진 combo:"any" 이용권에서는 그게 곧 "덜 깎는 것"이라
+   * 의미가 있지만, 조합이 하나로 고정된 이용권에는 그런 칸이 없다. 그래서 줄인 플래그를 그대로
+   * 넘기면 availableCount 가 "조합 불일치"로 0을 돌려주고, 멀쩡한 이용권을 들고도
+   * "남은 횟수가 방금 소진됐어요" 를 보게 된다 — 실제로 냈다.
+   *
+   * 감지 목록이 답변 어휘를 못 따라가는 일은 앞으로도 생긴다. 그때 요청이 통째로 막히는 대신
+   * 정상 차감되도록, 여기서 조합을 이용권 기준으로 되돌린다. */
+  const charge =
+    pass.combo === "any" ? { saju, ziwei } : { saju: COMBOS[pass.combo].saju, ziwei: COMBOS[pass.combo].ziwei };
+
+  if (availableCount(pass, spread, charge.saju, charge.ziwei) < 1) {
     throw new Error("COUNT_PASS_UNAVAILABLE");
   }
-  const nextRemaining = remainingAfterUse(pass, spread, saju, ziwei);
+  const nextRemaining = remainingAfterUse(pass, spread, charge.saju, charge.ziwei);
   const nextStatus = nextRemaining <= 0 ? "exhausted" : "active";
   tx.update(passRef, { remaining: nextRemaining, status: nextStatus, usedCount: FieldValue.increment(1) });
   tx.update(userRef, {

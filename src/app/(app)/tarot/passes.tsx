@@ -167,7 +167,8 @@ export function PassBar({
   onOpen,
 }: {
   label: string;
-  value: string;
+  /** 이용권이 하나도 없을 땐 안 준다 — 바에 안내 문구만 남는다. */
+  value?: string;
   /** 시간제일 때만 준다 — 남은 시간 비율. 횟수제 바에는 링이 없다. */
   ringPercent?: number;
   onOpen: () => void;
@@ -182,9 +183,11 @@ export function PassBar({
       >
         <SearchIcon className="h-3 w-3" />
       </button>
-      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-placeholder">{label}</span>
+      <span className={`min-w-0 flex-1 truncate text-xs font-semibold text-placeholder ${value ? "" : "pr-2"}`}>
+        {label}
+      </span>
       {ringPercent !== undefined && <ProgressRing percent={ringPercent} size={12} stroke={2} />}
-      <span className="shrink-0 pr-2 text-xs font-semibold text-placeholder">{value}</span>
+      {value && <span className="shrink-0 pr-2 text-xs font-semibold text-placeholder">{value}</span>}
     </div>
   );
 }
@@ -301,7 +304,12 @@ export function PurchaseTicketModal({
           언제든 이용권을 채워주세요.
         </p>
         <div className="mt-6 flex gap-3">
-          <button type="button" onClick={onInvite} className="h-12 flex-1 rounded-full bg-cta-fill text-base font-bold text-cta-text">
+          {/* 보조 버튼은 통일 모달과 같은 면색을 쓴다(ModalShell 의 tone="neutral", 2026-09-26).
+              예전엔 bg-cta-fill 이었는데 그 토큰은 다크에서 #e2dddd — 거의 흰색이다. 그래서
+              다크 모드에서 **혼자 라이트 모드 버튼처럼** 보였고(사용자 리포트), 옆의 코랄
+              "이용권 구입하기"보다 더 튀어서 주·보조가 뒤집혀 보였다. 이 모달은 ModalShell 을
+              쓰지 않는 옛 마크업이라 09-25 통일에서 빠져 있었다. */}
+          <button type="button" onClick={onInvite} className="h-12 flex-1 rounded-full bg-chip-fill text-base font-bold text-white">
             친구 초대하기
           </button>
           <button type="button" onClick={onPurchase} className="h-12 flex-1 rounded-full bg-point text-base font-bold text-white">

@@ -29,17 +29,29 @@ function optionsLabel(e: UsageEntry) {
 
 export default function UsageHistoryPage() {
   const [entries, setEntries] = useState<UsageEntry[] | null>(null);
+  /** 조회가 끝나긴 했는데 값을 못 받은 상태. `entries` 를 `[]` 로 떨어뜨려 겸하면 안 된다 —
+   *  그러면 "아직 이용 내역이 없어요"가 뜬다. 실패를 "없음"이라고 말하는 셈이다(2026-09-26). */
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (u: User | null) => {
       if (!u) return;
-      const idToken = await u.getIdToken();
-      const res = await fetch("/api/user/usage-history", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (res.ok) {
+      // 실패해도 반드시 로딩을 끝낸다. 예전엔 `if (res.ok)` 에 else 가 없어서 401(이 저장소에선
+      // 로컬 ADC 만료로 흔하다)이면 "불러오는 중..."에서 영영 멈췄다 — 사용자에겐 느린 화면과
+      // 구분이 안 된다. getIdToken·fetch·json 이 던지는 경우도 같은 결과라 통째로 감싼다.
+      try {
+        const idToken = await u.getIdToken();
+        const res = await fetch("/api/user/usage-history", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) {
+          setLoadFailed(true);
+          return;
+        }
         const data = await res.json();
         setEntries(data.entries);
+      } catch {
+        setLoadFailed(true);
       }
     });
   }, []);
@@ -48,7 +60,9 @@ export default function UsageHistoryPage() {
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="이용 내역" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
-        {entries === null ? (
+        {loadFailed ? (
+          <p className="pt-8 text-center text-sm text-icon-muted">이용 내역을 불러오지 못했어요.</p>
+        ) : entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (
           <p className="pt-8 text-center text-sm text-icon-muted">아직 이용 내역이 없어요.</p>

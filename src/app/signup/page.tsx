@@ -66,6 +66,12 @@ export default function SignupPage() {
   const [birthTime, setBirthTime] = useState("");
   const [timeUnknown, setTimeUnknown] = useState(false);
   const [gender, setGender] = useState<BirthInfo["gender"] | "">("");
+  /** 기존 값이 도착했는가. 여기는 (app) 그룹 **밖**이라 레이아웃 게이트가 닿지 않는다
+   *  (2026-09-26). 가드가 없으면 카카오에서 받은 닉네임·기존 생년월일이 들어오기 전에 빈 폼이
+   *  한 번 뜨고, 성별 토글은 아무것도 안 고른 상태였다가 옮겨간다 — 가입 첫 화면에서
+   *  "내 정보가 안 넘어왔네"로 읽힌다. 그 사이 타이핑한 값도 응답이 덮어쓴다. */
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [birthPlace, setBirthPlace] = useState("");
 
   useEffect(() => {
@@ -76,11 +82,16 @@ export default function SignupPage() {
         return;
       }
 
-      const idToken = await u.getIdToken();
-      const res = await fetch("/api/user/me", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (res.ok) {
+      // 실패도 반드시 끝낸다 — 안 그러면 가입 화면이 로딩에서 굳어 **가입 자체를 못 한다**.
+      try {
+        const idToken = await u.getIdToken();
+        const res = await fetch("/api/user/me", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) {
+          setLoadFailed(true);
+          return;
+        }
         const data = await res.json();
         if (data.nickname) setNickname(data.nickname);
 
@@ -93,6 +104,9 @@ export default function SignupPage() {
           setGender(info.gender);
           setBirthPlace(info.birthPlace ?? "");
         }
+        setLoaded(true);
+      } catch {
+        setLoadFailed(true);
       }
     });
   }, [router]);
@@ -161,6 +175,15 @@ export default function SignupPage() {
         <BrandBi />
       </div>
 
+      {loadFailed ? (
+        <p className="pt-8 text-center text-sm leading-relaxed text-icon-muted">
+          정보를 불러오지 못했어요.
+          <br />
+          잠시 후 다시 시도해주세요.
+        </p>
+      ) : !loaded ? (
+        <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
+      ) : (
       <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 overflow-y-auto">
         <div className="flex flex-col gap-4 rounded-[32px] border border-border bg-topbar p-4">
           <label className="flex flex-col gap-1">
@@ -269,6 +292,7 @@ export default function SignupPage() {
           타연 가입하기
         </button>
       </form>
+      )}
     </main>
   );
 }

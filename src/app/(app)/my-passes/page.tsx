@@ -55,15 +55,29 @@ function spreadLabel(spread: (typeof SPREAD_ORDER)[number], combo: ComboKey | "a
  */
 export default function MyPassesPage() {
   const [passes, setPasses] = useState<HeldPass[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ message: string; tone: "info" | "error" } | null>(null);
 
+  // 예전엔 실패를 `[]` 로 떨어뜨렸다 — 그러면 "보유 중인 이용권이 없어요"가 뜬다. 돈 주고 산
+  // 사람에게 없다고 말하는 화면이고, 환불 창구도 여기라 더 나쁘다. 실패는 실패라고 말한다
+  // (2026-09-26). 던지는 경우도 같이 잡는다 — 호출부가 `void load(u)` 라 rejection 이 그냥
+  // 버려져서, 그때는 "불러오는 중..."에서 굳었다.
   const load = useCallback(async (user: User) => {
-    const res = await fetch("/api/user/held-passes", {
-      headers: { Authorization: `Bearer ${await user.getIdToken()}` },
-    });
-    setPasses(res.ok ? (await res.json()).passes : []);
+    try {
+      const res = await fetch("/api/user/held-passes", {
+        headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+      });
+      if (!res.ok) {
+        setLoadFailed(true);
+        return;
+      }
+      setPasses((await res.json()).passes);
+      setLoadFailed(false);
+    } catch {
+      setLoadFailed(true);
+    }
   }, []);
 
   useEffect(() => onAuthStateChanged(auth, (u) => { if (u) void load(u); }), [load]);
@@ -95,7 +109,9 @@ export default function MyPassesPage() {
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="내 보유 이용권" />
       <div className="flex-1 overflow-visible p-4 pb-28 pt-20 xl:overflow-y-auto scroll-gutter-stable">
-        {passes === null ? (
+        {loadFailed ? (
+          <p className="pt-8 text-center text-sm text-icon-muted">보유 이용권을 불러오지 못했어요.</p>
+        ) : passes === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : passes.length === 0 ? (
           <p className="pt-8 text-center text-sm leading-relaxed text-icon-muted">

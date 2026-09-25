@@ -45,7 +45,9 @@ export type ZiweiResult = {
   timeUnknown: boolean;
 };
 
-export function calculateZiwei(birthInfo: BirthInfo): ZiweiResult | null {
+/** 명반 객체를 만든다. 대한·유년·사화(`horoscope.ts`)도 같은 명반에서 뽑아야 해서 따로 뺐다 —
+ *  시진 변환과 자시 관법 처리가 두 벌이 되면 언젠가 한쪽만 고쳐진다. */
+export function buildAstrolabe(birthInfo: BirthInfo) {
   if (!birthInfo.birthDate) return null;
 
   const [year, month, day] = birthInfo.birthDate.split("-").map(Number);
@@ -62,10 +64,14 @@ export function calculateZiwei(birthInfo: BirthInfo): ZiweiResult | null {
   const dateStr = `${y}-${m}-${d}`;
   const gender = GENDER_LABEL[birthInfo.gender];
 
-  const astrolabe =
-    birthInfo.calendarType === "lunar"
-      ? astro.byLunar(dateStr, timeIndex, gender, false, true, "ko-KR")
-      : astro.bySolar(dateStr, timeIndex, gender, true, "ko-KR");
+  return birthInfo.calendarType === "lunar"
+    ? astro.byLunar(dateStr, timeIndex, gender, false, true, "ko-KR")
+    : astro.bySolar(dateStr, timeIndex, gender, true, "ko-KR");
+}
+
+export function calculateZiwei(birthInfo: BirthInfo): ZiweiResult | null {
+  const astrolabe = buildAstrolabe(birthInfo);
+  if (!astrolabe) return null;
 
   const json = astrolabe.toJSON();
 

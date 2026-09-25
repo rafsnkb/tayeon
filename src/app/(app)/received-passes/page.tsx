@@ -47,6 +47,9 @@ export default function ReceivedPassesPage() {
   const { refreshMe, hasBirthInfo, myTimeUnknown } = useRooms();
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
   const [entries, setEntries] = useState<ReceivedPass[] | null>(null);
+  /** 실패를 빈 목록으로 겸하면 "받은 이용권이 없어요"가 뜬다 — 선물이 와 있는데 없다고
+   *  말하는 화면이다. 따로 든다(2026-09-26). */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<ComboKey | null>(null);
   const [claiming, setClaiming] = useState(false);
@@ -63,12 +66,21 @@ export default function ReceivedPassesPage() {
     setSelectedCombo(combo);
   }
 
+  // 실패해도 로딩을 끝낸다(2026-09-26). 예전엔 `if (res.ok)` 만 있어서 401·5xx 면 화면이
+  // "불러오는 중..."에서 굳었고, 던지는 경우엔 호출부(await load(u))까지 같이 reject 됐다.
   async function load(u: User) {
-    const idToken = await u.getIdToken();
-    const res = await fetch("/api/user/received-passes", { headers: { Authorization: `Bearer ${idToken}` } });
-    if (res.ok) {
+    try {
+      const idToken = await u.getIdToken();
+      const res = await fetch("/api/user/received-passes", { headers: { Authorization: `Bearer ${idToken}` } });
+      if (!res.ok) {
+        setLoadFailed(true);
+        return;
+      }
       const data = await res.json();
       setEntries(data.entries);
+      setLoadFailed(false);
+    } catch {
+      setLoadFailed(true);
     }
   }
 
@@ -128,7 +140,9 @@ export default function ReceivedPassesPage() {
       {/* 제목은 두 탭이 공유한다 — "보유 이용권"과 "받은 이용권 내역"이 한 화면의 두 면이다. */}
       <SubPageTopBar title="내 보유 이용권" />
       <div className="flex-1 overflow-visible p-4 pb-28 pt-20 xl:overflow-y-auto scroll-gutter-stable">
-        {entries === null ? (
+        {loadFailed ? (
+          <p className="pt-8 text-center text-sm text-icon-muted">받은 이용권을 불러오지 못했어요.</p>
+        ) : entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (
           <p className="pt-8 text-center text-sm text-icon-muted">아직 받은 이용권이 없어요.</p>

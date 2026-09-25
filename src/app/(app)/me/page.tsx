@@ -366,8 +366,11 @@ export default function MyPage() {
                   <span className="text-base font-semibold leading-none text-placeholder">
                     {bonusReward ? `${bonusReward.month}월 결제금액` : "이번 달 결제금액"}
                   </span>
+                  {/* 도착 전에 `?? 0` 으로 "0원"을 단언하면 안 된다(2026-09-26) — 이번 달에
+                      결제한 사람에게 "0원 / 5만 원 이상 결제하시면…"이라고 말하게 된다.
+                      같은 화면 위쪽(요율)은 이미 `!bonusReward ? "-"` 로 처리돼 있었다. */}
                   <span className="text-2xl font-bold leading-none text-chip-soft-text">
-                    {(bonusReward?.supplyWon ?? 0).toLocaleString("ko-KR")}원
+                    {bonusReward ? `${bonusReward.supplyWon.toLocaleString("ko-KR")}원` : "-"}
                   </span>
                 </div>
                 {bonusReward && bonusReward.projectedPasses > 0 ? (
@@ -410,10 +413,18 @@ export default function MyPage() {
                   </div>
                 ) : (
                   <div className="my-auto flex items-center justify-center p-4">
+                    {/* 아직 조회 중인 것과 기준 미달을 가른다 — 도착 전에 미달 안내를 띄우면
+                        이미 충분히 결제한 사람이 "더 결제하라"는 말을 먼저 본다. */}
                     <p className="text-center text-sm font-semibold text-placeholder">
-                      {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
-                      <br />
-                      리워드 이용권을 지급해 드려요.
+                      {!bonusReward ? (
+                        "불러오는 중..."
+                      ) : (
+                        <>
+                          {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
+                          <br />
+                          리워드 이용권을 지급해 드려요.
+                        </>
+                      )}
                     </p>
                   </div>
                 )}

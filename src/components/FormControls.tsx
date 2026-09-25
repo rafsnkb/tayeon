@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import WheelPicker, { type WheelColumn } from "@/components/WheelPicker";
-import { QuestionCircleIcon } from "@/app/(app)/tarot/icons";
+import { SearchIcon } from "@/app/(app)/tarot/icons";
+import ModalShell, { ModalButton } from "@/components/ModalShell";
 import { BIRTH_YEAR_MIN, dayCount, monthChoices, toBirthDate } from "@/lib/tarot/birthWheel";
 import type { CalendarMode } from "@/lib/tarot/birthInfo";
 
@@ -79,14 +80,72 @@ function WheelField({
   );
 }
 
-/** "태어난 시간" 아래 안내문. 목업(MyProfile_*)이 원형 물음표를 앞에 둔다. 같은 문장이 가입·
- *  내 프로필·궁합 세 곳에 복사돼 있었다. */
-export function BirthTimeNotice() {
+/** 경고 옆 돋보기를 눌렀을 때 뜨는 설명(목업 `asset/Screen/ZeweiTimeInfo.png`).
+ *
+ *  **왜** 시간이 필요한지가 없으면 그 경고는 "안 됩니다"로만 읽힌다 — 시간을 모르는 사람이
+ *  아무 값이나 찍어 넣는 것보다, 왜 필요한지 알고 확인해 오는 쪽이 낫다.
+ *
+ *  목업은 구버전 디자인이라(사용자 확인) 색은 지금 토큰으로 옮겼다. 실측한 것은 **관계**다:
+ *  모달 면 #19191d 위에 본문이 한 단 밝은 박스 #2a2c31 로 얹혀 있고, 본문은 muted(#868b9a)
+ *  에 강조만 흰색이다. 이 "면 위의 한 단 밝은 박스"는 스프레드 시트의 안쪽 패널과 같은 관계라
+ *  같은 토큰 짝(bg-bg / dark:bg-chip-fill)을 쓴다.
+ *
+ *  목업에는 하단 버튼이 없지만 여기서는 둔다 — 알림형 모달을 ModalForm 한 폼으로 통일한
+ *  결정(2026-09-25)이 더 뒤에 내려졌고, 버튼 없는 모달만 혼자 다른 모양이 된다. */
+function BirthTimeWhyModal({ onClose }: { onClose: () => void }) {
   return (
-    <p className="flex items-center gap-1.5 pt-1 text-sm font-semibold text-urgent">
-      <QuestionCircleIcon className="h-4 w-4 shrink-0" />
-      태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요
-    </p>
+    <ModalShell
+      title="자미두수에 태어난 시간이 꼭 필요한 이유"
+      onClose={onClose}
+      footer={<ModalButton onClick={onClose}>확인</ModalButton>}
+    >
+      <div className="flex flex-col gap-4 rounded-2xl bg-bg p-4 text-left text-icon-muted dark:bg-chip-fill">
+        <p>
+          태어난 월과 <b className="text-bold-text">[시간]</b>을 조합해야 내 운명의 중심인{" "}
+          <b className="text-bold-text">[명궁]</b>의 위치가 정해져요.
+        </p>
+        <p>
+          태어난 시간이 2시간만 달라져도 명궁의 위치가 바뀌고, 그러면 다른 별의 배치까지 완전히
+          바뀌어 <b className="text-bold-text">전혀 다른 사람의 운명표</b>가 되어버립니다.
+        </p>
+        <p>
+          결론적으로 태어난 시간은 내 운명의 지도를 그리기 위한{" "}
+          <b className="text-bold-text">&apos;시작점의 정확한 좌표&apos;</b> 역할을 해요.
+        </p>
+        <p>
+          좌표가 없거나 틀리면 지도를 아예 펼칠 수 없거나 남의 지도를 읽게 되기 때문에{" "}
+          <b className="text-bold-text">시간이 반드시 필요합니다.</b>
+        </p>
+      </div>
+    </ModalShell>
+  );
+}
+
+/** "태어난 시간" 아래 안내문. 같은 문장이 가입·내 프로필·궁합 세 곳에 복사돼 있었다. */
+export function BirthTimeNotice() {
+  const [whyOpen, setWhyOpen] = useState(false);
+  return (
+    // 예전엔 `?` 아이콘이 <p> 안의 **장식**이었다(2026-09-25 휠 커밋에서 들어옴). 물음표
+    // 동그라미는 누르면 설명이 나오는 표시라, 눌러 본 사용자가 아무 반응 없는 것을 버그로
+    // 겪었다(2026-09-26 리포트). 실제 버튼으로 만들고 모양은 마이페이지의 "자세히 보기"
+    // 돋보기 알약과 맞췄다(사용자 지시) — 같은 뜻의 조작이 같은 모양이어야 한다.
+    //
+    // 모달은 반드시 이 <p> **밖**이다. 안에 넣었더니 모달 본문의 <p> 가 중첩돼
+    // "`<p>` cannot be a descendant of `<p>`" 하이드레이션 에러가 났다.
+    <>
+      <p className="flex items-center gap-1.5 pt-1 text-sm font-semibold text-urgent">
+        <button
+          type="button"
+          onClick={() => setWhyOpen(true)}
+          aria-label="자미두수에 태어난 시간이 꼭 필요한 이유 보기"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-chip-soft text-chip-soft-text"
+        >
+          <SearchIcon className="h-3 w-3" />
+        </button>
+        태어난 시간을 모르면 자미두수 기능을 사용할 수 없어요
+      </p>
+      {whyOpen && <BirthTimeWhyModal onClose={() => setWhyOpen(false)} />}
+    </>
   );
 }
 

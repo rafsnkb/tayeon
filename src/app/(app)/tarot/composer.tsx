@@ -166,7 +166,13 @@ export function SpreadSelectSheet({
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl bg-border/40 p-2">
+        {/* 안쪽 패널 면색은 아래 "궁합 해석 추가" 박스와 **같아야 한다**(2026-09-26 사용자 지적).
+            목업 실측: 시트 면 #19191d 위에 두 박스가 **둘 다 #2a2c31**(SpreadSelect.png ·
+            SpreadSelect-2.png), 라이트는 #f7f4fb 위에 둘 다 #fcfbfd. 여기만 bg-border/40 을
+            쓰고 있었는데 그건 --topbar(#1a1616) 위에 #1f1b1b 를 40% 얹은 값이라 ≈#1c1818 —
+            시트와 거의 구분되지 않아 다크에서 두 박스가 눈에 띄게 달라 보였다.
+            목업의 hex 를 그대로 베끼지 않고 토큰으로 옮긴다(목업↔토큰 충돌 시 토큰 우선). */}
+        <div className="flex flex-col gap-1 rounded-2xl bg-bg p-2 dark:bg-chip-fill">
           {(Object.keys(SPREADS) as SpreadKey[]).map((key, i) => {
             const Icon = SPREAD_ICONS[key];
             const selected = spread === key;

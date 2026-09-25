@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { pickBestCoupon, discountedAmount } from "@/lib/payment/discountCoupon";
+import { discountedAmount } from "@/lib/payment/discountCoupon";
 import PortOne, { PaymentPayMethod } from "@portone/browser-sdk/v2";
 import {
   COUNT_PACKAGES,
@@ -53,11 +53,6 @@ const TIME_DURATIONS: TimeDuration[] = [15, 30, 60];
 /** 피그마 "Screen / Buy - Coin"·"Buy - CountPurchase". 포트원 V2 결제창을 직접 호출해 횟수제·
  * 시간제 이용권을 구매한다. 횟수제는 2026-09-18부터 구매 시점에 조합(타로전용/+사주/+자미두수/
  * +사주자미두수) 하나를 반드시 골라야 하고, 그 조합으로 완전히 고정된 이용권이 발급된다. */
-/** 화면에 쓸 "지금 적용될 쿠폰". 서버(`prepare`)가 쓰는 것과 **같은 순수 함수**로 고른다 —
- *  화면이 따로 계산하면 표시가와 청구가가 갈린다. 서버는 결제 직전에 다시 판정하므로 이건
- *  어디까지나 표시용이고, 신뢰의 근원이 아니다. */
-type UsableCoupon = { code: string; name: string; discountRate: number; startsAt: string; endsAt: string };
-
 export default function ChargePage() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => (searchParams.get("tab") === "time" ? "time" : "count"));
@@ -73,11 +68,13 @@ export default function ChargePage() {
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [noBirthTimeOpen, setNoBirthTimeOpen] = useState(false);
   const [suspension, setSuspension] = useState<SuspensionInfo | null>(null);
-  const [coupon, setCoupon] = useState<UsableCoupon | null>(null);
   // 쿠폰은 1 회용이라 자동 적용이 늘 이득은 아니다 — 3,000 원짜리에 30% 를 태우면 900 원 깎고
   // 사라진다. 이번 결제에는 쓰지 않도록 끌 수 있게 한다(2026-09-25 사용자 결정).
   const [useCoupon, setUseCoupon] = useState(true);
-  const { user, email, nickname, refreshMe, countPasses, timePasses, activeTimePass, hasBirthInfo, myTimeUnknown } = useRooms();
+  // 쿠폰은 **진입 시점에 이미** 알고 있어야 한다 — 마운트 후 따로 조회하면 첫 렌더가 정가였다가
+  // 할인가로 바뀌면서 가격이 눈에 띄게 튄다(2026-09-25 사용자 리포트). /api/user/me 가 로그인
+  // 시점에 실어다 주므로 여기서는 읽기만 한다.
+  const { user, email, nickname, refreshMe, countPasses, timePasses, activeTimePass, hasBirthInfo, myTimeUnknown, activeCoupon: coupon } = useRooms();
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
   const heldCountPass = countPasses.find(
     (pass) => pass.source === "purchase" && HELD_PASS_STATUSES.includes(pass.status)
@@ -89,34 +86,21 @@ export default function ChargePage() {
   const { amountWon: price, discountWon } = appliedCoupon
     ? discountedAmount(listPrice, appliedCoupon.discountRate)
     : { amountWon: listPrice, discountWon: 0 };
-  /** 목록 카드에 붙일 할인 정보. 상품마다 정가가 달라 금액은 카드에서 각자 계산한다. */
+  /** 목록 카드에 붙일 할인 정보. 상품마다 정가가 달라 금액은 카드에서 각자 계산한다.
+   *
+   *  **appliedCoupon 이 아니라 coupon 을 본다** — 끄기 토글은 "이번 결제"에 대한 결정이고,
+   *  목록은 아직 무엇을 살지 고르는 자리다. 여기까지 토글이 물들면 상세에서 껐다가 뒤로
+   *  나온 사람에게 목록이 통째로 정가로 보인다(2026-09-25 사용자 리포트). */
   const cardDiscount = (won: number) =>
-    appliedCoupon
+    coupon
       ? {
-          percent: Math.round(appliedCoupon.discountRate * 100),
+          percent: Math.round(coupon.discountRate * 100),
           listPrice: formatWon(won),
-          price: formatWon(discountedAmount(won, appliedCoupon.discountRate).amountWon),
+          price: formatWon(discountedAmount(won, coupon.discountRate).amountWon),
         }
       : null;
   // 상세 화면에서 "구입할 수 없음"을 판정하는 쪽이 탭마다 다르다.
   const blocked = selected?.kind === "time" ? hasTimePassHeld : hasCountPass;
-
-  // 보유 쿠폰을 읽어 "지금 적용될 것"을 하나 고른다. 서버가 결제 직전에 같은 함수로 다시
-  // 판정하므로, 여기서 틀려도 청구 금액이 틀리지는 않는다 — 다만 표시가 어긋나면 사용자가
-  // 결제창에서야 다른 금액을 보게 되니 같은 규칙을 쓴다.
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    void (async () => {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/user/discount-coupons", { headers: { Authorization: `Bearer ${idToken}` } });
-      if (!res.ok || cancelled) return;
-      const body = await res.json();
-      const held = (body.coupons ?? []).map((c: UsableCoupon & { status: string }) => ({ ...c, status: c.status }));
-      if (!cancelled) setCoupon(pickBestCoupon(held, new Date().toISOString()) as UsableCoupon | null);
-    })();
-    return () => { cancelled = true; };
-  }, [user]);
 
   function selectCombo(combo: ComboKey) {
     if (COMBOS[combo].ziwei && !hasBirthTime) {
@@ -193,6 +177,7 @@ export default function ChargePage() {
         await refreshMe();
         setSelected(null);
         setSelectedCombo(null);
+        setUseCoupon(true);
         setNotice({ type: "info", message: "결제가 완료됐어요!" });
       } else {
         setNotice({
@@ -246,7 +231,9 @@ export default function ChargePage() {
       {/* 제목은 목록·상세가 같다(목업). 예전엔 상세에서 "구입하기"로 바뀌었다. */}
       <SubPageTopBar
         title="이용권 구입"
-        onBack={selected ? () => { setSelected(null); setSelectedCombo(null); } : undefined}
+        /* 상세를 벗어나면 쿠폰 토글도 기본값(켜짐)으로 되돌린다. 끄기는 "이번 결제"에 대한
+           결정이라 다음 상품까지 따라가면 안 된다. */
+        onBack={selected ? () => { setSelected(null); setSelectedCombo(null); setUseCoupon(true); } : undefined}
         backHref={returnTo}
       />
       <div
@@ -271,9 +258,47 @@ export default function ChargePage() {
           />
         )}
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+          {/* 보유 쿠폰 (목업 Buy_TimePass_Purchase_*, 2026-09-25 갱신분).
+              쿠폰이 있을 때만 나온다 — 없으면 끌 것도 없다.
+
+              끌 수 있어야 하는 이유: 쿠폰은 1 회용인데 자동 적용이라, 3,000 원 상품에 30% 를
+              태우면 900 원 깎고 사라진다. 11 만원 상품에 쓸 기회가 없어지는 셈이다.
+
+              실측(scale 3): 카드 폭 378 · 모서리 24 · 높이 80 · 면 --topbar(정확 일치),
+              토글 56x29 · 오른쪽 안쪽 여백 24 · 켜짐 트랙 --point(정확 일치). */}
+          {selected && coupon && (
+            <section>
+              <p className="mb-2 text-base font-bold text-bold-text">보유 쿠폰</p>
+              <div className="flex h-20 items-center justify-between gap-3 rounded-3xl bg-topbar px-6">
+                <span className="truncate text-base font-bold text-bold-text">{coupon.name || coupon.code}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={useCoupon}
+                  aria-label={`${coupon.name || coupon.code} 적용`}
+                  onClick={() => setUseCoupon((on) => !on)}
+                  className={`relative h-[29px] w-14 shrink-0 rounded-full transition-colors ${
+                    useCoupon ? "bg-point" : "bg-chip-fill"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-[3px] h-[23px] w-[23px] rounded-full bg-white transition-[left] ${
+                      useCoupon ? "left-[27px]" : "left-[3px]"
+                    }`}
+                  />
+                </button>
+              </div>
+            </section>
+          )}
+
           {selected?.kind === "count" && (
             <>
-              <p className="text-center text-sm font-semibold text-icon-muted">구입하실 이용권의 옵션을 선택하세요</p>
+              {/* 조합을 고르기 전에는 결제 버튼이 잠겨 있다 — 왜 못 누르는지 알려면 이 줄이
+                  필수임을 드러내야 한다. 표시색은 폼의 필수 표시(FormControls 의 * )와 같은
+                  --urgent 를 쓴다. */}
+              <p className="text-center text-sm font-semibold text-icon-muted">
+                <span className="text-urgent">[필수]</span> 구입하실 이용권의 옵션을 선택하세요
+              </p>
               <ComboAllowanceList
                 layout="columns"
                 allowanceFor={(combo, spread) => countAllowanceForCombo(selected.pkg.basis, spread, combo)}
@@ -388,19 +413,6 @@ export default function ChargePage() {
               <span>총 결제금액</span>
               <span>{formatWonSuffix(price)}</span>
             </div>
-            {coupon && (
-              /* 쿠폰이 있을 때만 보인다 — 없으면 끌 것도 없다. 체크를 풀면 정가로 돌아가고
-                 쿠폰은 다음 구매를 위해 남는다. */
-              <label className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-icon-muted">
-                <input
-                  type="checkbox"
-                  checked={!useCoupon}
-                  onChange={(e) => setUseCoupon(!e.target.checked)}
-                  className="h-4 w-4 accent-[var(--point)]"
-                />
-                이번 결제에는 쿠폰을 사용하지 않기
-              </label>
-            )}
             <button
               type="button"
               onClick={() =>

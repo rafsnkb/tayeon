@@ -25,11 +25,14 @@ import {
 import { pickActiveCountPass, deriveIncludeOptions, chargeActiveCountPass } from "@/lib/tarot/activeCountPass";
 import { DEFAULT_TONE, isToneKey, type ToneKey } from "@/lib/tarot/tone";
 import { calculateSaju, buildSajuPromptBlock, type SajuResult } from "@/lib/saju/calculate";
+import { calculateSajuFortune, buildSajuFortunePromptBlock } from "@/lib/saju/fortune";
 import { calculateZiwei, buildZiweiPromptBlock, type ZiweiResult } from "@/lib/ziwei/calculate";
+import { calculateZiweiHoroscope, buildZiweiHoroscopePromptBlock } from "@/lib/ziwei/horoscope";
 import { isValidBirthInfo, type BirthInfo } from "@/lib/tarot/birthInfo";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
 import type { DocumentReference } from "firebase-admin/firestore";
 import { USERS, ROOMS, READINGS, COUNT_PASSES } from "@/lib/firestore/collections";
+import { DEFAULT_ROOM_TITLE } from "@/lib/tarot/room";
 import { blockIfSuspended } from "@/lib/auth/suspension";
 
 // 궁합 옵션이 꺼진 채 상대방 관계를 묻는 질문을 서버가 결정적으로 차단할 때(LLM 호출 없음) 쓰는
@@ -66,9 +69,8 @@ const RATE_LIMIT_DAY_MS = 24 * 60 * 60 * 1000;
 
 const READING_MODEL = "claude-haiku-4-5";
 const READING_MAX_OUTPUT_TOKENS = 8192;
-// 카드/사주·자미두수 안전장치 실패 시 재생성을 시도하는 최대 횟수(2026-09-12, 2→3회로 확대) —
-// 실패했을 때만 추가 API 호출이 발생하므로 정상 응답엔 비용·지연 영향 없음.
-const MAX_GENERATE_ATTEMPTS = 3;
+// (재생성 재시도는 스트리밍으로 바꾸면서 없앴다 — 2026-09-26. 판정에 필요한 cardsOk 는 답변이
+//  끝나야 알 수 있는데 그때는 이미 사용자가 읽고 있어서, 되돌릴 방법이 없다. generate() 위 주석 참고.)
 // charged:false 리딩은 히스토리 대상에서 제외하므로, 최근 항목 중 일부가 그런 경우에도 여전히
 // HISTORY_CONTEXT_SIZE만큼의 "실제 리딩" 맥락을 확보하기 위해 넉넉히 조회한다.
 const HISTORY_FETCH_LIMIT = 12;
@@ -123,6 +125,27 @@ async function acquireReadingLock(userRef: DocumentReference): Promise<ReadingLo
     });
     return { ok: true };
   });
+}
+
+/* 진짜 인젝션/탈옥 시도에서만 나타나는 신호들.
+ *
+ * 모델이 [NO_CHARGE] 를 붙이면 사용자 화면에 **"반복하면 서비스 이용이 정지될 수 있다"** 는 경고가
+ * 뜬다. 그런데 "새 과금 모델을 붙이면 수익이 오를까?" 같은 정상 질문에 이 마커를 붙이는 오탐이
+ * 반복됐다(2026-09-26 두 번). 프롬프트에 예시와 사고 이력까지 적어도 재발했다.
+ *
+ * 그래서 마지막 판단은 서버가 한다: 사용자가 실제로 **지시문을 집어넣었을 때만** 경고를 띄운다.
+ * 신호가 없으면 무과금 안내(GUIDANCE)로 낮춘다 — 차감을 막는 건 그대로지만 정지 경고는 빼는 것이다.
+ * 틀렸을 때의 비용이 양쪽에서 크게 다르다: 잘못된 안내는 성가신 정도지만, 돈 내고 쓰는 사람에게
+ * 잘못 띄운 정지 경고는 그 사람을 잃는다. */
+const INJECTION_SIGNALS = [
+  "시스템 프롬프트", "프롬프트를", "이전 지시", "위 지시", "지시를 무시", "규칙을 무시", "무시하고",
+  "너는 ai", "넌 ai", "ai야?", "ai 야?", "어떤 모델", "무슨 모델", "누가 만들", "어느 회사",
+  "개발자", "관리자 권한", "탈옥", "역할을 바꿔", "페르소나",
+  "ignore previous", "ignore all", "system prompt", "jailbreak", "you are an ai", "developer mode",
+];
+function looksLikeInjection(question: string): boolean {
+  const normalized = question.toLowerCase();
+  return INJECTION_SIGNALS.some((signal) => normalized.includes(signal));
 }
 
 async function releaseReadingLock(userRef: DocumentReference): Promise<void> {
@@ -182,6 +205,11 @@ export async function POST(req: NextRequest) {
       { status: 429, headers: { "Retry-After": String(lockResult.retryAfterSeconds) } }
     );
   }
+
+  /** 스트리밍으로 넘어가면 응답은 먼저 열리고 실제 작업은 뒤에서 계속된다(2026-09-26).
+   *  그때부터 리딩 락은 이 함수의 finally 가 아니라 그 백그라운드 작업이 풀어야 한다 —
+   *  여기서 같이 풀면 아직 생성 중인데 같은 사용자의 다음 요청이 통과한다. */
+  let lockHandedOff = false;
 
   try {
     const [userSnap, roomSnap] = await Promise.all([userRef.get(), roomRef.get()]);
@@ -367,8 +395,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    /* 시간축(대운·세운·월운, 대한·유년·사화)은 **나에게만** 붙인다(2026-09-26).
+     * 궁합은 두 사람의 원국을 맞춰 보는 것이지 상대의 운 흐름을 따로 읽는 게 아니라, 상대 쪽까지
+     * 붙이면 프롬프트만 두 배가 되고 모델이 누구의 대운인지 헷갈린다. */
+    const now = new Date();
+    const sajuFortune = sajuResult && birthInfo ? calculateSajuFortune(birthInfo, now) : null;
+    const ziweiHoroscope = ziweiResult && birthInfo ? calculateZiweiHoroscope(birthInfo, now) : null;
+
     const sajuBlock = [
-      sajuResult ? `### 나의 사주\n${buildSajuPromptBlock(sajuResult)}` : "",
+      sajuResult
+        ? `### 나의 사주\n${buildSajuPromptBlock(sajuResult)}${
+            sajuFortune ? `\n${buildSajuFortunePromptBlock(sajuFortune, now)}` : ""
+          }`
+        : "",
       partnerSajuResult && partner
         ? `### ${partner.nickname}의 사주\n${buildSajuPromptBlock(partnerSajuResult)}`
         : "",
@@ -377,7 +416,11 @@ export async function POST(req: NextRequest) {
       .join("\n\n");
 
     const ziweiBlock = [
-      ziweiResult ? `### 나의 자미두수\n${buildZiweiPromptBlock(ziweiResult)}` : "",
+      ziweiResult
+        ? `### 나의 자미두수\n${buildZiweiPromptBlock(ziweiResult)}${
+            ziweiHoroscope ? `\n${buildZiweiHoroscopePromptBlock(ziweiHoroscope, now)}` : ""
+          }`
+        : "",
       partnerZiweiResult && partner
         ? `### ${partner.nickname}의 자미두수\n${buildZiweiPromptBlock(partnerZiweiResult)}`
         : "",
@@ -423,6 +466,39 @@ export async function POST(req: NextRequest) {
       (r) => (r.cards as { nameKo: string }[] | undefined)?.map((c) => c.nameKo) ?? []
     );
 
+    /* 여기서부터는 응답을 **먼저 열고** 내용을 뒤에서 채운다.
+     *
+     * 사용자가 도중에 화면을 떠나도 생성·차감·저장은 끝까지 간다 — 쓰기가 실패하면 clientGone
+     * 으로 접고 나머지 일은 계속한다. 예전 비스트리밍 때도 서버는 끝까지 갔고 프론트가 히스토리를
+     * 다시 조회해 확인하는 구조였다(runReading 의 catch). 그 계약을 그대로 유지한다. */
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
+    let clientGone = false;
+    const send = (event: Record<string, unknown>) => {
+      if (clientGone) return;
+      writer.write(encoder.encode(`${JSON.stringify(event)}\n`)).catch(() => {
+        clientGone = true;
+      });
+    };
+    const pushText = (text: string) => send({ t: "delta", v: text });
+
+    /* 카드 그림부터 먼저 내려보낸다(2026-09-26). 카드는 이미 뽑혀 있어서 LLM 을 기다릴 이유가
+     * 없는데도, 예전엔 해석이 다 끝나야 같이 나갔다 — 사용자는 20초 동안 빈 화면을 보다가,
+     * 해석이 형식 검사에 걸리면 카드 그림조차 못 봤다. */
+    send({
+      t: "cards",
+      spread,
+      cards: drawnCards.map((d) => ({
+        id: d.card.id,
+        nameKo: d.card.nameKo,
+        nameEn: d.card.nameEn,
+        reversed: d.reversed,
+      })),
+    });
+
+    lockHandedOff = true;
+    void (async () => {
     try {
       const today = new Intl.DateTimeFormat("ko-KR", {
         timeZone: "Asia/Seoul",
@@ -440,8 +516,52 @@ export async function POST(req: NextRequest) {
         isFollowUp: history.length > 0,
       });
 
-      async function generate() {
-        const response = await anthropic.messages.create({
+      /* 본문을 만들어지는 대로 흘려보낸다(2026-09-26). 켈틱+사주+자미두수는 출력만 2,700 토큰이라
+       * 다 만들고 나서 주면 20~30초를 빈 화면으로 기다린다 — 시간제 이용권은 그 동안에도 시간이
+       * 흐른다. 스트리밍하면 첫 글자가 2초 안에 닿고, 읽는 속도가 생성 속도를 못 따라잡는다.
+       *
+       * 화면에 나가면 안 되는 두 종류의 마커를 흘리지 않도록 앞뒤를 쥐고 간다.
+       * - 앞머리: 무과금 마커는 "응답 맨 첫 글자"로 오도록 프롬프트가 강제한다. 그 길이만큼 모일
+       *   때까지 기다렸다가, 마커면 떼어 내고 그 뒤부터 흘린다.
+       * - 꼬리: [SUMMARY]/[TOPIC]/[SUGGESTIONS] 는 서버만 쓰는 블록이다. 마커 최대 길이만큼 항상
+       *   남겨 두고(마커가 청크 경계에서 잘려도 새어 나가지 않는다), 마커가 보이면 그 앞에서 멈춘다. */
+      async function generate(push: (text: string) => void) {
+        const HEAD_HOLD = Math.max(NO_CHARGE_MARKER.length, GUIDANCE_MARKER.length);
+        const TAIL_HOLD = Math.max(
+          HISTORY_SUMMARY_MARKER.length,
+          TOPIC_MARKER.length,
+          SUGGESTIONS_MARKER.length
+        );
+        let raw = "";
+        let emitted = 0;
+        let headDecided = false;
+
+        const flush = (final: boolean) => {
+          if (!headDecided) {
+            if (!final && raw.length < HEAD_HOLD) return;
+            headDecided = true;
+            const marker = raw.startsWith(NO_CHARGE_MARKER)
+              ? NO_CHARGE_MARKER
+              : raw.startsWith(GUIDANCE_MARKER)
+                ? GUIDANCE_MARKER
+                : null;
+            // 마커 뒤 줄바꿈까지 같이 건너뛴다 — 안 그러면 안내 문구가 빈 줄로 시작한다.
+            if (marker) emitted = marker.length + (raw.slice(marker.length).match(/^\s*/)?.[0].length ?? 0);
+          }
+          // 이미 흘려보낸 지점 뒤에서만 찾는다. 첫 글자에 붙은 무과금 마커는 위에서 건너뛴 자리라
+          // 여기서 다시 잡히면 안 된다.
+          const found = [HISTORY_SUMMARY_MARKER, TOPIC_MARKER, SUGGESTIONS_MARKER, NO_CHARGE_MARKER, GUIDANCE_MARKER]
+            .map((m) => raw.indexOf(m, emitted))
+            .filter((i) => i !== -1);
+          const stop = found.length > 0 ? Math.min(...found) : -1;
+          const limit = stop !== -1 ? stop : final ? raw.length : raw.length - TAIL_HOLD;
+          if (limit > emitted) {
+            push(raw.slice(emitted, limit));
+            emitted = limit;
+          }
+        };
+
+        const stream = anthropic.messages.stream({
           model: READING_MODEL,
           max_tokens: READING_MAX_OUTPUT_TOKENS,
           system: [
@@ -452,6 +572,12 @@ export async function POST(req: NextRequest) {
           ],
           messages: [...history, { role: "user", content: safeQuestion }],
         });
+        stream.on("text", (delta) => {
+          raw += delta;
+          flush(false);
+        });
+        const response = await stream.finalMessage();
+        flush(true);
 
         // 운영 분석 전용 원장: 질문 원문·응답은 저장하지 않고 토큰/모델/익명 속성만 남긴다.
         const nowForUsage = new Date();
@@ -467,8 +593,7 @@ export async function POST(req: NextRequest) {
           birthYear: typeof userData?.birthInfo?.birthDate === "string" ? Number(userData.birthInfo.birthDate.slice(0, 4)) : null,
         });
 
-        const textBlock = response.content.find((block) => block.type === "text");
-        const rawInterpretation = textBlock?.text ?? "";
+        const rawInterpretation = raw;
         // Two markers, two different user-facing outcomes: NO_CHARGE_MARKER is for genuine abuse
         // (injection/off-topic) and surfaces the "repeat this and you may be suspended" warning;
         // GUIDANCE_MARKER is for cases that aren't the user's fault (e.g. missing +궁합 option) and
@@ -484,6 +609,12 @@ export async function POST(req: NextRequest) {
         const guidanceIdx = rawInterpretation.indexOf(GUIDANCE_MARKER);
         const markedNoCharge = noChargeIdx !== -1;
         const markedGuidance = !markedNoCharge && guidanceIdx !== -1;
+        // 마커가 붙었어도 질문에 인젝션 신호가 없으면 정지 경고까지 갈 일이 아니다(위 주석 참고).
+        // 아래 스트리핑은 실제로 박힌 마커를 기준으로 그대로 두고, **바깥에 알리는 종류만** 낮춘다.
+        const abuseConfirmed = markedNoCharge && looksLikeInjection(safeQuestion);
+        if (markedNoCharge && !abuseConfirmed) {
+          console.warn("[reading] NO_CHARGE 오탐 의심 — 정지 경고 없이 안내로 낮춤", uid, safeQuestion.slice(0, 40));
+        }
         const strippedInterpretation = markedNoCharge
           ? (noChargeIdx === 0
               ? rawInterpretation.slice(NO_CHARGE_MARKER.length)
@@ -530,16 +661,22 @@ export async function POST(req: NextRequest) {
         const sajuOk = !Boolean(
           includeSaju &&
             sajuResult &&
-            ![sajuResult.pillars.day, "일간", "사주", "십신", "오행", "간지", "공망"].some((t) =>
-              strippedInterpretation.includes(t)
-            )
+            ![
+              sajuResult.pillars.day, "일간", "사주", "십신", "오행", "간지", "공망",
+              // 시간축을 프롬프트에 넣은 뒤(2026-09-26) 모델이 원국 용어 대신 이쪽으로 옮겨 갔다.
+              "대운", "세운", "월운",
+            ].some((t) => strippedInterpretation.includes(t))
         );
         const ziweiOk = !Boolean(
           includeZiwei &&
             ziweiResult &&
-            ![ziweiResult.soul, ziweiResult.body, "자미두수", "명궁", "신궁", "오행국"].some((t) =>
-              strippedInterpretation.includes(t)
-            )
+            ![
+              ziweiResult.soul, ziweiResult.body, "자미두수", "명궁", "신궁", "오행국",
+              // 같은 이유. 사화를 받은 뒤로는 "명궁" 한 번 없이 "유년 화록…" 으로만 쓰는 답변이
+              // 나온다 — 그걸 "자미두수를 안 봤다"로 읽으면 멀쩡한 요청이 통째로 막힌다.
+              "대한", "유년", "사화", "화록", "화권", "화과", "화기", "부처궁", "복덕궁", "재백궁",
+              "관록궁", "천이궁", "노복궁", "전택궁", "자녀궁", "형제궁", "부모궁", "질액궁",
+            ].some((t) => strippedInterpretation.includes(t))
         );
 
         // Split off the trailing history-summary + topic-tag + suggested-follow-ups blocks (never
@@ -601,8 +738,8 @@ export async function POST(req: NextRequest) {
           cardsOk,
           sajuOk,
           ziweiOk,
-          markedNoCharge,
-          markedGuidance,
+          markedNoCharge: abuseConfirmed,
+          markedGuidance: markedGuidance || (markedNoCharge && !abuseConfirmed),
         };
       }
 
@@ -619,16 +756,21 @@ export async function POST(req: NextRequest) {
       // 3배·지연 3배만 유발했고, 실제로 이게 쌓여서(약 35초) 인프라 타임아웃으로 500이 나는 사고로
       // 이어진 사례가 있었다(운영 로그로 확인). 진짜 재시도가 필요한 건 카드/사주/자미두수 누락처럼
       // 모델이 형식을 놓친 경우뿐이다.
-      let attempt = await generate();
-      for (
-        let i = 1;
-        i < MAX_GENERATE_ATTEMPTS &&
-        !attempt.markedNoCharge &&
-        !attempt.markedGuidance &&
-        !(attempt.cardsOk && attempt.sajuOk && attempt.ziweiOk);
-        i++
-      ) {
-        attempt = await generate();
+      //
+      // 스트리밍에서는 "조용히 다시 만들어서 바꿔치기"가 안 된다 — 판정에 필요한 cardsOk 는 답변이
+      // 끝나야 알 수 있고, 그때는 이미 사용자가 읽고 있다. 그래서 **드러내 놓고** 다시 만든다:
+      // 한 번 더 생성하되 그건 흘려보내지 않고, **다시 만든 쪽이 온전할 때만** 교체 이벤트를 보낸다.
+      // 재시도가 더 나빠지면 처음 것을 그대로 둔다 — 멀쩡한 답을 망가진 답으로 바꾸지 않기 위해서다.
+      let attempt = await generate(pushText);
+      const structurallyBroken = (a: typeof attempt) =>
+        !a.markedNoCharge && !a.markedGuidance && !(a.cardsOk && a.sajuOk && a.ziweiOk);
+      if (structurallyBroken(attempt)) {
+        send({ t: "redo" });
+        const retry = await generate(() => {});
+        if (!structurallyBroken(retry)) {
+          attempt = retry;
+          send({ t: "replace", v: retry.interpretation });
+        }
       }
 
       const { interpretation, historySummary, topic, suggestions, cardsOk } = attempt;
@@ -694,13 +836,14 @@ export async function POST(req: NextRequest) {
 
       const roomUpdate: Record<string, unknown> = { updatedAt: now };
       let newRoomTitle: string | undefined;
-      if (roomSnap.data()?.title === "새 대화" && recentSnap.empty) {
+      if (roomSnap.data()?.title === DEFAULT_ROOM_TITLE && recentSnap.empty) {
         newRoomTitle = question.slice(0, 24);
         roomUpdate.title = newRoomTitle;
       }
       await roomRef.update(roomUpdate);
 
-      return NextResponse.json({
+      send({
+        t: "done",
         spread,
         cards,
         includeSaju: sajuCharged,
@@ -722,25 +865,42 @@ export async function POST(req: NextRequest) {
         roomTitle: newRoomTitle,
       });
     } catch (error) {
-      // 위 사전 검사를 통과한 뒤 다른 요청이 잔량을 먼저 써 버린 경우. 리딩은 이미 만들어졌지만
-      // 차감할 권리가 없으므로 지급하지 않는다 — 그래도 500 대신 이유를 알려준다.
+      // 스트림이 이미 열린 뒤라 HTTP 상태코드를 바꿀 수 없다 — 에러도 이벤트로 흘려보내고
+      // 프론트가 그걸 보고 에러 말풍선을 띄운다.
       if (error instanceof Error && error.message === "COUNT_PASS_UNAVAILABLE") {
         console.error("[reading] 차감 직전에 잔량이 소진됨", uid, spread);
-        return NextResponse.json(
-          { error: "남은 횟수가 방금 소진됐어요. 이용권을 확인해주세요." },
-          { status: 409 }
-        );
-      }
-      if (error instanceof Anthropic.APIError) {
+        send({ t: "error", error: "남은 횟수가 방금 소진됐어요. 이용권을 확인해주세요." });
+      } else if (error instanceof Anthropic.APIError) {
         console.error("Anthropic API error:", error.status, error.message);
-        return NextResponse.json(
-          { error: "해석을 생성하지 못했어요. 잠시 후 다시 시도해주세요." },
-          { status: 502 }
-        );
+        send({ t: "error", error: "해석을 생성하지 못했어요. 잠시 후 다시 시도해주세요." });
+      } else {
+        console.error("[reading] 생성 중 오류", error);
+        send({ t: "error", error: "오류가 발생했어요. 잠시 후 다시 시도해주세요." });
       }
-      throw error;
+    } finally {
+      await releaseReadingLock(userRef);
+      await writer.close().catch(() => {});
     }
+    })();
+
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-store",
+        // 프록시가 버퍼링하면 스트리밍이 통째로 무의미해진다.
+        "X-Accel-Buffering": "no",
+      },
+    });
+  } catch (error) {
+    // 스트림을 열기 **전에** 터진 것들(계산·히스토리 조회·프롬프트 조립). 예전엔 이 자리에 catch 가
+    // 없어서 그대로 500 이 나갔고, 본문이 없으니 프론트는 "오류가 발생했어요." 밖에 못 띄웠다 —
+    // 무엇이 터졌는지 서버 로그를 봐야만 알 수 있었다(2026-09-26).
+    console.error("[reading] 생성 시작 전 오류", uid, error);
+    return NextResponse.json(
+      { error: "리딩을 준비하지 못했어요. 잠시 후 다시 시도해주세요." },
+      { status: 500 }
+    );
   } finally {
-    await releaseReadingLock(userRef);
+    if (!lockHandedOff) await releaseReadingLock(userRef);
   }
 }

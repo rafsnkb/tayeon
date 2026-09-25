@@ -4,7 +4,8 @@ import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { DEFAULT_TONE } from "@/lib/tarot/tone";
 import { pickActiveCountPass } from "@/lib/tarot/activeCountPass";
 import type { ComboKey, CountPassStatus } from "@/lib/tarot/pricing";
-import { USERS, TIME_PASSES, COUNT_PASSES, PENDING_REWARDS, REFUND_REQUESTS } from "@/lib/firestore/collections";
+import { USERS, TIME_PASSES, COUNT_PASSES, PENDING_REWARDS, REFUND_REQUESTS, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
+import { pickBestCoupon, type HeldDiscountCoupon } from "@/lib/payment/discountCoupon";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 
 export async function GET(req: NextRequest) {
@@ -47,9 +48,14 @@ export async function GET(req: NextRequest) {
       combo: (doc.data().combo as ComboKey | undefined) ?? (doc.data().includesOptions ? "tarot-saju-ziwei" : "tarot"),
     }));
 
-  const [countPassesSnap, pendingRewardsSnap] = await Promise.all([
+  const [countPassesSnap, pendingRewardsSnap, couponsSnap] = await Promise.all([
     userRef.collection(COUNT_PASSES).get(),
     userRef.collection(PENDING_REWARDS).get(),
+    // 지금 적용될 할인쿠폰을 여기서 같이 내려준다(2026-09-25). 예전엔 구입 화면이 마운트된
+    // **뒤에** 따로 조회해서, 첫 렌더가 정가로 그려졌다가 응답이 오면 할인가로 다시 그려졌다 —
+    // 화면이 눈에 띄게 튀었다. 이 응답은 로그인 시점에 이미 받아 두므로 구입 화면에 들어갈
+    // 때는 값이 준비돼 있다.
+    userRef.collection(USER_DISCOUNT_COUPONS).where("status", "==", "unused").get(),
   ]);
   const activePointerPassId = data?.activeCountPass?.passId as string | undefined;
   const activePass = pickActiveCountPass(countPassesSnap.docs, activePointerPassId);
@@ -108,8 +114,23 @@ export async function GET(req: NextRequest) {
     (createdAt) => typeof createdAt === "string" && (!notificationsSeenAt || createdAt > notificationsSeenAt)
   );
 
+  const heldCoupons: HeldDiscountCoupon[] = couponsSnap.docs.flatMap((doc) => {
+    const c = doc.data();
+    if (typeof c.discountRate !== "number" || typeof c.startsAt !== "string" || typeof c.endsAt !== "string") return [];
+    return [{ code: doc.id, discountRate: c.discountRate, startsAt: c.startsAt, endsAt: c.endsAt, status: "unused" as const }];
+  });
+  const best = pickBestCoupon(heldCoupons, new Date().toISOString());
+  const activeCoupon = best
+    ? {
+        ...best,
+        name: (couponsSnap.docs.find((d) => d.id === best.code)?.data().name as string | undefined) ?? "",
+      }
+    : null;
+
   return NextResponse.json({
     hasUnreadNotifications,
+    /** 지금 적용될 할인쿠폰(없으면 null). 표시용이며, 실제 할인은 결제 준비 때 서버가 다시 정한다. */
+    activeCoupon,
     nickname: data?.nickname ?? null,
     profileImage: data?.profileImage ?? null,
     email: data?.email ?? null,

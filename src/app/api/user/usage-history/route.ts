@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
+import { DEFAULT_ROOM_TITLE } from "@/lib/tarot/room";
 import { SPREADS, type SpreadKey } from "@/lib/tarot/pricing";
 import { USERS, ROOMS, READINGS } from "@/lib/firestore/collections";
 
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
       if (!data.charged) continue;
       entries.push({
         kind: "usage",
-        roomTitle: room.data()?.title ?? "새 대화",
+        roomTitle: room.data()?.title ?? DEFAULT_ROOM_TITLE,
         spread: data.spread,
         spreadLabel: SPREADS[data.spread as SpreadKey]?.label ?? data.spread,
         includeSaju: Boolean(data.includeSaju),

@@ -49,7 +49,7 @@ function formatDate(iso: string) {
  * 이 화면은 그 위에 "도착!" 알림 문구와 읽음 처리만 얹는다. */
 export default function NotificationsPage() {
   const router = useRouter();
-  const { setHasUnreadNotifications } = useRooms();
+  const { clearNotificationBadge } = useRooms();
   const [entries, setEntries] = useState<NotificationEntry[] | null>(null);
 
   useEffect(() => {
@@ -63,14 +63,14 @@ export default function NotificationsPage() {
         fetch("/api/user/refund-requests", { headers: { Authorization: `Bearer ${idToken}` } }),
         fetch("/api/user/notifications/mark-read", { method: "POST", headers: { Authorization: `Bearer ${idToken}` } }),
       ]);
-      setHasUnreadNotifications(false);
+      clearNotificationBadge();
       const read = async (res: Response) =>
         res.ok ? ((await res.json().catch(() => ({}))).entries as NotificationEntry[] | undefined) ?? [] : [];
       const merged = [...(await read(passRes)), ...(await read(refundRes))];
       merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       setEntries(merged);
     });
-  }, [setHasUnreadNotifications]);
+  }, [clearNotificationBadge]);
 
   return (
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">

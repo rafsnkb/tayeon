@@ -30,6 +30,9 @@ type PurchaseEntry = {
  * (피그마 "PurchaseHistoryRefund")을 거쳐 POST /api/user/refund-requests로 접수된다. */
 export default function PurchaseHistoryPage() {
   const [entries, setEntries] = useState<PurchaseEntry[] | null>(null);
+  /** 실패를 `entries = []` 로 겸하면 "아직 구매 내역이 없어요"가 뜬다 — 결제한 사람에게
+   *  안 했다고 말하는 화면이다. 따로 든다(2026-09-26). */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [selected, setSelected] = useState<PurchaseEntry | null>(null);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -40,13 +43,22 @@ export default function PurchaseHistoryPage() {
   useEffect(() => {
     return onAuthStateChanged(auth, async (u: User | null) => {
       if (!u) return;
-      const idToken = await u.getIdToken();
-      const res = await fetch("/api/user/purchase-history", {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (res.ok) {
+      // 실패해도 로딩을 끝낸다(2026-09-26). `if (res.ok)` 에 else 가 없어서 401·5xx 면
+      // "불러오는 중..."에서 영영 멈췄다. 결제 내역은 환불 신청 창구이기도 해서, 멈춰 있으면
+      // 사용자가 "내역이 안 뜬다"가 아니라 "환불을 못 넣는다"로 겪는다.
+      try {
+        const idToken = await u.getIdToken();
+        const res = await fetch("/api/user/purchase-history", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (!res.ok) {
+          setLoadFailed(true);
+          return;
+        }
         const data = await res.json();
         setEntries(data.entries);
+      } catch {
+        setLoadFailed(true);
       }
     });
   }, []);
@@ -106,7 +118,9 @@ ${REFUND_PROCESSING_BUSINESS_DAYS}영업일 내에 환불됩니다.`,
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="결제 내역" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
-        {entries === null ? (
+        {loadFailed ? (
+          <p className="pt-8 text-center text-sm text-icon-muted">구매 내역을 불러오지 못했어요.</p>
+        ) : entries === null ? (
           <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
         ) : entries.length === 0 ? (
           <div className="flex flex-1 items-center justify-center pt-8">

@@ -93,13 +93,26 @@ export default function SettingsPage() {
   // 현재 값과 비교해서 뭔가 바뀐 경우에만 버튼을 활성화한다(2026-09-14).
   const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
 
+  // 아래 조회가 **성공했을 때만** initialSnapshot 이 채워진다. 그래서 실패를 따로 들어야
+  // 한다(2026-09-26) — 안 그러면 "불러오는 중..."에서 영원히 멈춘다. 가드를 넣기 전에는
+  // 기본값 폼이라도 떴으니, 이건 어제 넣은 가드가 만든 새 버그다. 이 저장소에서 /api 가
+  // 전면 401 이 되는 상황(로컬 ADC 만료)은 실제로 반복됐다.
+  const [loadFailed, setLoadFailed] = useState(false);
+
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) return;
       setUser(u);
+      // getIdToken 도 fetch 도 json 도 전부 던질 수 있다. 던지면 이 async 콜백이 reject 되고
+      // 파이어베이스는 그걸 잡아주지 않는다 — 실패를 반드시 여기서 끝낸다.
+      try {
       const idToken = await u.getIdToken();
       const res = await fetch("/api/user/me", { headers: { Authorization: `Bearer ${idToken}` } });
-      if (res.ok) {
+      if (!res.ok) {
+        setLoadFailed(true);
+        return;
+      }
+      {
         const data = await res.json();
         setTone(data.tone);
         setUseReversedCards(data.useReversedCards);
@@ -113,6 +126,9 @@ export default function SettingsPage() {
             data.birthInfo?.jasiRule ?? "midnight",
           ])
         );
+      }
+      } catch {
+        setLoadFailed(true);
       }
     });
   }, []);
@@ -172,6 +188,20 @@ export default function SettingsPage() {
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
       <SubPageTopBar title="설정" />
       <div className="flex-1 overflow-visible p-4 pt-20 xl:overflow-y-auto scroll-gutter-stable">
+        {/* 저장된 설정이 도착하기 전에는 폼을 그리지 않는다(2026-09-25). 네 컨트롤의 초기값이
+            전부 기본값(어시스턴트 톤, 정방향만, 정시 기준, 자정 자시)이라, 그동안 화면은
+            **남의 설정을 내 설정인 양** 보여준다. 눈에 거슬리는 데서 끝나지 않는다 — 그 사이에
+            뭔가를 누르면 곧 도착하는 응답이 조용히 덮어써서, 분명히 바꿨는데 안 바뀐 것이 된다.
+            initialSnapshot 은 응답이 왔을 때만 채워지므로 그대로 "다 왔는가"로 쓴다. */}
+        {loadFailed ? (
+          <p className="pt-8 text-center text-sm leading-relaxed text-icon-muted">
+            설정을 불러오지 못했어요.
+            <br />
+            지금 저장하면 기본값이 덮어써질 수 있어 화면을 열지 않았어요.
+          </p>
+        ) : initialSnapshot === null ? (
+          <p className="pt-8 text-center text-sm text-icon-muted">불러오는 중...</p>
+        ) : (
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
           <SectionPanel title="상담 설정">
             <div>
@@ -287,6 +317,7 @@ export default function SettingsPage() {
             탈퇴하기
           </button>
         </div>
+        )}
       </div>
       <div className="shrink-0 border-t border-border bg-topbar p-4">
         <button
