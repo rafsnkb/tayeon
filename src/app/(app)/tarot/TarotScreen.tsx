@@ -853,7 +853,10 @@ function TarotChat() {
         {user && (!roomsLoaded || (activeRoomId !== null && !historyLoaded)) && (
           <div className="self-start text-sm text-text">이전 대화를 불러오는 중...</div>
         )}
-        {user && roomsLoadFailed && (
+        {/* 메인에서는 숨긴다(2026-09-25). 실패한 건 방 "목록"인데 메인엔 불러올 대화가
+            애초에 없어서, 이 문구가 대화 내용이 날아간 것처럼 읽혔다. 대화방에서는 실제로
+            그 방의 히스토리를 못 여는 상황이라 그대로 둔다. */}
+        {user && roomsLoadFailed && !isMain && (
           <div className="self-start text-sm text-text">
             대화를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
           </div>

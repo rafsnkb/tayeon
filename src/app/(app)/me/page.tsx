@@ -407,7 +407,7 @@ export default function MyPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="my-auto flex items-center justify-center rounded-2xl bg-chip-soft p-4">
+                  <div className="my-auto flex items-center justify-center p-4">
                     <p className="text-center text-sm font-semibold text-placeholder">
                       {(REWARD_MIN_WON / 10_000).toLocaleString("ko-KR")}만 원(VAT 제외) 이상 결제하시면
                       <br />
