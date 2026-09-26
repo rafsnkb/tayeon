@@ -21,14 +21,13 @@ export const PERSONALITY_COMPATIBILITY: SajuProduct = {
   // 섹션 9개 — 기획 결과 항목 10개에서 첫 항목(총평)을 뺀 수다. 빠진 게 아니라
   // 마지막 closing 페이지로 옮겨간 것이다. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "each-temperament", title: "각자의 기본 기질" },
-    { id: "emotion-expression", title: "감정 표현 방식" },
-    { id: "thinking-deciding", title: "사고·결정 방식" },
-    { id: "conversation-fit", title: "대화가 잘 통하는 지점" },
-    { id: "draining-points", title: "서로를 지치게 하는 지점" },
-    { id: "conflict-pattern", title: "갈등이 생기는 패턴" },
-    { id: "complementary-strengths", title: "관계에서 보완되는 강점" },
-    { id: "distance-moments", title: "거리를 조절해야 하는 순간" },
+    { id: "base-temperament", title: "각자의 기본 기질" },
+    { id: "emotion-style", title: "감정 표현 방식" },
+    { id: "decision-style", title: "사고·결정 방식" },
+    { id: "common-ground", title: "대화가 잘 통하는 지점" },
+    { id: "drain-and-conflict", title: "서로를 지치게 하는 지점과 갈등 패턴" },
+    { id: "complement", title: "관계에서 보완되는 강점" },
+    { id: "distance-control", title: "거리를 조절해야 하는 순간" },
     { id: "comfort-guide", title: "더 편안하게 지내는 방법" },
   ],
 

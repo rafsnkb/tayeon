@@ -17,16 +17,14 @@ export const COUPLE_COMPATIBILITY: SajuProduct = {
 
   // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "basic-compatibility", title: "두 사람의 기본 궁합" },
-    { id: "mutual-attraction", title: "서로에게 끌리는 이유" },
-    { id: "my-effect-on-them", title: "내가 상대에게 주는 영향" },
-    { id: "their-effect-on-me", title: "상대가 나에게 주는 영향" },
+    { id: "base-fit", title: "두 사람의 기본 궁합" },
+    { id: "attraction", title: "서로에게 끌리는 이유" },
+    { id: "mutual-influence", title: "서로에게 주는 영향" },
     { id: "affection-style", title: "애정 표현 방식" },
     { id: "conflict-points", title: "갈등이 생기는 지점" },
-    { id: "improves-over-time", title: "오래 만날수록 좋아지는 부분" },
-    { id: "strains-over-time", title: "힘들어질 수 있는 부분" },
+    { id: "over-time", title: "시간이 지나며 달라지는 부분" },
     { id: "long-term-flow", title: "결혼·장기 관계 흐름" },
-    { id: "maintenance-guide", title: "관계 유지 가이드" },
+    { id: "relationship-guide", title: "관계 유지 가이드" },
   ],
 
   sajuFocus: "일간·일지와 배우자궁의 상호 관계, 오행 보완·과다, 대운에서의 관계 변화.",

@@ -17,15 +17,14 @@ export const EXAM_FORTUNE: SajuProduct = {
 
   // 기획 결과 항목 9개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "current-prep-flow", title: "현재 시험 준비 흐름" },
-    { id: "learning-strengths", title: "학습 강점" },
-    { id: "focus-slips", title: "집중력이 흔들리는 패턴" },
-    { id: "study-method-fit", title: "잘 맞는 공부 방식" },
-    { id: "prep-reset-timing", title: "준비 과정에서 정비할 시기" },
-    { id: "pre-exam-condition", title: "시험 전 컨디션 관리" },
-    { id: "exam-day-mindset", title: "시험 당일의 마음가짐" },
-    { id: "result-period-flow", title: "결과 발표 전후의 흐름" },
-    { id: "next-options", title: "결과와 무관하게 준비할 다음 선택지" },
+    { id: "current-flow", title: "현재 시험 준비 흐름" },
+    { id: "study-strength", title: "학습 강점" },
+    { id: "focus-drop", title: "집중력이 흔들리는 패턴" },
+    { id: "study-method", title: "잘 맞는 공부 방식" },
+    { id: "prep-timing", title: "준비 과정에서 정비할 시기" },
+    { id: "exam-day", title: "시험 전 컨디션과 당일의 마음가짐" },
+    { id: "result-flow", title: "결과 발표 전후의 흐름" },
+    { id: "next-choice", title: "결과와 무관하게 준비할 다음 선택지" },
   ],
 
   sajuFocus: "인성·식상·관성의 균형, 운의 집중력·압박 변화, 생활 리듬.",

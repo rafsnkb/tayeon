@@ -32,16 +32,14 @@ export const SKINSHIP_COMPATIBILITY: SajuProduct = {
 
   // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "baseline-energy", title: "관계 안에서의 기본 에너지" },
-    { id: "lead-respond-tendency", title: "주도성과 반응성의 경향" },
-    { id: "care-responsibility", title: "돌봄·책임을 표현하는 방식" },
+    { id: "base-energy", title: "관계 안에서의 기본 에너지" },
+    { id: "lead-and-care", title: "주도성·반응성과 돌봄의 표현" },
     { id: "trust-building", title: "신뢰를 쌓는 방식" },
-    { id: "control-comfort-range", title: "통제·위임에 대한 편안함의 범위" },
-    { id: "role-expectations", title: "심리적 역할 기대" },
+    { id: "comfort-range", title: "통제·위임에 대한 편안함의 범위" },
+    { id: "role-expectation", title: "심리적 역할 기대" },
     { id: "harmony-points", title: "두 사람의 조화 포인트" },
     { id: "friction-risk", title: "충돌 가능성" },
-    { id: "boundaries-talk", title: "경계·안전·신뢰 대화" },
-    { id: "consent-style", title: "서로에게 맞는 합의 방식" },
+    { id: "consent-talk", title: "경계·안전·신뢰를 만드는 대화와 합의" },
   ],
 
   sajuFocus: "음양 균형, 자기표현·책임·정서 관련 십성, 상호 보완과 긴장.",

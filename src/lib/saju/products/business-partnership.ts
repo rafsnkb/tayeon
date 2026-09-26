@@ -21,15 +21,14 @@ export const BUSINESS_PARTNERSHIP: SajuProduct = {
   // 섹션 9개 — 기획 결과 항목 10개에서 첫 항목(총평)을 뺀 수다. 빠진 게 아니라
   // 마지막 closing 페이지로 옮겨간 것이다. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "joint-strengths", title: "함께 일할 때의 강점" },
+    { id: "work-strength", title: "함께 일할 때의 강점" },
     { id: "role-split", title: "자연스러운 역할 분담" },
-    { id: "decision-style", title: "의사결정 방식" },
-    { id: "pace-execution-gap", title: "속도와 실행력의 차이" },
-    { id: "money-risk-attitude", title: "돈·위험에 대한 태도" },
+    { id: "decide-and-execute", title: "의사결정과 실행 속도" },
+    { id: "money-risk", title: "돈·위험에 대한 태도" },
     { id: "external-relations", title: "고객·외부 관계 대응" },
     { id: "conflict-points", title: "갈등이 생기기 쉬운 지점" },
     { id: "review-timing", title: "사업 흐름을 점검할 시기" },
-    { id: "operating-principles", title: "오래 협업하기 위한 운영 원칙" },
+    { id: "operating-rules", title: "오래 협업하기 위한 운영 원칙" },
   ],
 
   sajuFocus: "비겁·재성·식상·관성의 협업과 수익 구조, 오행 보완, 대운·세운의 사업·이동 흐름.",

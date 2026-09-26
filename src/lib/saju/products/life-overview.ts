@@ -29,17 +29,16 @@ export const LIFE_OVERVIEW: SajuProduct = {
   userInputPrompt: "지금 가장 고민되는 나이대·삶의 영역 또는 앞으로 궁금한 시기를 적어주세요. 그 질문을 중심으로 더 깊게 짚어드립니다.",
   purpose: "타고난 성향부터 연령대별 변곡점까지, 내 인생의 큰 흐름과 활용할 강점은 무엇인가?",
 
-  // 기획 결과 항목 18개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
+  // 섹션 11개. **기획 결과 항목 18개에서 합쳤다**(2026-09-27 사용자 결정) — 기획이 시기를
+  // `10대·20대`·`30대`·`40대`·`50대`·`60대 이후`로 쪼개 놨는데, 한 장에 한 연령대만 담으니
+  // 장마다 대운 얘기가 반복되고 내용이 얇아졌다(목업 실측: 한 장 573자). 「나이에 따른 흐름」
+  // 한 장으로 유년~노년을 풀면 같은 총량이 한 장에 모여 936자가 된다. `주요 변곡점`도 거기
+  // 넣었다 — 시기를 관통해 보면 변곡점은 그 안에서 자연히 나온다.
+  // `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "innate-temperament", title: "타고난 기질과 성향" },
-    { id: "inner-desires", title: "숨겨진 내면과 욕구" },
+    { id: "innate-temperament", title: "타고난 기질과 내면" },
     { id: "strengths-gaps", title: "강점과 보완점" },
-    { id: "life-arc", title: "인생 전체 흐름" },
-    { id: "age-10s-20s", title: "10대·20대" },
-    { id: "age-30s", title: "30대" },
-    { id: "age-40s", title: "40대" },
-    { id: "age-50s", title: "50대" },
-    { id: "age-60s-plus", title: "60대 이후" },
+    { id: "life-arc-by-age", title: "나이에 따른 흐름 — 유년부터 노년까지" },
     { id: "career-achievement", title: "직업·사회적 성취" },
     { id: "wealth-tendency", title: "재물과 자산관리 성향" },
     { id: "love-marriage", title: "연애·배우자·결혼" },
@@ -47,7 +46,6 @@ export const LIFE_OVERVIEW: SajuProduct = {
     { id: "relations-helpers", title: "인간관계·귀인" },
     { id: "health-rhythm", title: "건강·생활 리듬" },
     { id: "moves-changes", title: "이동·환경 변화" },
-    { id: "turning-points", title: "주요 변곡점" },
     { id: "life-task-synthesis", title: "전체를 관통하는 인생 과제와 종합 제안" },
   ],
 

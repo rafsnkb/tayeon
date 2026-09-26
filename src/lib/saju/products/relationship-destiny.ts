@@ -18,16 +18,14 @@ export const RELATIONSHIP_DESTINY: SajuProduct = {
 
   // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "social-tendency", title: "인간관계 성향" },
-    { id: "first-impression", title: "첫인상과 관계 방식" },
-    { id: "compatible-types", title: "잘 맞는 사람 유형" },
-    { id: "helper-types", title: "나를 돕는 귀인 유형" },
-    { id: "helper-environments", title: "귀인을 만나는 환경" },
+    { id: "social-tendency", title: "인간관계 성향과 첫인상" },
+    { id: "fitting-people", title: "잘 맞는 사람 유형" },
+    { id: "helper-type", title: "나를 돕는 귀인 유형" },
+    { id: "helper-context", title: "귀인을 만나는 환경" },
     { id: "helper-timing", title: "귀인운이 열리는 시기" },
-    { id: "friction-types", title: "갈등하기 쉬운 사람 유형" },
-    { id: "recurring-problems", title: "반복되는 관계 문제" },
-    { id: "worth-keeping-close", title: "가까이하면 좋은 관계" },
-    { id: "social-change-guide", title: "인간관계 변화와 행동 가이드" },
+    { id: "friction-and-repeat", title: "부딪히는 유형과 반복되는 문제" },
+    { id: "good-circle", title: "가까이하면 좋은 관계" },
+    { id: "change-guide", title: "인간관계 변화와 행동 가이드" },
   ],
 
   sajuFocus: "비겁·인성·관성·식상의 관계 양상, 합충, 대운·세운의 귀인·대인 변화.",

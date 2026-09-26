@@ -18,15 +18,13 @@ export const CRUSH_READING: SajuProduct = {
   // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
     { id: "how-they-see-me", title: "상대가 보는 나" },
-    { id: "current-temperature", title: "현재 관계 온도" },
-    { id: "attraction-signals", title: "이성적 호감의 신호" },
+    { id: "temperature-signals", title: "지금의 관계 온도와 호감 신호" },
     { id: "their-hesitation", title: "상대가 망설이는 이유" },
-    { id: "basic-compatibility", title: "두 사람의 기본 궁합" },
-    { id: "closeness-trigger", title: "가까워질 계기" },
-    { id: "confession-timing", title: "표현·고백에 좋은 흐름" },
+    { id: "base-fit", title: "두 사람의 기본 궁합" },
+    { id: "approach-and-timing", title: "가까워질 계기와 고백에 좋은 흐름" },
     { id: "obstacles", title: "관계를 방해하는 요소" },
-    { id: "future-potential", title: "앞으로의 관계 가능성" },
-    { id: "low-pressure-actions", title: "부담을 줄이는 행동 가이드" },
+    { id: "possibility", title: "앞으로의 관계 가능성" },
+    { id: "action-guide", title: "부담을 줄이는 행동 가이드" },
   ],
 
   sajuFocus: "두 명식의 일간 관계, 배우자성·합충, 시기 운에서의 관계 활성.",

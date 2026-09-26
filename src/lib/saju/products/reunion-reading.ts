@@ -18,15 +18,13 @@ export const REUNION_READING: SajuProduct = {
   // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
     { id: "breakup-cause", title: "이별의 핵심 원인" },
-    { id: "their-current-view", title: "상대가 현재 바라보는 관계" },
-    { id: "lingering-feelings", title: "남아 있는 감정의 흔적" },
-    { id: "recontact-conditions", title: "다시 연락이 닿기 쉬운 상황" },
-    { id: "their-likely-response", title: "내가 연락할 때의 반응 경향" },
+    { id: "their-remaining", title: "상대의 마음에 남은 것" },
+    { id: "contact-context", title: "다시 연락이 닿기 쉬운 상황" },
+    { id: "their-reaction", title: "내가 연락할 때의 반응 경향" },
     { id: "contact-timing", title: "접점이 생기기 쉬운 시기" },
-    { id: "reunion-obstacles", title: "재회를 방해하는 요소" },
-    { id: "recurring-issues", title: "재회 후 반복될 문제" },
-    { id: "post-reunion-change", title: "재회 시 관계 변화" },
-    { id: "self-care-advice", title: "재회 여부와 별개로 나를 위한 제안" },
+    { id: "obstacles", title: "재회를 방해하는 요소" },
+    { id: "after-reunion", title: "재회 후 달라지는 것과 반복될 것" },
+    { id: "self-guide", title: "재회 여부와 별개로 나를 위한 제안" },
   ],
 
   sajuFocus: "관계의 합충과 배우자궁 변화, 현재·향후 운의 재접점 신호.",

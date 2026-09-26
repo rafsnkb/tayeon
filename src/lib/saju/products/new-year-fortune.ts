@@ -27,16 +27,14 @@ export const NEW_YEAR_FORTUNE: SajuProduct = {
   // 섹션 11개 — 기획 결과 항목 12개에서 첫 항목(총평)을 뺀 수다. 빠진 게 아니라
   // 마지막 closing 페이지로 옮겨간 것이다. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "year-keywords", title: "올해의 핵심 키워드" },
-    { id: "first-half", title: "상반기 흐름" },
-    { id: "second-half", title: "하반기 흐름" },
+    { id: "year-keyword", title: "올해의 핵심 키워드" },
+    { id: "year-flow", title: "한 해의 흐름과 결정적 시기" },
     { id: "money-flow", title: "재물·소비 흐름" },
-    { id: "work-opportunity", title: "직장·사업 기회" },
+    { id: "work-chance", title: "직장·사업 기회" },
     { id: "love-flow", title: "연애·인연 흐름" },
     { id: "health-care", title: "건강·컨디션 관리" },
-    { id: "helpers-collab", title: "귀인과 협업 기회" },
-    { id: "caution-relations", title: "주의할 관계·상황" },
-    { id: "decisive-timing", title: "올해의 결정적 시기" },
+    { id: "helpers", title: "귀인과 협업 기회" },
+    { id: "cautions", title: "주의할 관계·상황" },
     { id: "year-guide", title: "올해를 잘 보내는 방법" },
   ],
 

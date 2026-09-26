@@ -21,17 +21,15 @@ export const MARRIAGE_COMPATIBILITY: SajuProduct = {
   // 섹션 11개 — 기획 결과 항목 12개에서 첫 항목(총평)을 뺀 수다. 빠진 게 아니라
   // 마지막 closing 페이지로 옮겨간 것이다. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "dating-vs-married", title: "연애와 결혼 후 달라지는 점" },
-    { id: "daily-habits", title: "생활 습관" },
-    { id: "money-values", title: "경제관념" },
-    { id: "role-split", title: "역할 분담" },
-    { id: "conflict-resolution", title: "대화·갈등 해결 방식" },
-    { id: "in-law-relations", title: "가족·부모와의 관계" },
-    { id: "home-base", title: "주거·생활 기반" },
-    { id: "views-on-children", title: "자녀관" },
-    { id: "mutual-support", title: "서로에게 힘이 되는 부분" },
-    { id: "long-term-risk", title: "장기 리스크" },
-    { id: "stable-marriage-guide", title: "안정적인 결혼생활 가이드" },
+    { id: "after-marriage", title: "연애와 결혼 후 달라지는 점" },
+    { id: "living-and-home", title: "생활 습관과 주거 기반" },
+    { id: "money-and-roles", title: "경제관념과 역할 분담" },
+    { id: "talk-conflict", title: "대화·갈등 해결 방식" },
+    { id: "in-laws", title: "가족·부모와의 관계" },
+    { id: "children-view", title: "자녀관" },
+    { id: "mutual-strength", title: "서로에게 힘이 되는 부분" },
+    { id: "long-risk", title: "장기 리스크" },
+    { id: "marriage-guide", title: "안정적인 결혼생활 가이드" },
   ],
 
   sajuFocus: "일지·배우자궁, 오행의 상생상극, 재성·관성·인성 구조, 장기 운의 변화.",

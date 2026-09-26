@@ -39,18 +39,14 @@ export const SINGLE_LOVE: SajuProduct = {
   // `id` 는 여기서 새로 지은 영문 kebab-case 다(기획에는 없다). `title` 은 기획의 한국어 항목명
   // 그대로이고 **화면 페이지 제목으로 바로 쓰인다** — 임의로 줄이거나 바꾸지 말 것.
   sections: [
-    { id: "basic-tendency", title: "기본 연애 성향" },
-    { id: "recurring-pattern", title: "반복되는 연애 패턴" },
+    { id: "love-tendency", title: "기본 연애 성향" },
+    { id: "repeat-pattern", title: "반복되는 연애 패턴" },
     { id: "current-flow", title: "현재 연애 흐름" },
     { id: "next-timing", title: "다음 인연의 시기" },
     { id: "meeting-context", title: "만남의 환경·계기" },
-    { id: "partner-character", title: "상대의 성격과 분위기" },
-    { id: "partner-lifestyle", title: "상대의 생활·직업 스타일" },
-    { id: "relationship-start", title: "관계가 시작되는 방식" },
-    { id: "relationship-growth", title: "관계 발전의 흐름" },
-    // id 를 `action-guide` 로 하지 않았다 — 모든 섹션의 본문에 `action_guide` 필드가 따로 있어서
-    // (설계 §7 pages/{n}) 섹션 id 와 필드명이 같아지면 로그·저장분에서 구분이 안 된다.
-    { id: "good-match-actions", title: "좋은 인연을 잡는 행동 가이드" },
+    { id: "their-portrait", title: "다가올 인연의 모습" },
+    { id: "start-and-growth", title: "관계가 시작되고 깊어지는 흐름" },
+    { id: "action-guide", title: "좋은 인연을 잡는 행동 가이드" },
   ],
 
   sajuFocus:

@@ -17,16 +17,14 @@ export const SITUATIONSHIP_READING: SajuProduct = {
 
   // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "current-status", title: "지금의 관계 상태" },
-    { id: "their-feelings", title: "상대가 느끼는 감정" },
-    { id: "their-wanted-shape", title: "상대가 원하는 관계" },
-    { id: "why-passive", title: "적극적이지 않은 이유" },
-    { id: "pace-gap", title: "연애 속도 차이" },
-    { id: "shared-wavelength", title: "잘 통하는 포인트" },
-    { id: "growth-trigger", title: "발전하기 쉬운 계기" },
-    { id: "progress-timing", title: "진전되기 좋은 시기" },
-    { id: "breakdown-risk", title: "틀어질 수 있는 포인트" },
-    { id: "next-step-advice", title: "다음 단계 제안" },
+    { id: "current-state", title: "지금의 관계 상태" },
+    { id: "their-heart", title: "상대의 마음 — 감정과 원하는 관계" },
+    { id: "pace-gap", title: "속도가 어긋나는 이유" },
+    { id: "matching-points", title: "잘 통하는 포인트" },
+    { id: "trigger", title: "발전하기 쉬운 계기" },
+    { id: "good-timing", title: "진전되기 좋은 시기" },
+    { id: "risk-points", title: "틀어질 수 있는 포인트" },
+    { id: "next-step", title: "다음 단계 제안" },
   ],
 
   sajuFocus: "상호 일간·지지의 조화와 긴장, 연애성의 흐름, 해당 시기 합충.",

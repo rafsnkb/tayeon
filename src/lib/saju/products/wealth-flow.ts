@@ -22,17 +22,14 @@ export const WEALTH_FLOW: SajuProduct = {
   // 섹션 11개 — 기획 결과 항목 12개에서 첫 항목(총평)을 뺀 수다. 빠진 게 아니라
   // 마지막 closing 페이지로 옮겨간 것이다. `title` 이 화면 페이지 제목으로 바로 쓰인다.
   sections: [
-    { id: "earning-style", title: "돈을 버는 방식" },
-    { id: "income-growth-env", title: "소득이 커지는 환경" },
-    { id: "saving-habits", title: "돈이 모이는 습관" },
-    { id: "spending-leaks", title: "지출·손실로 이어지기 쉬운 패턴" },
-    { id: "job-income-flow", title: "직업소득 흐름" },
+    { id: "earning-and-saving", title: "돈이 들어오고 쌓이는 방식" },
+    { id: "loss-patterns", title: "지출·손실로 이어지기 쉬운 패턴" },
+    { id: "salary-flow", title: "직업소득 흐름" },
     { id: "business-aptitude", title: "사업·부업 적성" },
-    { id: "risk-investing", title: "위험 선호와 투자 성향" },
-    { id: "asset-style", title: "자산관리 스타일" },
+    { id: "risk-and-assets", title: "투자와 자산관리 성향" },
     { id: "money-and-people", title: "돈과 인간관계" },
     { id: "review-timing", title: "재정 점검이 필요한 시기" },
-    { id: "long-term-direction", title: "장기 자산관리 방향" },
+    { id: "long-term-plan", title: "장기 자산관리 방향" },
   ],
 
   sajuFocus: "재성의 강약·흐름, 식상생재·관성 구조, 용신과 대운·세운의 재물 환경.",
