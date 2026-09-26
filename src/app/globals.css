@@ -20,7 +20,13 @@
                           AA Large 로 받는다. */
 /* 팔레트는 토스 앱 스크린샷 실측 + 사용자가 고른 코랄에서 나왔다. 유도 과정과 근거는
    doc/design/build-toss-tone-mockup.mjs 와 measure-*.mjs 에 있고, 결과는
-   doc/design/toss-tone-mockup.html 에서 볼 수 있다. 값을 손댈 땐 그쪽 생성기부터 고칠 것.
+   doc/design/toss-tone-mockup.html 에서 볼 수 있다. **유도된 값**을 손댈 땐 그쪽 생성기부터
+   고칠 것 — 생성기를 안 고치면 다음에 돌릴 때 옛 값으로 되돌아온다.
+
+   다만 **사용자가 직접 지정한 값은 생성기로 되돌리지 않는다.** 그 파일들은 "토스 스크린샷에서
+   이렇게 유도했다"는 기록이라, 유도와 무관한 지정값을 거기 덮어쓰면 기록이 거짓이 된다.
+   지금 지정값은 둘이다 — 라이트 --point #e04e6e, 다크 --point #df4667(2026-09-26).
+   그래서 doc/design 쪽에는 아직 옛 다크값(#f53a63)이 남아 있고, 그건 오류가 아니다.
 
    두 가지 원칙만 기억하면 된다.
      1. 중성색은 완전 무채가 아니라 H 18°로 살짝 따뜻하다(코랄 판에서 실측).
@@ -105,10 +111,12 @@
   --border: #1f1b1b;
   --bold-text: #f1ecec;
   --text: #bcb6b6;
-  --point: #f53a63;
+  /* 2026-09-26 사용자 지시로 #f53a63 → #df4667. 아래 --point-bg·--point-glow 는 이 색을
+     알파만 달리해 쓰는 파생값이라 **함께** 옮긴다 — 한쪽만 바꾸면 면과 글로우가 갈라진다. */
+  --point: #df4667;
   --point-strong: #ff7e8e;
   --point-muted: #c31145;
-  --point-bg: rgba(245, 58, 99, 0.12);
+  --point-bg: rgba(223, 70, 103, 0.12);
   --cta-fill: #e2dddd;
   --cta-text: #1a1616;
   --urgent: #e5472d;
@@ -128,7 +136,7 @@
   --point-text: #fc5f78;
   --gold: #f9de92;
   --point-light: #ff7e8e;
-  --point-glow: rgba(245, 58, 99, 0.355);
+  --point-glow: rgba(223, 70, 103, 0.355);
   color-scheme: dark;
 }
 
