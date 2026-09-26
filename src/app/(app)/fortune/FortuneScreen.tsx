@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { openMenu } from "@/lib/ui/menuBus";
 import { TarotFortuneToggle } from "@/components/TarotFortuneToggle";
 import type { SajuProduct } from "@/lib/saju/products";
+import { useRooms, type ActiveCoupon } from "@/lib/tarot/RoomsContext";
+import { discountedAmount } from "@/lib/payment/discountCoupon";
 import { FORTUNE_FILTERS, fortuneFilterFromKey, fortuneListHref } from "./filters";
 import { productMeta, productsFor } from "./productList";
 import { productArt } from "./productArt";
@@ -32,6 +34,8 @@ export function FortuneScreen() {
   const searchParams = useSearchParams();
   const filter = fortuneFilterFromKey(searchParams.get("c"));
   const products = productsFor(filter);
+  // 할인쿠폰은 사주에도 적용된다(2026-09-27 사용자 결정 — 아래 ProductCard 주석 참고).
+  const { activeCoupon } = useRooms();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -88,6 +92,7 @@ export function FortuneScreen() {
               <ProductCard
                 key={product.slug}
                 product={product}
+                activeCoupon={activeCoupon}
                 onOpen={() => router.push(`/fortune/${product.slug}`)}
               />
             ))}
@@ -103,12 +108,27 @@ export function FortuneScreen() {
   );
 }
 
-function ProductCard({ product, onOpen }: { product: SajuProduct; onOpen: () => void }) {
+function ProductCard({
+  product,
+  activeCoupon,
+  onOpen,
+}: {
+  product: SajuProduct;
+  activeCoupon: ActiveCoupon | null;
+  onOpen: () => void;
+}) {
   const art = productArt(product.slug, "card");
   /* 목업의 속궁합 카드는 `연애 · 궁합 · 속궁합` 이지만 상품표는 `궁합, 연애` 순이라 화면에는
      `궁합 · 연애 · 속궁합` 으로 나온다. 설계 §3 이 **상품표를 단일 출처**로 못박았고 목업
      카드의 순서는 예시로 읽으라고 적어 뒀다. */
   const meta = productMeta(product);
+  // 세 모드 중 최저가인 사주 단품가. 목업에 "부터" 같은 말이 없어서 붙이지 않는다.
+  // 라이트 목업의 `50% ₩4,450` 은 사주에 타로 쿠폰이 먹는다는 전제였는데, 2026-09-27
+  // 사용자가 "할인쿠폰은 사주에도 적용된다"고 정하면서 그 전제가 풀렸다 — 정가만 그리던 걸
+  // 멈추고 할인가를 그린다. 표시가는 `discountedAmount`(discountCoupon.ts) 그대로 쓴다 —
+  // 여기서 따로 계산하면 결제창 금액과 갈릴 수 있다(그 파일 머리말 경고와 같은 사고).
+  const listPrice = product.pricesWon.saju;
+  const discounted = activeCoupon ? discountedAmount(listPrice, activeCoupon.discountRate) : null;
 
   return (
     <button
@@ -126,12 +146,21 @@ function ProductCard({ product, onOpen }: { product: SajuProduct; onOpen: () => 
         <p className="text-sm font-semibold leading-none text-placeholder">{meta}</p>
         {/* 제목은 줄 수를 자르지 않는다 — 목업의 세 번째 카드가 3줄이다. */}
         <p className="text-lg font-bold leading-[22px] text-bold-text">{product.title}</p>
-        {/* 세 모드 중 최저가인 사주 단품가. 목업에 "부터" 같은 말이 없어서 붙이지 않는다.
-            라이트 목업의 `50% ₩4,450` 은 사주에 타로 쿠폰이 먹는다는 전제인데 아직 안 정해졌다 —
-            정가 한 줄만 그린다(2026-09-26 판단). */}
-        <p className="mt-auto text-right text-lg font-bold leading-none text-bold-text">
-          ₩{product.pricesWon.saju.toLocaleString("ko-KR")}
-        </p>
+        {discounted ? (
+          <div className="mt-auto text-right">
+            <p className="text-xs font-semibold text-icon-muted line-through">
+              ₩{listPrice.toLocaleString("ko-KR")}
+            </p>
+            <p className="text-lg font-bold leading-none text-bold-text">
+              <span className="text-point-text">{Math.round(activeCoupon!.discountRate * 100)}%</span> ₩
+              {discounted.amountWon.toLocaleString("ko-KR")}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-auto text-right text-lg font-bold leading-none text-bold-text">
+            ₩{listPrice.toLocaleString("ko-KR")}
+          </p>
+        )}
       </div>
     </button>
   );

@@ -16,7 +16,13 @@ import { adminDb } from "@/lib/firebase/admin";
 import { COMBOS, isComboKey, isHeldPass } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
 import { USERS, COUNT_PASSES, TIME_PASSES, PAYMENT_INTENTS, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
-import { pickBestCoupon, discountedAmount, type HeldDiscountCoupon } from "@/lib/payment/discountCoupon";
+import {
+  pickBestCoupon,
+  resolveCouponSelection,
+  discountedAmount,
+  normalizeCouponCode,
+  type HeldDiscountCoupon,
+} from "@/lib/payment/discountCoupon";
 import { blockIfSuspended } from "@/lib/auth/suspension";
 
 // 결제창(PortOne.requestPayment)을 열기 직전에 프론트가 호출하는 엔드포인트.
@@ -60,12 +66,17 @@ export async function POST(req: NextRequest) {
   // 적용해 버리면 3,000 원 상품에 30% 쿠폰이 소진되고(900 원 할인) 11 만원 상품에 쓸 기회가
   // 사라진다 — 사용자가 스스로 막을 수 있어야 한다(2026-09-25 사용자 결정).
   //
-  // 클라이언트가 보내는 것은 **쓸지 말지**뿐이다. 어떤 쿠폰을 쓸지도, 얼마를 깎을지도 서버가
-  // 정한다 — 그쪽을 믿으면 금액을 조작할 수 있다.
-  const { productId, combo, useCoupon, userInput, consent } = (await req.json()) as {
+  // 클라이언트가 보내는 것은 **쓸지 말지, 그리고(2장 이상 보유 시) 어느 것을 쓸지**뿐이다.
+  // 얼마를 깎을지는 서버가 정한다 — 그쪽을 믿으면 금액을 조작할 수 있다. `couponCode` 는
+  // 식별자일 뿐이고, 서버는 이 uid 의 보유분에서 그 코드를 다시 찾아 상태·기간을 직접
+  // 검증한 뒤 할인율도 그 문서에서 읽는다(2026-09-27 사용자 결정 — 2장 이상이면 사용자가 고른다).
+  const { productId, combo, useCoupon, couponCode: rawCouponCode, userInput, consent } = (await req.json()) as {
     productId?: string;
     combo?: string;
     useCoupon?: boolean;
+    /** 보유 쿠폰이 2장 이상일 때 사용자가 고른 코드. 1장 이하면 화면이 아예 보내지 않고,
+     *  그러면 지금까지처럼 서버가 `pickBestCoupon`으로 자동 선택한다. */
+    couponCode?: string;
     /** 사주 리포트 상품에서 사용자가 적어 넣은 사연(상품의 userInputPrompt 에 대한 답). */
     userInput?: string;
     /** [필수] 동의 둘 — 이용약관 + 청약철회 제한 안내. 사주 리포트 상품에서만 요구한다.
@@ -163,16 +174,16 @@ export async function POST(req: NextRequest) {
     if (held) return blockedByHeldPass(held.data().status, "시간제 ");
   }
 
-  // 보유 중인 할인쿠폰 가운데 지금 쓸 수 있는 것을 **서버가** 고른다. 클라이언트는 어떤 쿠폰을
-  // 쓸지도, 얼마를 깎을지도 보내지 않는다 — 보내 봐야 읽지 않는다.
+  // 보유 중인 할인쿠폰 중 지금 적용할 것을 정한다. 클라이언트는 "쓸지 말지"와(2장 이상 보유
+  // 시) "어느 것"만 보낸다 — 얼마를 깎을지는 항상 서버가 이 문서들에서 다시 계산한다.
   //
-  // 기간이 겹치게 발급하지 않는 것이 운영 원칙이라 후보는 보통 0 또는 1 개다(pickBestCoupon 주석).
-  // 쿼리는 status 로만 추리고 기간은 코드에서 본다 — Firestore 복합 조건은 색인이 필요한데,
-  // 한 사람이 가진 쿠폰 수는 많아야 몇 개라 전부 읽어도 부담이 없다.
+  // status 로 거르지 않고 전부 읽는다 — couponCode 로 특정 코드를 골랐을 때 "이미 썼다"와
+  // "애초에 그런 코드가 없다"를 구분해야 하는데(resolveCouponSelection), unused 만 읽으면 이미
+  // 쓴 쿠폰이 조회에서 아예 빠져 항상 "없는 코드"로 보인다. 한 사람이 가진 쿠폰 수는 많아야
+  // 몇 개라 전부 읽어도 부담이 없다.
   const nowIso = new Date().toISOString();
   const heldCoupons: HeldDiscountCoupon[] = useCoupon === false ? [] : await userRef
     .collection(USER_DISCOUNT_COUPONS)
-    .where("status", "==", "unused")
     .get()
     .then((snap) =>
       snap.docs.flatMap((doc) => {
@@ -181,7 +192,13 @@ export async function POST(req: NextRequest) {
           console.error("[coupon] 형식이 깨진 보유 쿠폰 — 무시한다", uid, doc.id);
           return [];
         }
-        return [{ code: doc.id, discountRate: data.discountRate, startsAt: data.startsAt, endsAt: data.endsAt, status: "unused" as const }];
+        return [{
+          code: doc.id,
+          discountRate: data.discountRate,
+          startsAt: data.startsAt,
+          endsAt: data.endsAt,
+          status: data.status === "used" ? ("used" as const) : ("unused" as const),
+        }];
       })
     )
     .catch((error) => {
@@ -190,7 +207,30 @@ export async function POST(req: NextRequest) {
       console.error("[coupon] 보유 쿠폰 조회 실패 — 정가로 진행한다", uid, error);
       return [];
     });
-  const coupon = pickBestCoupon(heldCoupons, nowIso);
+
+  // couponCode 가 오면 **그 쿠폰만** 본다 — 안 되면 조용히 다른 쿠폰이나 정가로 넘어가지 않고
+  // 거절한다(2026-09-27 사용자 결정: "A 를 쓴 줄 알았는데 B 가 없어졌다"가 되면 안 된다, 쿠폰은
+  // 1 회용이라 되돌릴 수 없다). 코드가 없으면(1장 이하 보유 시 화면이 아예 안 보냄) 지금까지처럼
+  // 자동으로 가장 유리한 것을 고른다.
+  const normalizedCouponCode = useCoupon === false ? null : normalizeCouponCode(rawCouponCode);
+  if (rawCouponCode !== undefined && useCoupon !== false && !normalizedCouponCode) {
+    return NextResponse.json({ error: "쿠폰 코드를 다시 확인해주세요.", code: "COUPON_NOT_FOUND" }, { status: 409 });
+  }
+  let coupon: HeldDiscountCoupon | null;
+  if (normalizedCouponCode) {
+    const picked = resolveCouponSelection(heldCoupons, normalizedCouponCode, nowIso);
+    if (!picked.ok) {
+      const byReason = {
+        not_found: { error: "쿠폰을 찾을 수 없어요. 다시 골라주세요.", code: "COUPON_NOT_FOUND" },
+        used: { error: "이미 사용한 쿠폰이에요. 다시 골라주세요.", code: "COUPON_ALREADY_USED" },
+        expired: { error: "사용 기간이 지난 쿠폰이에요. 다시 골라주세요.", code: "COUPON_EXPIRED" },
+      } as const;
+      return NextResponse.json(byReason[picked.reason], { status: 409 });
+    }
+    coupon = picked.coupon;
+  } else {
+    coupon = pickBestCoupon(heldCoupons, nowIso);
+  }
   const { amountWon, discountWon } = coupon
     ? discountedAmount(product.priceWon, coupon.discountRate)
     : { amountWon: product.priceWon, discountWon: 0 };

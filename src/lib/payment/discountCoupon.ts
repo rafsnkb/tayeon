@@ -49,11 +49,41 @@ export function isCouponUsable(coupon: HeldDiscountCoupon, nowIso: string): bool
  * 운영 원칙상 기간이 겹치게 발급하지 않으므로 후보는 보통 0 또는 1 개다. 그래도 **할인율이 가장
  * 높은 것**을 고르도록 해 둔다 — 수동 수정이나 발급 실수로 겹쳤을 때 사용자에게 불리한 쪽으로
  * 조용히 기우는 것보다 낫고, 무엇이 뽑힐지가 정해져 있어야 재현이 된다.
+ *
+ * **할인율이 같으면 만료가 빠른 쪽을 고른다.** 이 동점 처리가 없으면 `Array.reduce` 가 배열
+ * 순서(호출부에서는 Firestore 문서 id = 쿠폰 코드 알파벳순)로 정하게 되는데, 그건 우연히 먼저
+ * 온 것일 뿐 아무 의미가 없다 — 최악의 경우 내일 만료되는 쿠폰이 알파벳순으로 밀려 그대로
+ * 만료된다(2026-09-27, 실사용 시나리오로 발견). 만료가 빠른 걸 먼저 쓰면 그런 손실이 없다.
  */
 export function pickBestCoupon(held: HeldDiscountCoupon[], nowIso: string): HeldDiscountCoupon | null {
   const usable = held.filter((c) => isCouponUsable(c, nowIso));
   if (usable.length === 0) return null;
-  return usable.reduce((best, c) => (c.discountRate > best.discountRate ? c : best));
+  return usable.reduce((best, c) => {
+    if (c.discountRate !== best.discountRate) return c.discountRate > best.discountRate ? c : best;
+    return Date.parse(c.endsAt) < Date.parse(best.endsAt) ? c : best;
+  });
+}
+
+/** `couponCode`(사용자가 고른 것)를 서버가 검증할 때의 결과. 클라이언트는 "어느 것"만 보내고
+ *  "얼마"는 절대 안 보낸다 — 할인율은 여기서 서버가 보유분 문서에서 직접 읽는다. */
+export type CouponSelectionResult =
+  | { ok: true; coupon: HeldDiscountCoupon }
+  /** `not_found` 코드가 아예 없거나 남의 것. `used` 이미 소진. `expired` 기간이 지났거나
+   *  아직 시작 전(어드민이 미리 지급한 경우도 이 하나로 묶는다 — 사용자 입장에서는 "지금은 못
+   *  쓴다"는 같은 의미다). 화면이 "다시 고르세요" 안내를 사유별로 나눠 보여줄 수 있게 셋을
+   *  구분해 둔다(2026-09-27 사용자 결정 — 조용히 다른 쿠폰으로 대체하지 않는다). */
+  | { ok: false; reason: "not_found" | "used" | "expired" };
+
+export function resolveCouponSelection(
+  held: HeldDiscountCoupon[],
+  code: string,
+  nowIso: string
+): CouponSelectionResult {
+  const found = held.find((c) => c.code === code);
+  if (!found) return { ok: false, reason: "not_found" };
+  if (found.status === "used") return { ok: false, reason: "used" };
+  if (!isCouponUsable(found, nowIso)) return { ok: false, reason: "expired" };
+  return { ok: true, coupon: found };
 }
 
 /** 만료된 **미사용** 쿠폰을 쿠폰함에 남겨 두는 기간. 지나면 지운다(사용자 결정, 2026-09-25).

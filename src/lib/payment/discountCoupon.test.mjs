@@ -4,6 +4,7 @@ import {
   normalizeCouponCode,
   isCouponUsable,
   pickBestCoupon,
+  resolveCouponSelection,
   discountedAmount,
   couponShelfState,
   MIN_CHARGE_WON,
@@ -56,6 +57,41 @@ test("겹쳐 버린 경우에는 할인율이 가장 높은 것을 고른다 (�
   const 큰할인 = { ...쿠폰, code: "BIG50", discountRate: 0.5 };
   const picked = pickBestCoupon([쿠폰, 큰할인], "2026-10-03T00:00:00.000Z");
   assert.equal(picked.code, "BIG50");
+});
+
+test("할인율이 같으면 만료가 빠른 쿠폰을 고른다 — 알파벳순(문서 id)에 맡기면 늦게 만료되는 쪽이 알파벳상 뒤일 때 먼저 만료되는 쪽이 그대로 소멸한다", () => {
+  const 내일만료 = { ...쿠폰, code: "BONUS20", discountRate: 0.2, endsAt: "2026-10-04T23:59:59.000Z" };
+  const 다음달만료 = { ...쿠폰, code: "APRIL20", discountRate: 0.2, endsAt: "2026-11-30T23:59:59.000Z" };
+  // 배열 순서를 바꿔도(알파벳순이든 아니든) 결과가 같아야 진짜 규칙이다.
+  const now = "2026-10-03T00:00:00.000Z";
+  assert.equal(pickBestCoupon([다음달만료, 내일만료], now).code, "BONUS20");
+  assert.equal(pickBestCoupon([내일만료, 다음달만료], now).code, "BONUS20");
+});
+
+// ── couponCode 검증(사용자가 2장 이상 보유 시 직접 고른 것, 2026-09-27 사용자 결정) ──────────
+// "조용히 다른 쿠폰으로 대체하지 않는다" — 없음/이미 사용/기간 만료를 구분해 거절한다.
+
+test("보유한 코드가 없으면 not_found다 — 남의 쿠폰이나 오타를 그냥 통과시키지 않는다", () => {
+  const result = resolveCouponSelection([쿠폰], "NOSUCH20", "2026-10-03T00:00:00.000Z");
+  assert.deepEqual(result, { ok: false, reason: "not_found" });
+});
+
+test("이미 쓴 코드면 used다", () => {
+  const 쓴쿠폰 = { ...쿠폰, status: "used" };
+  const result = resolveCouponSelection([쓴쿠폰], "LAUNCH30", "2026-10-03T00:00:00.000Z");
+  assert.deepEqual(result, { ok: false, reason: "used" });
+});
+
+test("기간이 지났거나 아직 시작 전이면 expired다", () => {
+  assert.deepEqual(resolveCouponSelection([쿠폰], "LAUNCH30", "2026-11-01T00:00:00.000Z"), { ok: false, reason: "expired" });
+  assert.deepEqual(resolveCouponSelection([쿠폰], "LAUNCH30", "2026-09-01T00:00:00.000Z"), { ok: false, reason: "expired" });
+});
+
+test("본인이 보유한, 아직 안 쓴, 기간 안의 코드면 그 쿠폰을 그대로 돌려준다 — 얼마를 깎을지는 여기서 다시 계산하지 않는다", () => {
+  const result = resolveCouponSelection([쿠폰], "LAUNCH30", "2026-10-03T00:00:00.000Z");
+  assert.equal(result.ok, true);
+  assert.equal(result.coupon.code, "LAUNCH30");
+  assert.equal(result.coupon.discountRate, 0.3);
 });
 
 test("정률 할인이 적용된다", () => {

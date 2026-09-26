@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { discountedAmount } from "@/lib/payment/discountCoupon";
@@ -36,6 +36,9 @@ type TimeDuration = 15 | 30 | 60;
 type CountPackage = (typeof COUNT_PACKAGES)[number];
 type TimePackage = (typeof TIME_PASS_PACKAGES)[number];
 type SelectedProduct = { kind: "count"; pkg: CountPackage } | { kind: "time"; pkg: TimePackage };
+
+/** `/api/user/discount-coupons` 가 주는 쿠폰함 한 장 — 여기서 쓰는 필드만 뽑아 둔다. */
+type WalletCoupon = { code: string; name: string; discountRate: number; endsAt: string; usable: boolean };
 
 /** 목록 카드의 제목·설명. 목업 문구를 그대로 따른다. */
 const timePassName = (minutes: number) => `${minutes}분 무제한 이용권`;
@@ -73,8 +76,43 @@ export default function ChargePage() {
   const [useCoupon, setUseCoupon] = useState(true);
   // 쿠폰은 **진입 시점에 이미** 알고 있어야 한다 — 마운트 후 따로 조회하면 첫 렌더가 정가였다가
   // 할인가로 바뀌면서 가격이 눈에 띄게 튄다(2026-09-25 사용자 리포트). /api/user/me 가 로그인
-  // 시점에 실어다 주므로 여기서는 읽기만 한다.
+  // 시점에 실어다 주므로 여기서는 읽기만 한다. `coupon` 은 그중 가장 유리한 하나(서버 기본
+  // 선택)이고, 보유가 1장 이하면 이 값만으로 충분하다 — 그래서 아래 보유 목록 조회 전에도
+  // 가격이 튀지 않는다.
   const { user, email, nickname, refreshMe, countPasses, timePasses, activeTimePass, hasBirthInfo, myTimeUnknown, activeCoupon: coupon } = useRooms();
+  // 2장 이상 보유했을 때만 "어느 걸 쓸지" 고르게 한다(2026-09-27 사용자 결정 — 1장뿐이면 고를
+  // 게 없는데 단계만 늘어난다). 상세로 들어갈 때만 조회한다 — 목록에서는 필요 없다.
+  const [usableCoupons, setUsableCoupons] = useState<WalletCoupon[] | null>(null);
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  useEffect(() => {
+    // 상품을 아직 안 고른 화면(목록)에서는 조회하지 않는다 — 상세로 들어가고 나갈 때의 정리는
+    // `selected` 를 null 로 되돌리는 두 자리(뒤로가기·구매 완료)에서 직접 한다(이벤트 핸들러
+    // 쪽 setState 라 괜찮다 — 여기 effect 안에서 동기 setState 를 하면 렌더가 겹친다).
+    if (!selected || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch("/api/user/discount-coupons", { headers: { Authorization: `Bearer ${idToken}` } });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { coupons?: WalletCoupon[] };
+        if (cancelled) return;
+        setUsableCoupons((data.coupons ?? []).filter((c) => c.usable));
+      } catch (error) {
+        // 실패해도 구매를 막지 않는다 — 선택 UI 없이 지금까지처럼 서버가 자동으로 고른다.
+        console.error("[charge] 쿠폰함 조회 실패 — 선택 UI 없이 진행한다", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, user]);
+  // 고를 게 있을 때만(2장 이상) 픽커를 보여준다. 그 전까지는 `coupon`(서버 기본 선택) 그대로다.
+  const showCouponPicker = (usableCoupons?.length ?? 0) >= 2;
+  const selectedCouponCode = couponCode ?? coupon?.code ?? null;
+  const displayedCoupon = showCouponPicker
+    ? (usableCoupons!.find((c) => c.code === selectedCouponCode) ?? coupon)
+    : coupon;
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
   const heldCountPass = countPasses.find(
     (pass) => pass.source === "purchase" && HELD_PASS_STATUSES.includes(pass.status)
@@ -82,7 +120,7 @@ export default function ChargePage() {
   const hasCountPass = Boolean(heldCountPass);
   const hasTimePassHeld = timePasses.length > 0 || activeTimePass !== null;
   const listPrice = selected?.pkg.priceWon ?? 0;
-  const appliedCoupon = useCoupon ? coupon : null;
+  const appliedCoupon = useCoupon ? displayedCoupon : null;
   const { amountWon: price, discountWon } = appliedCoupon
     ? discountedAmount(listPrice, appliedCoupon.discountRate)
     : { amountWon: listPrice, discountWon: 0 };
@@ -122,8 +160,15 @@ export default function ChargePage() {
       const prepareRes = await fetch("/api/payment/prepare", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        // 쿠폰을 쓸지 말지만 보낸다 — 어떤 쿠폰을 쓸지도 얼마를 깎을지도 서버가 정한다.
-        body: JSON.stringify({ productId, combo, useCoupon }),
+        // 쓸지 말지, 그리고(2장 이상 보유해 직접 골랐을 때만) 어느 걸 쓸지만 보낸다 — 얼마를
+        // 깎을지는 서버가 다시 계산한다. 1장 이하면 couponCode 를 아예 안 보내고, 그러면
+        // 서버가 지금까지처럼 자동으로 고른다.
+        body: JSON.stringify({
+          productId,
+          combo,
+          useCoupon,
+          ...(showCouponPicker && selectedCouponCode ? { couponCode: selectedCouponCode } : {}),
+        }),
       });
       if (!prepareRes.ok) {
         const failed = await prepareRes.json().catch(() => ({}));
@@ -134,6 +179,14 @@ export default function ChargePage() {
         }
         if (failed.code === "NO_BIRTH_TIME") {
           setNoBirthTimeOpen(true);
+          return;
+        }
+        // 고른 쿠폰이 그새 어긋났다(이미 쓰였거나 기간이 지났거나 못 찾음) — 조용히 다른
+        // 쿠폰이나 정가로 넘기지 않고, 선택을 지워 다시 고르게 한다(2026-09-27 사용자 결정).
+        if (failed.code === "COUPON_NOT_FOUND" || failed.code === "COUPON_ALREADY_USED" || failed.code === "COUPON_EXPIRED") {
+          setCouponCode(null);
+          setUsableCoupons((prev) => (prev ? prev.filter((c) => c.code !== selectedCouponCode) : prev));
+          setNotice({ type: "error", message: failed.error ?? "쿠폰을 다시 골라주세요." });
           return;
         }
         setNotice({ type: "error", message: failed.error ?? "결제 준비에 실패했어요. 잠시 후 다시 시도해주세요." });
@@ -178,6 +231,8 @@ export default function ChargePage() {
         setSelected(null);
         setSelectedCombo(null);
         setUseCoupon(true);
+        setUsableCoupons(null);
+        setCouponCode(null);
         setNotice({ type: "info", message: "결제가 완료됐어요!" });
       } else {
         setNotice({
@@ -233,7 +288,17 @@ export default function ChargePage() {
         title="이용권 구입"
         /* 상세를 벗어나면 쿠폰 토글도 기본값(켜짐)으로 되돌린다. 끄기는 "이번 결제"에 대한
            결정이라 다음 상품까지 따라가면 안 된다. */
-        onBack={selected ? () => { setSelected(null); setSelectedCombo(null); setUseCoupon(true); } : undefined}
+        onBack={
+          selected
+            ? () => {
+                setSelected(null);
+                setSelectedCombo(null);
+                setUseCoupon(true);
+                setUsableCoupons(null);
+                setCouponCode(null);
+              }
+            : undefined
+        }
         backHref={returnTo}
       />
       <div
@@ -266,16 +331,18 @@ export default function ChargePage() {
 
               실측(scale 3): 카드 폭 378 · 모서리 24 · 높이 80 · 면 --topbar(정확 일치),
               토글 56x29 · 오른쪽 안쪽 여백 24 · 켜짐 트랙 --point(정확 일치). */}
-          {selected && coupon && (
+          {selected && displayedCoupon && (
             <section>
               <p className="mb-2 text-base font-bold text-bold-text">보유 쿠폰</p>
               <div className="flex h-20 items-center justify-between gap-3 rounded-3xl bg-topbar px-6">
-                <span className="truncate text-base font-bold text-bold-text">{coupon.name || coupon.code}</span>
+                <span className="truncate text-base font-bold text-bold-text">
+                  {displayedCoupon.name || displayedCoupon.code}
+                </span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={useCoupon}
-                  aria-label={`${coupon.name || coupon.code} 적용`}
+                  aria-label={`${displayedCoupon.name || displayedCoupon.code} 적용`}
                   onClick={() => setUseCoupon((on) => !on)}
                   className={`relative h-[29px] w-14 shrink-0 rounded-full transition-colors ${
                     useCoupon ? "bg-point" : "bg-chip-fill"
@@ -288,6 +355,39 @@ export default function ChargePage() {
                   />
                 </button>
               </div>
+              {/* 2장 이상 보유했을 때만 어느 걸 쓸지 고르게 한다(2026-09-27 사용자 결정). 디자인이
+                  아직 없어서 기존 토큰만으로 최소한으로 그린다 — 시안이 나오면 교체될 자리다. */}
+              {useCoupon && showCouponPicker && (
+                <div className="mt-2 space-y-2 rounded-3xl bg-topbar p-4">
+                  {usableCoupons!.map((c) => {
+                    const isSelected = c.code === selectedCouponCode;
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => setCouponCode(c.code)}
+                        className="flex w-full items-center gap-3 text-left"
+                      >
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-point ${
+                            isSelected ? "" : "bg-transparent"
+                          }`}
+                        >
+                          {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-point" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-bold-text">
+                          {c.name || c.code}
+                        </span>
+                        <span className="shrink-0 text-sm font-semibold text-icon-muted">
+                          {Math.round(c.discountRate * 100)}%
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           )}
 
