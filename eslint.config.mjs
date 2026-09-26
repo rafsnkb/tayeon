@@ -6,6 +6,27 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    // 경고가 아니라 **에러**다(2026-09-26). 이 규칙이 경고로 있는 동안 실제 버그를 하나
+    // 놓쳤다 — `generate/outline.ts` 의 `personRule`("상대의 명반이 없으면 그 사람 명반을
+    // 인용하지 말라"는 안전 규칙)이 계산만 되고 시스템 블록 배열에 안 들어가 있었는데,
+    // lint 는 그걸 계속 "defined but never used" 로 알려주고 있었고 우리는 경고 22개
+    // 사이에서 그걸 못 봤다. 프롬프트를 조립하는 코드에서 "값을 만들었는데 안 쓴다"는
+    // 거의 항상 버그다.
+    //
+    // 이 파일의 `globalIgnores` 가 이미 같은 이유로 존재한다("drown out the ones in src/").
+    // 이건 그 판단을 한 걸음 더 끌고 온 것이다 — 묻히지 않게 하는 것에서, 애초에 못
+    // 들어오게 하는 것으로.
+    //
+    // `_` 접두사는 남겨 둔다. 일부러 안 쓰는 바인딩(구조분해로 필드를 버릴 때, 서명을
+    // 맞추려고 받는 인자)은 정당하고, 그걸 표현할 방법이 없으면 규칙을 끄게 된다.
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
     // `.cjs` is CommonJS by definition, so `require()` is the only import form available.
     // eslint-config-next applies the TypeScript rules everywhere, which flags the one-off
     // maintenance script under scripts/ as an error and buries real errors under it.
@@ -34,6 +55,10 @@ const eslintConfig = defineConfig([
     // never bundled, and routinely destructure more of a measurement than they print — which
     // is 18 unused-var warnings that drown out the ones in src/.
     "doc/**",
+    // 같은 이유의 스크래치 디렉터리다(`/.tmp` 로 git 도 무시한다). unused-vars 를 에러로
+    // 올리자마자 여기서 4건이 터졌는데, 전부 "픽셀을 재고 일부만 출력하는" 그 패턴이었다 —
+    // 던져 버릴 스크립트가 `src/` 의 빌드를 막게 두지 않는다.
+    ".tmp/**",
   ]),
 ]);
 

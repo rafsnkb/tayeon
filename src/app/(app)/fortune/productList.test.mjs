@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { productsFor, productMeta, ALL_SAJU_PRODUCTS } from "@/app/(app)/fortune/productList";
+import { productsFor, productMeta } from "@/app/(app)/fortune/productList";
 import { FORTUNE_FILTERS, fortuneFilterFromKey, fortuneListHref } from "@/app/(app)/fortune/filters";
 import { NEW_SLUGS, SAJU_PRODUCTS, getSajuProduct } from "@/lib/saju/products";
 import { purchasableSajuProducts } from "@/lib/saju/purchase";
