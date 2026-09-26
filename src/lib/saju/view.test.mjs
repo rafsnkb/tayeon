@@ -28,6 +28,9 @@ function sajuResult(over = {}) {
       hour: { stem: "식신", branch: "비견" },
     },
     voidBranches: ["신", "유"],
+    // 2026-09-27 추가 — `buildSajuPromptBlock` 이 쓰는 값과 정확히 같은 모양(calculate.ts 머리말).
+    specialStars: [{ star: "도화", branch: "자", positions: ["year"] }],
+    elementCounts: { 목: 1, 화: 1, 토: 3, 금: 1, 수: 2 },
     timeUnknown: false,
     ...over,
   };
@@ -167,6 +170,39 @@ test("시간축(대운·세운·대한·유년)도 나간다 — 모델은 이�
   assert.deepEqual(view.chart.self.sajuFortune.annual.map((a) => a.year), [2025, 2026, 2027]);
   assert.equal(view.chart.self.ziweiHoroscope.decadal.stem, "갑");
   assert.deepEqual(view.chart.self.ziweiHoroscope.yearly.mutagen, ["천기", "천량", "자미", "거문"]);
+});
+
+test("신살·오행 개수도 나간다 — 모델이 받는 값(buildSajuPromptBlock)과 같은 모양이다(2026-09-27)", () => {
+  const view = toReadingView(reading(), [], product());
+  assert.deepEqual(view.chart.self.saju.specialStars, [{ star: "도화", branch: "자", positions: ["year"] }]);
+  assert.deepEqual(view.chart.self.saju.elementCounts, { 목: 1, 화: 1, 토: 3, 금: 1, 수: 2 });
+});
+
+test("신살이 없는 사람은 빈 배열로 나간다 — '없다'를 빈 문자열이 아니라 빈 배열로 표현한다", () => {
+  const view = toReadingView(
+    reading({ chart: chart({ self: personChart({ saju: sajuResult({ specialStars: [] }) }) }) }),
+    [],
+    product()
+  );
+  assert.deepEqual(view.chart.self.saju.specialStars, []);
+});
+
+test("자미두수 단일 모드는 신살·오행 개수도 함께 가려진다 — saju 가 통째로 null 이라 딸려서 막힌다", () => {
+  const view = toReadingView(
+    reading({
+      mode: "ziwei",
+      chart: chart({
+        mode: "ziwei",
+        self: personChart({
+          saju: sajuResult({ specialStars: [{ star: "역마", branch: `LEAK_${LEAK_MARK}`, positions: ["day"] }] }),
+        }),
+      }),
+    }),
+    [],
+    product()
+  );
+  assert.equal(view.chart.self.saju, null);
+  assert.ok(!JSON.stringify(view).includes(LEAK_MARK));
 });
 
 test("사주 단일 모드는 자미두수 명식·시간축을 절대 내보내지 않는다 — 안 낸 돈으로 산 값이 보이면 안 된다", () => {
