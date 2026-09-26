@@ -24,6 +24,7 @@ import type { BirthInfo } from "@/lib/tarot/birthInfo";
 import type { SajuChart, SajuMode } from "@/lib/saju/generate/chart";
 import type { SajuOutline } from "@/lib/saju/generate/outline";
 import type { SajuSection } from "@/lib/saju/generate/section";
+import type { SajuAnswer } from "@/lib/saju/generate/answer";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
 
 /** 리포트 한 편의 상태.
@@ -67,6 +68,12 @@ export type SajuReading = {
   outline: SajuOutline;
   /** 사용자가 주문할 때 적어 넣은 추가 질문. 섹션·총평 생성이 매번 다시 받아야 해서 같이 둔다. */
   userInput: string;
+  /** 사연(`userInput`)에 직접 답하는 장. **사연이 비어 있으면 영영 null 이다** — 이 필드의
+   *  유무가 곧 그 장의 유무다(설계「모듈형 설계 원칙」: 슬롯은 상품 설정이 아니라 데이터로 정한다).
+   *
+   *  `closing`·`image` 와 같은 부류라 **번호 있는 페이지(`pages/{n}`)가 아니다** — 저 둘이 이미
+   *  같은 문제를 이 모양으로 풀어 놓았다(`generate/answer.ts` 머리말). */
+  userAnswer: SajuAnswer | null;
   closing: SajuClosing | null;
   image: SajuReadingImage | null;
   lastReadPage: number;
@@ -176,6 +183,7 @@ export async function createSajuReading(args: {
     chart: args.chart,
     outline: args.outline,
     userInput: args.userInput,
+    userAnswer: null,
     closing: null,
     image: null,
     // 0 = 목차 페이지. 아직 아무 섹션도 안 읽었다는 뜻이다(§6 미해결 ③).
@@ -514,6 +522,32 @@ export async function saveSajuPageFailure(args: {
     };
     tx.set(target, page);
     return { outcome: "created", page };
+  });
+}
+
+/**
+ * 사연 답변을 저장한다. 이미 있으면 덮지 않는다 — 총평과 같은 이유다.
+ *
+ * **상태를 `complete` 로 올리지 않는다.** 답변은 총평 앞 장이고, 리포트가 끝났다는 신호는
+ * 총평 하나뿐이다(`SajuReadingStatus` 의 `complete` 주석: "마지막 페이지가 있다는 뜻이다").
+ * 여기서 같이 올리면 답변만 있고 총평이 없는 리포트가 `complete` 로 보인다.
+ *
+ * **다시 만들 수 있는 길을 두지 않는다**(이미지와 다르다). 같은 사연을 다시 굴려도 셀링포인트가
+ * 안 되고 재호출 비용만 늘어서, 덮어쓰기 인자 자체를 안 만들었다.
+ */
+export async function saveSajuAnswer(args: {
+  uid: string;
+  id: string;
+  answer: SajuAnswer;
+}): Promise<{ outcome: "created" | "exists"; answer: SajuAnswer }> {
+  const ref = readingRef(args.uid, args.id);
+  return adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error(`사주 리포트를 찾을 수 없다: ${args.id}`);
+    const current = snap.data() as Omit<SajuReading, "id">;
+    if (current.userAnswer) return { outcome: "exists" as const, answer: current.userAnswer };
+    tx.update(ref, { userAnswer: args.answer });
+    return { outcome: "created" as const, answer: args.answer };
   });
 }
 

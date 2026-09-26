@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { USERS, PAYMENTS, PAYMENT_ARCHIVE, REFUND_REQUESTS } from "@/lib/firestore/collections";
+import { deleteSajuReviewsOfUser } from "@/lib/saju/review";
 // 전자상거래법 시행령 제6조: 대금결제 기록 5년 보존 의무(같은 시행령 제5조의2가 개인정보
 // 보호법 제21조 파기 원칙의 명시적 예외로 지정) — 탈퇴로 이 기록이 사라지면 안 된다.
 // 반대로 5년이 지나면 실제로 파기돼야 해서, TTL이 읽을 수 있는 Timestamp로 만료 시각을 심는다.
@@ -59,6 +60,16 @@ export async function POST(req: NextRequest) {
     }
     await batch.commit();
   }
+
+  // 공개 후기는 **최상위 컬렉션**이라 recursiveDelete 가 못 건드린다(refundRequests 와 같은
+  // 함정). 방침 제3조가 "회원 탈퇴 시 지체 없이 파기"이므로 남겨 둘 수 없다 — 완전 익명으로
+  // 보이더라도 본인이 쓴 글이고, 문서에는 uid 도 들어 있다.
+  //
+  // 실패해도 탈퇴를 막지 않는다. 막으면 "후기 삭제가 안 돼서 탈퇴가 안 되는" 상태가 생기는데,
+  // 탈퇴는 사용자의 권리라 그쪽이 더 나쁘다. 남은 문서는 로그로 잡는다.
+  await deleteSajuReviewsOfUser(uid).catch((error) =>
+    console.error("[delete] 사주 후기 삭제 실패 — 수동 정리 필요", uid, error)
+  );
 
   // doc.delete()는 서브컬렉션(rooms/readings, coinGrants, suspensionLog, timePasses)을
   // 지우지 않으므로 recursiveDelete로 전부 함께 삭제한다.

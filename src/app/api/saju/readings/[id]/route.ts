@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
 import { getSajuProduct } from "@/lib/saju/products";
 import { getSajuReadingWithPages } from "@/lib/saju/storage";
+import { getSajuReview } from "@/lib/saju/review";
 import { toReadingView } from "@/lib/saju/view";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,5 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // 섹션은 상품의 문체 규칙·중점이 있어야 쓸 수 있어서, 없는 채로 만들면 앞뒤가 다른 글이 된다.
   const product = getSajuProduct(loaded.reading.productSlug);
 
-  return NextResponse.json(toReadingView(loaded.reading, loaded.pages, product));
+  // 내가 남긴 후기. 문서 하나 더 읽는 값으로 "총평 장이 폼으로 깜빡였다가 읽기 전용이 되는"
+  // 일을 없앤다. 실패해도 읽기를 막지 않는다 — 후기는 리포트를 읽는 데 필요한 것이 아니다.
+  const myReview = await getSajuReview(id).catch(() => null);
+
+  return NextResponse.json(toReadingView(loaded.reading, loaded.pages, product, myReview));
 }

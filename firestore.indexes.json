@@ -55,6 +55,14 @@
         { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "sajuReviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "productSlug", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

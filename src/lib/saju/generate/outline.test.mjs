@@ -1,12 +1,14 @@
 // `buildSystemBlock` — 1·2·3단이 **바이트 단위로 공유**하는 캐시 블록(설계 §5).
 //
-// 세 단계가 전부 이 함수를 그대로 가져다 쓰므로(`section.ts`·`closing.ts` 가 `import
-// { buildSystemBlock } from "./outline"`) "세 단계가 같은 문자열을 받는가"는 사실 "이 함수가
+// 네 단계가 전부 이 함수를 그대로 가져다 쓰므로(`section.ts`·`answer.ts`·`closing.ts` 가
+// `import { buildSystemBlock } from "./outline"`) "세 단계가 같은 문자열을 받는가"는 사실 "이 함수가
 // 같은 입력에 항상 같은 출력을 내는가" 하나로 줄어든다. 페르소나가 상품마다 다른 문체 지시를
 // 이 블록에 꽂기 시작하면서(2026-09-26), 그 지시문이 조용히 상품별로 달라지거나 페르소나
 // 교체가 반영이 안 되는 회귀를 여기서 막는다.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { buildSystemBlock, sajuRefExists, ziweiRefExists, logSajuRefMismatches } from "./outline.ts";
 import { calculateChart } from "./chart.ts";
 import { getSajuProduct } from "@/lib/saju/products";
@@ -317,4 +319,29 @@ test("person: 'partner' 로 명시하면 같은 십신이 통과한다", () => {
 test("상대가 없는 리포트에서 person: 'partner' 를 대면 막힌다(모순 상태도 안전하게 처리)", () => {
   const soloChart = calculateChart(birthInfo(), "integrated", TODAY); // chart.partner === null
   assert.equal(sajuRefExists(soloChart, { person: "partner", pillar: "year", tenGod: "정인" }), false);
+});
+
+
+// ── 캐시 동일성을 깨는 유일한 방법: 블록을 다시 조립하는 것 ──────────────────────────
+//
+// 위 결정성 테스트는 "같은 입력이면 같은 출력"만 보장한다. 정작 캐시를 깨는 회귀는 다른
+// 모양으로 온다 — 어떤 단계가 `buildSystemBlock` 을 **안 쓰고** 비슷한 문자열을 스스로
+// 만드는 것이다. 그러면 결정성 테스트는 그대로 통과하는데 캐시만 조용히 안 걸린다.
+//
+// 그건 값으로는 못 잡고 **호출부의 모양**으로만 잡힌다. 모델을 실제로 부르지 않고 확인할 수
+// 있는 선까지만 재는 것이고, 실호출 검증(cache_read_input_tokens 실측)을 대신하지는 않는다.
+test("모든 생성 단계가 buildSystemBlock 을 그대로 가져다 쓴다 (답변 단계 포함)", () => {
+  for (const name of ["section.ts", "answer.ts", "closing.ts"]) {
+    const source = readFileSync(fileURLToPath(new URL(name, import.meta.url)), "utf8");
+    assert.match(
+      source,
+      /import [{][^}]*buildSystemBlock[^}]*[}] from "[.][/]outline"/,
+      `${name} 이 buildSystemBlock 을 import 하지 않는다 — 시스템 블록을 따로 조립하면 캐시가 안 걸린다`
+    );
+    assert.match(
+      source,
+      /text: buildSystemBlock[(]product, chart, today[)]/,
+      `${name} 이 시스템 블록에 buildSystemBlock(product, chart, today) 을 그대로 넣지 않는다`
+    );
+  }
 });

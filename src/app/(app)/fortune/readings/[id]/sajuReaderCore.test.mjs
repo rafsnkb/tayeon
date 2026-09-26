@@ -33,6 +33,17 @@ function failedPage(pageNumber, attempts = 3) {
 
 const CLOSING = { title: "총평", body: "결론이에요.", nextSteps: ["하나", "둘"] };
 
+const ANSWER = {
+  summary: "답이에요.",
+  sajuBasis: "",
+  ziweiBasis: "",
+  directAnswer: "다시 답을 드리면…",
+  closingNote: "마무리예요.",
+  sajuRefs: [],
+  ziweiRefs: [],
+  needsRedirect: false,
+};
+
 /**
  * 가짜 서버. 실제 라우트의 계약을 그대로 흉내낸다 — 순서 게이트(N 은 N-1 이 있어야 한다),
  * `sections_incomplete` 의 `missing` 번호 배열, 이미지 GET 의 404.
@@ -48,6 +59,8 @@ function makeServer(options = {}) {
     initialImage = null,
     lastReadPage = 0,
     status = "generating",
+    userInput = "",
+    initialAnswer = null,
     // 먼 미래 — 기본값은 "안 지났다"다. 만료 테스트만 과거 시각을 넣는다.
     routes = {},
   } = options;
@@ -55,6 +68,7 @@ function makeServer(options = {}) {
   const stored = new Map(initialPages.map((p) => [p.pageNumber, p]));
   let closing = initialClosing;
   let image = initialImage;
+  let answer = initialAnswer;
   const calls = [];
   /**
    * **실제로 모델을 불러 만든 것**만 담는다. 돈은 여기서 나간다.
@@ -88,7 +102,9 @@ function makeServer(options = {}) {
         closing,
         image,
         lastReadPage,
-        userInput: "",
+        userInput,
+        userAnswer: answer,
+        myReview: null,
       });
     }
 
@@ -102,6 +118,16 @@ function makeServer(options = {}) {
       created.push(n);
       stored.set(n, sectionPage(n));
       return json(200, { page: stored.get(n) });
+    }
+
+    if (path === "/api/saju/readings/r1/answer" && method === "POST") {
+      if (!userInput.trim()) return json(409, { error: "no_question" });
+      if (answer) return json(200, { answer });
+      const missing = Array.from({ length: sectionCount }, (_, i) => i + 1).filter((n) => !stored.has(n));
+      if (missing.length) return json(409, { error: "sections_incomplete", missing });
+      created.push("answer");
+      answer = ANSWER;
+      return json(200, { answer });
     }
 
     if (path === "/api/saju/readings/r1/closing" && method === "POST") {
@@ -142,6 +168,9 @@ function makeServer(options = {}) {
     created,
     get closing() {
       return closing;
+    },
+    get answer() {
+      return answer;
     },
     get image() {
       return image;
@@ -656,4 +685,194 @@ test("dispose 뒤에는 blob 주소를 놓아주고 더 알리지 않는다", as
   core.goTo(1);
   await settle();
   assert.equal(notified, 0);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 사연 답변 장 — 총평 앞에 한 장이 끼어든다
+//
+// **장 번호가 밀리는 변경이라 위험하다.** 여기가 틀리면 총평이 답변 자리에 그려지거나,
+// 마지막 장에 닿을 수 없게 된다. 그래서 유무·위치·개수를 전부 못 박는다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("사연이 없으면 답변 장 자체가 없다 — 장 수가 전과 같다", async () => {
+  const server = makeServer({ sectionCount: 3 });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  // 목차 1 + 섹션 3 + 총평 1
+  assert.equal(core.getSnapshot().pageCount, 5);
+  assert.equal(postsTo(server.calls, "/api/saju/readings/r1/answer"), 0);
+});
+
+test("사연이 있으면 총평 바로 앞에 한 장이 는다", async () => {
+  const server = makeServer({ sectionCount: 3, userInput: "둘째는 언제쯤이 좋을까요?" });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  assert.equal(core.getSnapshot().pageCount, 6);
+
+  core.goTo(4);
+  await settle();
+  assert.equal(core.getSnapshot().page.kind, "answer");
+
+  core.goTo(5);
+  await settle();
+  assert.equal(core.getSnapshot().page.kind, "closing");
+});
+
+test("이미지가 있으면 이미지 다음, 총평 앞이다", async () => {
+  const server = makeServer({ sectionCount: 3, hasImage: true, userInput: "궁금해요" });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  // 목차 1 + 섹션 3 + 이미지 1 + 답변 1 + 총평 1
+  assert.equal(core.getSnapshot().pageCount, 7);
+
+  core.goTo(4);
+  await settle();
+  assert.equal(core.getSnapshot().page.kind, "image");
+  core.goTo(5);
+  await settle();
+  assert.equal(core.getSnapshot().page.kind, "answer");
+  core.goTo(6);
+  await settle();
+  assert.equal(core.getSnapshot().page.kind, "closing");
+});
+
+test("답변 장이 늘어나도 총평은 여전히 '마지막 바로 앞'에서 걸린다", async () => {
+  // 총평 트리거를 `pageCount() - 2` 로 일반화한 것의 회귀 테스트다. 예전처럼
+  // `hasImagePage() ? imageIndex() : sectionCount()` 로 두면 답변 장이 끼는 순간
+  // 총평이 **한 장 일찍** 걸려서, 사용자가 답변 장을 열기도 전에 총평이 만들어진다.
+  const server = makeServer({ sectionCount: 3, userInput: "궁금해요" });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+
+  core.goTo(3); // 마지막 섹션 — 답변(4) 앞이라 답변만 걸린다
+  await settle();
+  assert.equal(madeCount(server.created, "answer"), 1);
+  assert.equal(madeCount(server.created, "closing"), 0, "답변 장에 닿기도 전에 총평이 만들어졌다");
+
+  core.goTo(4); // 답변 장 = pageCount - 2 → 여기서 총평을 건다
+  await settle();
+  assert.equal(madeCount(server.created, "closing"), 1);
+});
+
+test("답변은 딱 한 번만 만든다 — 앞뒤로 오가도 다시 안 부른다", async () => {
+  const server = makeServer({ sectionCount: 3, userInput: "궁금해요" });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+
+  core.goTo(3);
+  await settle();
+  core.goTo(4);
+  await settle();
+  core.goTo(3);
+  await settle();
+  core.goTo(4);
+  await settle();
+
+  assert.equal(madeCount(server.created, "answer"), 1);
+});
+
+test("저장된 답변이 있으면 POST 를 아예 안 보낸다", async () => {
+  const server = makeServer({
+    sectionCount: 3,
+    userInput: "궁금해요",
+    initialAnswer: ANSWER,
+    initialPages: [sectionPage(1), sectionPage(2), sectionPage(3)],
+  });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+
+  core.goTo(4);
+  await settle();
+  assert.equal(core.getSnapshot().page.answer.summary, "답이에요.");
+  assert.equal(postsTo(server.calls, "/api/saju/readings/r1/answer"), 0);
+});
+
+test("섹션이 덜 찼으면 빠진 번호를 채우고 답변을 다시 부른다", async () => {
+  const server = makeServer({ sectionCount: 3, userInput: "궁금해요", lastReadPage: 3 });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  // 3번 장에서 열렸으므로 답변이 걸리는데, 그 시점에 1·2·3 이 다 있진 않다.
+  assert.equal(madeCount(server.created, "answer"), 1);
+  assert.deepEqual([...server.stored.keys()].sort(), [1, 2, 3]);
+});
+
+test("환불된 리포트는 답변도 만들지 않는다", async () => {
+  // 답변도 모델을 부르는 자리라(약 20원) 총평·이미지와 같은 가드를 타야 한다.
+  const server = makeServer({ sectionCount: 3, userInput: "궁금해요", status: "failed", lastReadPage: 4 });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  assert.equal(postsTo(server.calls, "/api/saju/readings/r1/answer"), 0);
+});
+
+test("사연 원문은 답변이 아직 없어도 화면에 실린다", async () => {
+  // "내 질문이 읽혔다"는 확인이 기다리는 동안에도 보여야 한다(`ReaderAnswer.tsx`).
+  const server = makeServer({
+    sectionCount: 3,
+    userInput: "둘째는 언제쯤이 좋을까요?",
+    routes: { "POST /api/saju/readings/r1/answer": ({ json }) => json(500, { error: "boom" }) },
+  });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  core.goTo(4);
+  await settle();
+  const page = core.getSnapshot().page;
+  assert.equal(page.kind, "answer");
+  assert.equal(page.question, "둘째는 언제쯤이 좋을까요?");
+  assert.equal(page.answer, null);
+  assert.ok(page.error, "실패했는데 오류가 안 실렸다");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 후기
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("후기를 남기면 서버가 돌려준 값으로 총평 장이 바뀐다", async () => {
+  const review = { readingId: "r1", productSlug: "single-love", stars: 5, body: "좋았어요 정말로요", createdAt: "2026-09-27T00:00:00.000Z" };
+  const server = makeServer({
+    sectionCount: 3,
+    initialClosing: CLOSING,
+    initialPages: [sectionPage(1), sectionPage(2), sectionPage(3)],
+    routes: { "POST /api/saju/readings/r1/review": ({ json }) => json(200, { review }) },
+  });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+
+  core.goTo(4);
+  await settle();
+  assert.equal(core.getSnapshot().page.myReview, null);
+
+  const error = await core.submitReview(5, "좋았어요 정말로요");
+  assert.equal(error, null);
+  // **서버가 준 값**을 그대로 쓴다 — 화면이 자기 입력으로 그리면 서버가 다듬은 결과와 어긋난다.
+  assert.deepEqual(core.getSnapshot().page.myReview, review);
+});
+
+test("후기 제출이 거절되면 서버 문구를 그대로 돌려주고 상태를 안 바꾼다", async () => {
+  const server = makeServer({
+    sectionCount: 3,
+    initialClosing: CLOSING,
+    initialPages: [sectionPage(1), sectionPage(2), sectionPage(3)],
+    routes: {
+      "POST /api/saju/readings/r1/review": ({ json }) => json(409, { error: "이미 후기를 남기셨어요." }),
+    },
+  });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+  core.goTo(4);
+  await settle();
+
+  const error = await core.submitReview(5, "좋았어요 정말로요");
+  assert.equal(error, "이미 후기를 남기셨어요.");
+  assert.equal(core.getSnapshot().page.myReview, null);
 });

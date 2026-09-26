@@ -194,7 +194,13 @@ export function ReaderChartPair({
   /** 이 카드쌍이 누구·무엇에 대한 것인지 — "나 · 타고난 바탕", "두 일간의 궁합" 처럼 사람
    *  이름이 아니라 **주제**를 적을 때도 있다(목업 life-overview 1장, situationship 1장). */
   who: string;
-  cells: [{ label: string; value: string }, { label: string; value: string }];
+  /** `sub` 는 칸 아래 작은 줄 — 사주 칸의 십신(「식신 · 비견」)이 여기 온다(목업 New/
+   *  `Fortune_Report_{QnA,Section}_*` 2026-09-27 갱신분). 자미두수 칸은 궁·별 두 줄이면
+   *  충분해서 비운다. 없으면 그 줄을 아예 안 그린다 — 빈 줄을 두면 두 칸 높이가 어긋난다. */
+  cells: [
+    { label: string; value: string; sub?: string },
+    { label: string; value: string; sub?: string },
+  ];
   note: string;
 }) {
   return (
@@ -209,6 +215,7 @@ export function ReaderChartPair({
             <div className="flex-1 rounded-2xl bg-point-bg px-2.5 py-2.5 text-center">
               <p className="text-[11px] font-bold text-icon-muted">{cell.label}</p>
               <p className="mt-0.5 text-[15px] font-bold text-bold-text">{cell.value}</p>
+              {cell.sub && <p className="mt-0.5 text-[11px] font-semibold text-icon-muted">{cell.sub}</p>}
             </div>
           </span>
         ))}

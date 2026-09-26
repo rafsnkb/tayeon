@@ -24,7 +24,9 @@ import { useSajuReader, type ReaderPage, type SajuReader } from "./useSajuReader
 import ReaderToc from "./ReaderToc";
 import ReaderSection from "./ReaderSection";
 import ReaderImage from "./ReaderImage";
+import ReaderAnswer from "./ReaderAnswer";
 import ReaderClosing from "./ReaderClosing";
+import ReaderReview from "./ReaderReview";
 import { ReaderFailed, ReaderPending, ReaderRefunded } from "./ReaderStates";
 
 export default function FortuneReadingPage() {
@@ -141,7 +143,25 @@ function renderPage(page: ReaderPage, title: string, reader: SajuReader) {
           onRegenerate={reader.regenerateImage}
         />
       );
+    case "answer":
+      return (
+        <ReaderAnswer
+          question={page.question}
+          answer={page.answer}
+          chart={page.chart}
+          partnerNickname={page.partnerNickname}
+          busy={page.busy}
+          error={page.error}
+        />
+      );
     case "closing":
-      return <ReaderClosing closing={page.closing} busy={page.busy} error={page.error} />;
+      return (
+        <ReaderClosing
+          closing={page.closing}
+          busy={page.busy}
+          error={page.error}
+          review={<ReaderReview myReview={page.myReview} onSubmit={reader.submitReview} />}
+        />
+      );
   }
 }

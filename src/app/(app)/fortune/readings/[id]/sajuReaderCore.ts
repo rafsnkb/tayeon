@@ -11,9 +11,11 @@
 // 설계의 근거는 §6 하나다. 10섹션을 한 번에 만들면 147초인데 한 섹션은 660자라 읽는 데 1분이
 // 걸린다. **읽는 속도가 생성 속도를 절대 못 따라잡으므로**, 사용자가 N 을 읽는 동안 N+1 을 미리
 // 만들어 두면 147초가 통째로 사라진다.
+import type { SajuAnswer } from "@/lib/saju/generate/answer";
+import type { SajuReview } from "@/lib/saju/review";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
 import type { SajuReadingImage } from "@/lib/saju/storage";
-import type { OutlineEntry, SajuReadingPageView, SajuReadingView } from "@/lib/saju/view";
+import type { OutlineEntry, SajuChartView, SajuReadingPageView, SajuReadingView } from "@/lib/saju/view";
 
 /** 저장된 섹션 본문 한 장(실패 자리표가 아닌 쪽). 화면이 실제로 받는 모양(`SajuReadingPageView`)
  *  이다 — 화면이 보면 안 되는 값은 `view.ts` 가 걸러 내려준다. */
@@ -51,7 +53,32 @@ export type ReaderPage =
       busy: boolean;
       error: string | null;
     }
-  | { kind: "closing"; index: number; closing: SajuClosing | null; busy: boolean; error: ReaderError | null };
+  /** 사연 답변 장. **총평 바로 앞**이고, 사연을 안 적은 리포트에는 아예 없다. */
+  | {
+      kind: "answer";
+      index: number;
+      /** 사용자가 적은 사연 원문. 그대로 보여준다(2026-09-26 사용자 결정) — 사주담이 이걸
+       *  하는 이유가 "내 질문이 읽혔다"는 확인이다. */
+      question: string;
+      answer: SajuAnswer | null;
+      /** 근거 참조가 가리키는 실제 값(간지·십신·별)이 있는 곳. 답변 데이터에는 **참조만**
+       *  들어 있어서 명식 없이는 근거 칸을 그릴 수 없다(`chartRefs.ts`). 화면이
+       *  `view` 에서 따로 꺼내지 않고 여기 실어 주는 이유는 `page.tsx` 가 `switch` 하나만
+       *  하도록 두기 위해서다 — 거기서 `view` 를 꺼내면 널 단언이 생긴다. */
+      chart: SajuChartView;
+      partnerNickname: string | null;
+      busy: boolean;
+      error: ReaderError | null;
+    }
+  | {
+      kind: "closing";
+      index: number;
+      closing: SajuClosing | null;
+      busy: boolean;
+      error: ReaderError | null;
+      /** 이 리포트에 내가 남긴 후기. 있으면 화면이 폼 대신 읽기 전용을 그린다. */
+      myReview: SajuReview | null;
+    };
 
 /** 화면이 읽는 전부. 액션은 코어가 들고 있으므로 여기 없다. */
 export type ReaderSnapshot = {
@@ -111,6 +138,11 @@ export type SajuReaderCore = {
   regenerateImage: () => void;
   /** 실패한 섹션을 사용자가 다시 요청하는 자리. 자리표·끝난 실패에는 아무 일도 하지 않는다. */
   retryPage: (pageNumber: number) => void;
+  /** 후기를 남긴다. 성공하면 `null`, 실패하면 화면에 보여줄 메시지를 돌려준다.
+   *
+   *  **돈이 나가는 자리가 아니다** — 그래서 이 파일이 지키는 "POST 는 과금" 규칙과 무관하다.
+   *  POST 인 이유는 평범하다: 부작용이 있는 쓰기다. */
+  submitReview: (stars: number, body: string) => Promise<string | null>;
   /** 언마운트. blob 주소를 놓아주고 이후 상태 변경을 멈춘다. */
   dispose: () => void;
 };
@@ -127,6 +159,10 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
   let index = 0;
   let pages = new Map<number, SajuReadingPageView>();
   let pageErrors = new Map<number, ReaderError>();
+  let answer: SajuAnswer | null = null;
+  let answerBusy = false;
+  let answerError: ReaderError | null = null;
+  let myReview: SajuReview | null = null;
   let closing: SajuClosing | null = null;
   let closingBusy = false;
   let closingError: ReaderError | null = null;
@@ -139,6 +175,7 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
   // 서버도 같은 생성을 묶고 있지만(`produce.ts` 의 `share()`), **클라이언트가 안 보내는 게
   // 먼저다.** prefetch 와 사용자의 이동이 같은 장을 동시에 노리는 건 정상 흐름에서 늘 생긴다.
   const pageInFlight = new Map<number, Promise<void>>();
+  let answerInFlight: Promise<void> | null = null;
   let closingInFlight: Promise<void> | null = null;
   let imageInFlight: Promise<void> | null = null;
   /** 이미지 첫 생성을 리포트당 한 번만 시도하기 위한 표시. */
@@ -171,15 +208,33 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
     return hasImagePage() ? sectionCount() + 1 : -1;
   }
 
-  function pageCount(): number {
-    return sectionCount() + (hasImagePage() ? 2 : 1) + 1;
+  /** 사연 답변 장이 있는가. **`userInput` 이 정한다** — `userAnswer` 로 판단하면 "사연이
+   *  없어서 없는 장"과 "아직 안 만들어진 장"이 같아 보이고, 아직 안 만든 리포트에서 장이
+   *  통째로 사라졌다가 생성 뒤에 끼어드는 일이 생긴다(장 번호가 도중에 밀린다). */
+  function hasAnswerPage(): boolean {
+    return Boolean(view?.userInput?.trim());
   }
 
-  /** 총평을 언제 거는가(§6). 이미지 장에 들어설 때 — 사용자가 그림을 보는 동안 만들면 지연이
-   *  보이지 않는다. 이미지가 없는 상품은 **마지막 섹션**에 들어설 때다. 마지막 장에서 걸면
-   *  사용자가 총평 페이지에서 그대로 기다리게 된다. */
+  /** 답변 장의 인덱스. 이미지가 있으면 그 다음, 없으면 마지막 섹션 다음이다 — 둘 다
+   *  **총평 바로 앞**이라는 같은 규칙의 두 모습이다. */
+  function answerIndex(): number {
+    if (!hasAnswerPage()) return -1;
+    return hasImagePage() ? imageIndex() + 1 : sectionCount() + 1;
+  }
+
+  function pageCount(): number {
+    // 목차 1 + 섹션 N + (이미지) + (답변) + 총평 1
+    return sectionCount() + (hasImagePage() ? 1 : 0) + (hasAnswerPage() ? 1 : 0) + 2;
+  }
+
+  /** 총평을 언제 거는가(§6). **총평 바로 앞 장에 들어설 때**다 — 사용자가 그 장을 읽는 동안
+   *  만들면 지연이 보이지 않는다. 마지막 장에서 걸면 사용자가 총평 페이지에서 그대로 기다린다.
+   *
+   *  예전엔 `hasImagePage() ? imageIndex() : sectionCount()` 로 갈라 썼는데, 그 둘은 사실
+   *  **`pageCount() - 2` 하나**였다(직접 대입해 확인). 답변 장이 끼어들면서 갈래가 셋이 될
+   *  뻔한 자리라, 규칙 하나로 되돌렸다 — 앞으로 장이 더 붙어도 여기는 안 바뀐다. */
   function closingTriggerIndex(): number {
-    return hasImagePage() ? imageIndex() : sectionCount();
+    return Math.max(pageCount() - 2, 0);
   }
 
   function currentPage(): ReaderPage | null {
@@ -211,7 +266,20 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
       };
     }
 
-    return { kind: "closing", index: i, closing, busy: closingBusy, error: closingError };
+    if (i === answerIndex()) {
+      return {
+        kind: "answer",
+        index: i,
+        question: view.userInput,
+        answer,
+        chart: view.chart,
+        partnerNickname: view.partnerNickname,
+        busy: answerBusy,
+        error: answerError,
+      };
+    }
+
+    return { kind: "closing", index: i, closing, busy: closingBusy, error: closingError, myReview };
   }
 
   /** 스냅샷을 새로 만들고 구독자에게 알린다. `useSyncExternalStore` 가 객체 동일성으로 변경을
@@ -257,6 +325,8 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
       if (disposed) return;
       view = loaded;
       pages = new Map(loaded.pages.map((p) => [p.pageNumber, p]));
+      answer = loaded.userAnswer;
+      myReview = loaded.myReview;
       closing = loaded.closing;
       image = loaded.image;
       // 읽던 자리에서 이어 본다(§6 미해결 ③). 저장된 값이 지금 장 수보다 크면(상품이 바뀐
@@ -360,6 +430,49 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
   }
 
   // ── 총평 ───────────────────────────────────────────────────────────────────
+
+  /** 사연 답변을 확보한다. 총평(`ensureClosing`)과 모양이 같다 — 전제도 같고(모든 섹션 완료)
+   *  덜 찼을 때 빠진 번호를 받아 스스로 메우는 회복 방식도 같다.
+   *
+   *  **총평과 따로 거는 이유**: 서버는 총평을 만들 때 답변을 먼저 만들지만(`produce.ts`),
+   *  그러면 답변이 총평과 **같은 시점에** 끝난다. 화면에서 답변 장은 총평보다 앞이라,
+   *  그때까지 기다리면 사용자는 답변 장에서 총평이 끝나기를 기다리게 된다. */
+  function ensureAnswer(): Promise<void> {
+    if (disposed || answer || !hasAnswerPage()) return Promise.resolve();
+    if (answerInFlight) return answerInFlight;
+
+    const task = (async () => {
+      answerBusy = true;
+      answerError = null;
+      publish();
+      try {
+        for (let guard = 0; guard <= sectionCount() + 2; guard++) {
+          const res = await deps.fetch(`${base}/answer`, { method: "POST" });
+          const body = await readJson(res);
+          if (res.ok && body.answer) {
+            answer = body.answer as SajuAnswer;
+            return;
+          }
+          if (res.status === 409 && body.error === "sections_incomplete" && Array.isArray(body.missing)) {
+            for (const n of body.missing as number[]) await ensurePage(n);
+            continue;
+          }
+          answerError = res.status === 409 && body.error === "product_gone" ? PRODUCT_GONE : RETRYABLE;
+          return;
+        }
+        answerError = RETRYABLE;
+      } catch {
+        answerError = RETRYABLE;
+      } finally {
+        answerBusy = false;
+        answerInFlight = null;
+        if (!disposed) publish();
+      }
+    })();
+
+    answerInFlight = task;
+    return task;
+  }
 
   function ensureClosing(): Promise<void> {
     if (disposed || closing) return Promise.resolve();
@@ -491,6 +604,10 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
       void ensurePage(index + 1);
     }
 
+    // 답변은 총평보다 **한 장 앞서** 건다. 총평 트리거와 같은 자리에서 걸면 답변 장에
+    // 들어서는 순간 비어 있고, 그때부터 만들기 시작해 기다림이 그대로 보인다.
+    if (hasAnswerPage() && index >= Math.max(answerIndex() - 1, 0)) void ensureAnswer();
+
     if (index >= closingTriggerIndex()) void ensureClosing();
 
     // 이미지는 **맨 뒤에 붙이지 않는다**(§6). 8초가 걸리므로 리포트를 열자마자 시작해 두면
@@ -526,6 +643,25 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
     },
     regenerateImage() {
       void runImage(true);
+    },
+    async submitReview(stars, body) {
+      if (disposed) return "잠시 후 다시 시도해 주세요.";
+      try {
+        const res = await deps.fetch(`${base}/review`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ stars, body }),
+        });
+        const payload = await readJson(res);
+        if (!res.ok) return typeof payload.error === "string" ? payload.error : RETRYABLE.message;
+        // 서버가 받은 값을 그대로 들고 있는다 — 화면이 자기 입력으로 그리면 서버가 다듬은
+        // 결과(앞뒤 공백 제거 등)와 어긋난다.
+        myReview = (payload.review as SajuReview) ?? null;
+        publish();
+        return null;
+      } catch {
+        return RETRYABLE.message;
+      }
     },
     retryPage(pageNumber) {
       // 자리표가 남은 섹션은 다시 시도하지 않는다(§9) — 이미 3회 했다.

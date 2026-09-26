@@ -13,6 +13,7 @@
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { anthropic } from "@/lib/anthropic";
 import type { SajuProduct } from "@/lib/saju/products";
+import type { SajuAnswer } from "./answer";
 import type { SajuChart } from "./chart";
 import { SAJU_TEXT_MODEL, buildSystemBlock } from "./outline";
 import type { SajuSection } from "./section";
@@ -47,9 +48,15 @@ export async function generateClosing(args: {
   product: SajuProduct;
   chart: SajuChart;
   sections: SajuSection[];
+  /** 사연 답변 장이 **실제로 쓴 것**. 없으면(사연을 안 적었으면) null.
+   *
+   *  예측이 아니라 실제 본문을 받는다 — 이 파일이 `outline.thesis` 대신 섹션의 `summary` 를
+   *  받기로 한 것과 같은 이유다. 총평과 답변은 재료가 겹쳐서(둘 다 섹션 결론을 받아쓴다),
+   *  "겹치지 마라"를 프롬프트로만 말하면 걸러낼 장치가 없다. */
+  answer: SajuAnswer | null;
   today: Date;
 }): Promise<SajuClosing> {
-  const { product, chart, sections, today } = args;
+  const { product, chart, sections, answer, today } = args;
 
   const response = await anthropic.messages.parse({
     model: SAJU_TEXT_MODEL,
@@ -74,7 +81,22 @@ export async function generateClosing(args: {
           "",
           // 여기서 새 근거를 꺼내면 "안 읽은 이야기가 결론에 나오는" 꼴이 된다. 총평을 뒤로 옮긴
           // 이유가 본문을 근거로 쓰게 하려는 것이므로, 본문 밖으로 나가면 그 이유가 사라진다.
+          // 답변 장이 있으면 그 본문을 보여주고 "여기 있는 답은 되풀이하지 마라"고 못 박는다.
+          // 안 보여주고 금지만 하면 모델은 무엇을 피해야 하는지 모른다.
+          ...(answer
+            ? [
+                "## 사연 답변 장이 이미 한 말 (되풀이하지 말 것)",
+                answer.summary,
+                answer.directAnswer,
+                "",
+              ]
+            : []),
           "## 규칙",
+          ...(answer
+            ? [
+                "- 사용자가 남긴 사연에 대한 **직접적인 답은 이미 앞 장에서 했습니다.** 여기서 다시 답하지 말고, 리포트 전체를 관통하는 결론에 집중하세요.",
+              ]
+            : []),
           "- 위 결론들에서 **반복해서 나타난 것**을 짚어 주세요. 섹션을 순서대로 요약하지 마세요.",
           "- 새로운 궁·십신·시기를 여기서 처음 꺼내지 마세요. 읽은 것만으로 맺습니다.",
           "- 잘 풀리는 이야기만 하지 말고, 조정이 필요한 지점도 한 번은 짚어 주세요.",

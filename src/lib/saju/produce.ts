@@ -23,6 +23,8 @@ import { notifyOwner } from "@/lib/notify/owner";
 import { getSajuProduct } from "@/lib/saju/products";
 import { SAJU_PERSONAS } from "@/lib/saju/personas";
 import { echoOf, generateSection, type SectionEcho } from "@/lib/saju/generate/section";
+import { generateAnswer } from "@/lib/saju/generate/answer";
+import type { SajuAnswer } from "@/lib/saju/generate/answer";
 import { generateClosing } from "@/lib/saju/generate/closing";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
 import { generateSajuImage } from "@/lib/saju/generate/image";
@@ -31,6 +33,7 @@ import {
   getSajuReading,
   getSajuReadingWithPages,
   pageGateReason,
+  saveSajuAnswer,
   saveSajuClosing,
   saveSajuImage,
   saveSajuPage,
@@ -80,6 +83,17 @@ export type ProduceClosingResult =
   | { outcome: "product_gone" }
   /** 환불된 건이다. 저장된 건 계속 읽히지만 **새로 만들지 않는다.** */
   | { outcome: "not_producible" };
+
+/** 답변은 총평과 전제가 같아서(모든 섹션 완료) 결과 모양도 같다 — 하나만 다르다. */
+export type ProduceAnswerResult =
+  | { outcome: "ready"; answer: SajuAnswer }
+  | { outcome: "not_found" }
+  | { outcome: "sections_incomplete"; missing: number[] }
+  | { outcome: "all_sections_failed" }
+  | { outcome: "product_gone" }
+  | { outcome: "not_producible" }
+  /** 사용자가 사연을 안 적었다. **이 장 자체가 없다** — 오류가 아니라 정상 상태다. */
+  | { outcome: "no_question" };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 진행 중인 생성 공유
@@ -243,6 +257,60 @@ async function runPage(args: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 사연 답변
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 사연 답변 장을 만든다. 총평과 **전제가 같다**(모든 섹션 완료) — 둘 다 섹션이 실제로 쓴
+ * 결론을 받아 쓰기 때문이다.
+ *
+ * 총평보다 **먼저** 돈다. `runClosing` 이 이 함수를 직접 부르므로 순서는 프롬프트가 아니라
+ * 코드가 보장한다(`generate/answer.ts` 머리말 「총평과의 역할 분담」).
+ */
+export function produceAnswer(args: { uid: string; id: string }): Promise<ProduceAnswerResult> {
+  return share(`answer:${args.uid}:${args.id}`, () => runAnswer(args));
+}
+
+async function runAnswer(args: { uid: string; id: string }): Promise<ProduceAnswerResult> {
+  const { uid, id } = args;
+
+  const loaded = await getSajuReadingWithPages(uid, id);
+  if (!loaded) return { outcome: "not_found" };
+  const { reading, pages } = loaded;
+
+  // 사연이 없으면 이 장 자체가 없다. **모델을 부르지 않는다** — 빈 사연에 답하라고 시키면
+  // 모델은 무언가를 지어낸다.
+  if (!reading.userInput.trim()) return { outcome: "no_question" };
+  if (reading.userAnswer) return { outcome: "ready", answer: reading.userAnswer };
+  if (mustNotProduce(reading)) return { outcome: "not_producible" };
+
+  const total = reading.outline.sections.length;
+  const savedNumbers = new Set(pages.map((p) => p.pageNumber));
+  const missing = Array.from({ length: total }, (_, i) => i + 1).filter((n) => !savedNumbers.has(n));
+  if (missing.length) return { outcome: "sections_incomplete", missing };
+
+  const product = getSajuProduct(reading.productSlug);
+  if (!product) return { outcome: "product_gone" };
+
+  const sections = pages
+    .filter((p): p is Extract<SajuReadingPage, { kind: "section" }> => p.kind === "section")
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+  // 총평과 같은 이유로 막는다 — 본문이 하나도 없는데 사연에만 답하면, 리포트가 통째로
+  // 실패했다는 사실이 이 한 장에 가려진다.
+  if (sections.length === 0) return { outcome: "all_sections_failed" };
+
+  const answer = await generateAnswer({
+    product,
+    chart: reading.chart,
+    sections,
+    userInput: reading.userInput,
+    today: new Date(),
+  });
+  const saved = await saveSajuAnswer({ uid, id, answer });
+  return { outcome: "ready", answer: saved.answer };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 총평
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -304,10 +372,23 @@ async function runClosing(args: { uid: string; id: string }): Promise<ProduceClo
     return { outcome: "all_sections_failed" };
   }
 
+  // 답변이 먼저다(설계 B안). **프롬프트가 아니라 코드로 순서를 보장한다** — 총평과 답변은
+  // 둘 다 섹션 결론을 재료로 써서, "겹치지 마라"를 지시로만 말하면 걸러낼 장치가 없다.
+  //
+  // 여기서 답변 생성이 실패해도 **총평은 계속 만든다.** 총평은 리포트의 마지막 장이고,
+  // 답변 한 장 때문에 결론을 통째로 못 읽게 되는 건 손해가 훨씬 크다. 그 경우 총평은
+  // `answer: null` 로 돌아가 "사연 답을 되풀이하지 말라"는 지시만 빠진다 — 답변 장이 실제로
+  // 없으니 되풀이할 것도 없어서 앞뒤가 맞는다.
+  const produced = reading.userInput.trim()
+    ? await produceAnswer({ uid, id }).catch(() => null)
+    : null;
+  const answer = produced?.outcome === "ready" ? produced.answer : null;
+
   const closing = await generateClosing({
     product,
     chart: reading.chart,
     sections,
+    answer,
     today: new Date(),
   });
   const saved = await saveSajuClosing({ uid, id, closing });

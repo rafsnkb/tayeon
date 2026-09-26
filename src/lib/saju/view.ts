@@ -23,6 +23,8 @@
 //
 // 그래서 "빼는 목록"이 아니라 **"내보낼 목록"** 으로 짰다. 빼는 목록은 §7 에 필드가 하나 늘 때
 // 조용히 새지만, 내보낼 목록은 명시하지 않으면 안 나간다.
+import type { SajuAnswer } from "@/lib/saju/generate/answer";
+import type { SajuReview } from "@/lib/saju/review";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
 import type { SajuChart, SajuMode, SajuPersonChart } from "@/lib/saju/generate/chart";
 import type { SajuResult } from "@/lib/saju/calculate";
@@ -181,6 +183,10 @@ export type SajuReadingView = {
    *  "다음 페이지가 있는가" 판단이 틀린다. */
   sectionCount: number;
   pages: SajuReadingPageView[];
+  /** 사연 답변 장. **`userInput` 이 비어 있으면 영영 null 이다** — 화면은 이 둘로 그 장의
+   *  유무(`userInput`)와 준비 여부(`userAnswer`)를 구분한다. 하나로 합치면 "사연이 없어서
+   *  없는 장"과 "아직 안 만들어진 장"이 같아 보인다. */
+  userAnswer: SajuAnswer | null;
   closing: SajuClosing | null;
   image: SajuReadingImage | null;
   lastReadPage: number;
@@ -193,6 +199,13 @@ export type SajuReadingView = {
    *  부르므로(`storage.ts` 의 `SajuPartnerSnapshot` 주석) 명식 카드도 같은 이름을 써야 "나"와
    *  "상대방" 을 구분해서 보여줄 수 있다. 상대가 없는 상품은 `null`. */
   partnerNickname: string | null;
+  /** 이 리포트에 **내가** 남긴 후기. 없으면 null — 총평 장이 폼을 그릴지 읽기 전용을 그릴지
+   *  이 값으로 정한다. 재방문해도 곧장 읽기 전용이 나와야 해서 조회 응답에 같이 싣는다
+   *  (따로 부르면 총평 장이 잠깐 폼으로 깜빡인다).
+   *
+   *  **남의 후기는 절대 여기 오지 않는다** — 문서 id 가 리포트 id 이고 리포트는 `users/{uid}`
+   *  아래에 있어서, 경로 자체가 소유권이다. */
+  myReview: SajuReview | null;
 };
 
 /**
@@ -203,7 +216,8 @@ export type SajuReadingView = {
 export function toReadingView(
   reading: SajuReading,
   pages: SajuReadingPage[],
-  product: SajuProduct | undefined
+  product: SajuProduct | undefined,
+  myReview: SajuReview | null = null
 ): SajuReadingView {
   return {
     id: reading.id,
@@ -220,12 +234,14 @@ export function toReadingView(
     })),
     sectionCount: reading.outline.sections.length,
     pages: [...pages].sort((a, b) => a.pageNumber - b.pageNumber),
+    userAnswer: reading.userAnswer,
     closing: reading.closing,
     image: reading.image,
     lastReadPage: reading.lastReadPage,
     userInput: reading.userInput,
     chart: toChartView(reading.chart),
     partnerNickname: reading.partnerBirthSnapshot?.nickname ?? null,
+    myReview,
   };
 }
 

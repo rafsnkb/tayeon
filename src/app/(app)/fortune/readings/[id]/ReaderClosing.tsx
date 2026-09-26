@@ -8,6 +8,7 @@
 // **이 장이 리포트의 결론이다**(§1 "총평은 마지막이다"). 0페이지의 목차와 혼동하면 안 된다 —
 // 목차는 "무슨 이야기를 할 것인가"이고 이쪽은 10장을 실제로 읽은 뒤의 답이다. 그래서 내용도
 // 골격이 예측한 것이 아니라 **섹션들이 실제로 쓴 결론을 받아** 만든 것이다.
+import type { ReactNode } from "react";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
 import type { ReaderError } from "./sajuReaderCore";
 
@@ -15,10 +16,15 @@ export default function ReaderClosing({
   closing,
   busy,
   error,
+  review,
 }: {
   closing: SajuClosing | null;
   busy: boolean;
   error: ReaderError | null;
+  /** 별점·후기 슬롯. **이 카드 안에** 들어간다(`ReaderReview.tsx` 머리말) — 그래서 형제
+   *  컴포넌트가 아니라 자식으로 받는다. 총평이 아직 없을 때는 그리지 않는다: 읽지도 않은
+   *  결론에 별점을 묻는 꼴이 된다. */
+  review: ReactNode;
 }) {
   // 총평은 이미지 장에 들어설 때 미리 걸어 두므로(§6) 여기서 기다리는 일은 거의 없다.
   if (!closing) {
@@ -52,6 +58,8 @@ export default function ReaderClosing({
           </ol>
         </div>
       )}
+
+      {review}
     </section>
   );
 }

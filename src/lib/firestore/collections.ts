@@ -40,6 +40,22 @@ export const PAYMENT_INTENTS = "paymentIntents";
  *  쿠폰은 최대 한 장**이 된다 — "여러 장 중 무엇을 적용하나" 라는 문제가 설계에서 사라진다. */
 export const DISCOUNT_COUPONS = "discountCoupons";
 
+/** 사주 리포트 후기(공개). **최상위인 이유는 "상품별로 읽어야" 하기 때문**이다 — 사용자
+ *  서브트리에 두면 상품 화면이 전 사용자를 훑어야 한다. 문서 id 는 **리포트 id** 라, 한 리포트에
+ *  후기가 둘 생길 길이 구조적으로 없다.
+ *
+ *  ⚠️ **최상위라 회원 탈퇴의 `recursiveDelete(users/{uid})` 에 안 지워진다.** `refundRequests`
+ *  와 같은 함정이고 같은 방식으로 푼다 — `api/user/delete` 가 `uid` 로 찾아 직접 지운다.
+ *  방침 제3조가 "회원 탈퇴 시 지체 없이 파기"라 남겨 둘 수 없다. */
+export const SAJU_REVIEWS = "sajuReviews";
+
+/** 상품별 별점 집계 캐시. 문서 id 는 상품 slug.
+ *
+ *  **상품 문서의 필드가 아니다** — 상품은 Firestore 가 아니라 코드에 있다(`products/`).
+ *  읽을 때마다 후기를 세지 않는 이유는 보관함이 페이지 수를 안 세는 것과 같다: 인기 상품일수록
+ *  느려지는 화면이 된다. 후기 쓰기·삭제와 **같은 트랜잭션**에서만 움직인다. */
+export const SAJU_PRODUCT_RATINGS = "sajuProductRatings";
+
 /** users/{uid} 서브컬렉션. */
 export const PAYMENTS = "payments";
 export const COUNT_PASSES = "countPasses";

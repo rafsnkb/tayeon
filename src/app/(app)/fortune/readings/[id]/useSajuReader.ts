@@ -23,6 +23,8 @@ export type SajuReader = ReaderSnapshot & {
   regenerateImage: () => void;
   /** 생성이 실패한 섹션을 사용자가 다시 요청하는 자리. 자리표에는 아무 일도 하지 않는다. */
   retryPage: (pageNumber: number) => void;
+  /** 후기를 남긴다. 성공하면 `null`, 실패하면 화면에 보여줄 메시지. */
+  submitReview: (stars: number, body: string) => Promise<string | null>;
 };
 
 /** 로그인 전(토큰이 없을 때) 쓰는 빈 스냅샷. 매번 새 객체를 만들면 `useSyncExternalStore` 가
@@ -78,6 +80,13 @@ export function useSajuReader(readingId: string): SajuReader {
   const prev = useCallback(() => core?.prev(), [core]);
   const regenerateImage = useCallback(() => core?.regenerateImage(), [core]);
   const retryPage = useCallback((pageNumber: number) => core?.retryPage(pageNumber), [core]);
+  // 코어가 없으면(로그인 전) 실패 메시지를 돌려준다. 이 자리는 총평 장 안이라 로그인 없이는
+  // 닿지 않지만, `undefined` 를 돌려주면 폼이 성공으로 읽는다.
+  const submitReview = useCallback(
+    async (stars: number, body: string) =>
+      core ? core.submitReview(stars, body) : "잠시 후 다시 시도해 주세요.",
+    [core]
+  );
 
-  return { ...snapshot, goTo, next, prev, regenerateImage, retryPage };
+  return { ...snapshot, goTo, next, prev, regenerateImage, retryPage, submitReview };
 }
