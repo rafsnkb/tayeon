@@ -1,0 +1,50 @@
+// 솔직히 말해봐😏, 우리 성향 잘 맞을까? — 기획 doc/사주구상.md 의 `bdsm-compatibility` 상품 블록을 옮긴 것이다.
+//
+// 한국어 문장은 전부 기획 원문 그대로다(화면·프롬프트로 바로 나가는 값이라 다듬지 않는다).
+// 카테고리·태그·가격은 사용자 상품표(2026-09-26) 기준이고, 섹션 `id` 만 여기서 새로 지었다.
+//
+// **성인 전용이 아니다**(2026-09-26 사용자 결정). 슬러그도 `bdsm-compatibility` 였다 —
+// 제목에서 19금을 뺐는데 주소창에 BDSM 이 뜨면 앞뒤가 안 맞아서 `skinship-compatibility` 로 바꿨다.
+// 저장된 리포트가 아직 없을 때라 슬러그 변경이 공짜였다(팔리기 시작하면 기존 리포트가 옛 슬러그를 든다).
+//
+// 기획의 `분석 방식` 항목은 아래 `constraints` 에 담았다(2026-09-26 타입에 필드 추가). 19개 중
+// 이 항목을 가진 상품은 여기 하나뿐이다. 주석으로만 두면 모델에 전달되지 않는데 이건 안전
+// 제약이라, generate/outline.ts 의 시스템 블록이 문체 규칙보다 **앞**에 꽂는다.
+import type { SajuProduct } from "./index";
+
+export const SKINSHIP_COMPATIBILITY: SajuProduct = {
+  slug: "skinship-compatibility",
+  categories: ["연애", "궁합"],
+  tag: "성향",
+  pricesWon: { saju: 8900, ziwei: 10900, integrated: 17900 },
+  title: "솔직히 말해봐😏, 우리 성향 잘 맞을까?",
+  subtitle: "솔직한 성향과 신뢰의 균형, 우리 둘에게 맞는 합의의 방식.",
+  description: "두 사람의 생년월일시에서 드러나는 주도성·돌봄·정서 표현 성향을 바탕으로, 서로의 합의와 신뢰를 중심으로 관계의 조화를 살펴드립니다.",
+  userInputPrompt:
+    "현재 관계, 서로 궁금한 성향·역할·경계에 관한 질문을 적어주세요. 실제 선호와 한계는 반드시 대화로 확인한다는 전제에서 더 깊게 해석해 드립니다.",
+  purpose: "사주와 자미두수에서 읽히는 두 사람의 주도성·돌봄·신뢰·경계 설정 성향은 합의된 관계 안에서 어떻게 조화되는가?",
+
+  // 기획 결과 항목 10개. `title` 이 화면 페이지 제목으로 바로 쓰인다.
+  sections: [
+    { id: "baseline-energy", title: "관계 안에서의 기본 에너지" },
+    { id: "lead-respond-tendency", title: "주도성과 반응성의 경향" },
+    { id: "care-responsibility", title: "돌봄·책임을 표현하는 방식" },
+    { id: "trust-building", title: "신뢰를 쌓는 방식" },
+    { id: "control-comfort-range", title: "통제·위임에 대한 편안함의 범위" },
+    { id: "role-expectations", title: "심리적 역할 기대" },
+    { id: "harmony-points", title: "두 사람의 조화 포인트" },
+    { id: "friction-risk", title: "충돌 가능성" },
+    { id: "boundaries-talk", title: "경계·안전·신뢰 대화" },
+    { id: "consent-style", title: "서로에게 맞는 합의 방식" },
+  ],
+
+  sajuFocus: "음양 균형, 자기표현·책임·정서 관련 십성, 상호 보완과 긴장.",
+  ziweiFocus: "명·복덕·부처궁의 욕구와 관계 패턴, 주도성·돌봄·감정 안정 관련 별의 작용.",
+  crossPoints: "역할 선호를 고정 라벨이 아닌 스펙트럼으로 해석, 합의와 신뢰가 강점인지 점검, 반드시 대화로 확인해야 할 경계.",
+
+  image: null,
+  needsPartner: true,
+  // 기획의 `분석 방식` 원문 그대로. 문장을 다듬지 말 것 — 모델에게 주는 안전 제약이다.
+  constraints:
+    "별도 테스트는 제공하지 않는다. 사주와 자미두수의 관계·정서·자기표현 신호를 바탕으로 각자의 성향을 추정하여 해석하며, 실제 선호·경계는 반드시 당사자 간 대화로 확인해야 한다.",
+};
