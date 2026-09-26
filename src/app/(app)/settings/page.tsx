@@ -19,11 +19,14 @@ const PORTRAITS: Record<ToneKey, string> = {
   friendly: "/portraits/friendly.jpg",
 };
 
-// 피그마엔 이름표(루미/그레모라/셀레네아/모리)+설명 문구가 있었지만, 현재 실제 페르소나 정의
-// (src/lib/tarot/tone.ts)와 어긋나는 구버전 문구였음 — 이름은 label에서 뽑고, 설명은 사용자가
-// 직접 확정한 문구를 따로 둔다(2026-09-15).
-function toneName(key: ToneKey): string {
-  return TONES[key].label.split(" · ")[0];
+// 초상화 아래 칩에 들어가는 낱말. **이름이 아니다**(2026-09-26 사용자 결정: "페르소나 이름은
+// 필요 없어") — 전엔 여기가 `label` 을 " · " 로 쪼개 이름(루미/그레모라/…)을 뽑아 썼지만
+// `tone.ts` 에서 이름을 아예 없앴다. 지금 `label` 은 성격 낱말 한 단어라 그대로 쓴다.
+//
+// 칩이 아예 없으면 초상화 4개를 얼굴로만 구별해야 해서 남겼다 — 고른 톤의 자세한 설명은
+// 그 아래 `TONE_DESCRIPTIONS` 가 맡는다.
+function toneLabel(key: ToneKey): string {
+  return TONES[key].label;
 }
 const TONE_DESCRIPTIONS: Record<ToneKey, string> = {
   warm: "밝고 순수한 스타일",
@@ -233,7 +236,7 @@ export default function SettingsPage() {
                         tone === key ? "bg-point text-white" : "bg-chip-fill text-white"
                       }`}
                     >
-                      {toneName(key)}
+                      {toneLabel(key)}
                     </span>
                   </button>
                 ))}
