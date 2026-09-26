@@ -13,7 +13,7 @@ import {
   validatePurchaseConsent,
   REFUND_NOTICE_VERSION,
 } from "@/lib/saju/purchase";
-import { pageGateReason, isSajuReadingExpired } from "@/lib/saju/storage";
+import { pageGateReason } from "@/lib/saju/storage";
 import { SAJU_PRODUCTS } from "@/lib/saju/products";
 import {
   resolveProduct,
@@ -162,20 +162,18 @@ test("환불이 열기보다 먼저 온 경우 — 마커가 refunded 면 리포
   assert.equal(openGateReason(null).ok, false);
 });
 
-const FUTURE = "2099-01-01T00:00:00.000Z";
-
 test("환불이 열기 뒤에 온 경우 — 잠긴 리포트는 뒤 페이지 생성이 막힌다", () => {
   const outline = { sections: [{}, {}, {}] };
   // 잠기기 전: 1번은 앞이 골격뿐이라 바로 만들 수 있다.
-  assert.deepEqual(pageGateReason({ status: "generating", outline, expiresAt: FUTURE }, [], 1), { ok: true });
+  assert.deepEqual(pageGateReason({ status: "generating", outline }, [], 1), { ok: true });
   // 잠긴 뒤: 앞 페이지가 다 있어도 막힌다.
-  const locked = pageGateReason({ status: "failed", outline, expiresAt: FUTURE }, [1, 2], 3);
+  const locked = pageGateReason({ status: "failed", outline }, [1, 2], 3);
   assert.equal(locked.ok, false);
   assert.equal(locked.reason, "reading_failed");
 });
 
 test("페이지 게이트 — 범위 밖과 앞 페이지 누락을 구분해서 알려준다", () => {
-  const reading = { status: "generating", outline: { sections: [{}, {}, {}] }, expiresAt: FUTURE };
+  const reading = { status: "generating", outline: { sections: [{}, {}, {}] } };
   assert.equal(pageGateReason(reading, [], 0).reason, "out_of_range");
   assert.equal(pageGateReason(reading, [], 4).reason, "out_of_range");
   assert.equal(pageGateReason(reading, [], 1.5).reason, "out_of_range");
@@ -285,37 +283,8 @@ test("동의 시각은 서버가 찍는다 — 클라이언트 시계를 기록�
   assert.deepEqual(Object.keys(ok.record).sort(), ["consentedAt", "refundNoticeVersion", "termsVersion"]);
 });
 
-// ── 보관 기간 (2026-09-26 추가) ───────────────────────────────────────────────
-// 화면이 "30일 간 보관됩니다 / 초과하여 소실된 경우 복구 불가" 를 약속한다. 실제 삭제는 아직
-// 없고(§11) 접근 차단까지만 하는 단계라, **차단이 정말 걸리는지**를 여기서 고정한다.
-
-test("만료된 리포트는 새 페이지를 만들지 않는다 — status 가 아니라 expiresAt 을 본다", () => {
-  const outline = { sections: [{}, {}, {}] };
-  const now = new Date("2026-10-31T00:00:00.000Z");
-  // status 는 멀쩡한 complete 다. 만료를 상태로 표현하지 않기 때문에 그게 정상이다 —
-  // 아무도 안 건드린 문서의 status 를 바꿔 줄 코드가 없다.
-  const expired = { status: "complete", outline, expiresAt: "2026-10-30T23:59:59.000Z" };
-  assert.equal(isSajuReadingExpired(expired, now), true);
-  const gate = pageGateReason(expired, [1, 2], 3, now);
-  assert.equal(gate.ok, false);
-  assert.equal(gate.reason, "expired");
-
-  // 1초 전이면 아직 열린다.
-  const alive = { status: "complete", outline, expiresAt: "2026-10-31T00:00:01.000Z" };
-  assert.equal(isSajuReadingExpired(alive, now), false);
-  assert.deepEqual(pageGateReason(alive, [1, 2], 3, now), { ok: true });
-});
-
-test("만료 값이 깨졌으면 만료로 보지 않는다 — 읽던 리포트를 파싱 실패로 잠그지 않는다", () => {
-  assert.equal(isSajuReadingExpired({ expiresAt: "" }), false);
-  assert.equal(isSajuReadingExpired({ expiresAt: "언제까지" }), false);
-});
-
-test("환불 잠금이 만료보다 먼저 판정된다 — 사유가 섞이지 않는다", () => {
-  const outline = { sections: [{}] };
-  const both = { status: "failed", outline, expiresAt: "2000-01-01T00:00:00.000Z" };
-  assert.equal(pageGateReason(both, [], 1).reason, "reading_failed");
-});
+// 보관 기간 테스트는 **없다**(2026-09-27). 리포트가 무기한 보관으로 바뀌면서 만료 판정과
+// `pageGateReason` 의 `expired` 사유가 통째로 사라졌다 — 지킬 동작이 없어졌다.
 
 // ── 할인쿠폰이 사주에도 걸린다 (2026-09-26 확인) ─────────────────────────────
 // 쿠폰 경로는 상품 종류를 가리지 않으므로 사주에도 코드 변경 없이 적용된다. 그 사실을 고정해 둔다 —

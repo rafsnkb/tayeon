@@ -30,7 +30,6 @@ import { putSajuImageBytes, sajuImageUrl } from "@/lib/saju/imageStore";
 import {
   getSajuReading,
   getSajuReadingWithPages,
-  isSajuReadingExpired,
   pageGateReason,
   saveSajuClosing,
   saveSajuImage,
@@ -79,7 +78,7 @@ export type ProduceClosingResult =
   | { outcome: "all_sections_failed" }
   /** 상품이 레지스트리에서 빠졌다. 총평도 상품의 문체 규칙 위에서 쓰이므로 만들 수 없다. */
   | { outcome: "product_gone" }
-  /** 환불됐거나 보관 기간이 지난 건이다. 저장된 건 계속 읽히지만 **새로 만들지 않는다.** */
+  /** 환불된 건이다. 저장된 건 계속 읽히지만 **새로 만들지 않는다.** */
   | { outcome: "not_producible" };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,18 +106,18 @@ function share<T>(key: string, start: () => Promise<T>): Promise<T> {
 }
 
 /**
- * **더 만들면 안 되는 건인가.** 환불됐거나 보관 기간이 지난 리포트다.
+ * **더 만들면 안 되는 건인가.** 환불된 리포트다.
  *
  * 페이지 생성은 `pageGateReason` 이 이미 막는데, **총평과 이미지는 그 게이트를 안 거친다.**
- * 그래서 이미지를 쓰는 상품의 만료·환불된 리포트를 **열기만 해도** 총평(약 20원)과
+ * 그래서 이미지를 쓰는 상품의 환불된 리포트를 **열기만 해도** 총평(약 20원)과
  * 이미지(8원)가 실제로 만들어졌다. 화면이 안 보여준다고 돈이 안 나가는 게 아니다 —
  * 화면 쪽 가드는 다른 클라이언트나 직접 호출로 우회된다.
  *
- * 판정은 `storage.ts` 의 것을 그대로 쓴다. 깨진 `expiresAt` 을 만료로 보지 않는 규칙까지
- * 거기 있으므로 여기서 날짜 비교를 다시 쓰면 그 규칙이 갈라진다.
+ * 2026-09-27 에 만료 분기가 빠졌다(무기한 보관). 남은 건 **환불**뿐이다 — 환불된 리포트에
+ * 돈 드는 생성을 더 태우지 않는다.
  */
-function mustNotProduce(reading: Pick<SajuReading, "status" | "expiresAt">): boolean {
-  return reading.status === "failed" || isSajuReadingExpired(reading);
+function mustNotProduce(reading: Pick<SajuReading, "status">): boolean {
+  return reading.status === "failed";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -324,7 +323,7 @@ export type ProduceImageResult =
   | { outcome: "not_found" }
   /** 이미지를 지원하지 않는 상품이다(19개 중 3개만 지원). */
   | { outcome: "unsupported" }
-  /** 환불됐거나 보관 기간이 지난 건이다. 다시 그리지 않는다. */
+  /** 환불된 건이다. 다시 그리지 않는다. */
   | { outcome: "not_producible" };
 
 /**

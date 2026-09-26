@@ -9,7 +9,7 @@
 // 2. **`chart` 원본은 여전히 안 나간다** — 계산 결과 원본이라 크다(§7). ⚠️ **2026-09-26 사용자
 //    결정으로 전제가 바뀌었다**: "명식(사주 기둥·자미두수)을 뷰어에 보여주자, 다른 운세
 //    서비스들도 다 한다" — 그래서 **원본이 아니라 표시용 부분집합**(`SajuChartView`, 아래)을
-//    내보낸다. 원본을 그대로 스프레드하면 `expiresAtTs` 유출(`SajuReadingPageView` 주석)과
+//    내보낸다. 원본을 그대로 스프레드하면 화면이 보면 안 되는 값이 새므로(`SajuReadingPageView` 주석)
 //    같은 사고가 난다. **2026-09-27 에 한 번 더 바뀌었다**: 처음엔 원국(사주 기둥·자미두수
 //    명반)만 내보내고 `sajuFortune`·`ziweiHoroscope`(대운·세운·유년 등 시간축)는 "파생 계산
 //    이라 크다"며 뺐는데, `buildChartBlock`(chart.ts)이 **모델에는 이미 그 시간축을 주고
@@ -47,13 +47,12 @@ export type OutlineEntry = { title: string; gist: string };
  *  남겨 `kind: "failed"` 전용 필드(`attempts`)와 `kind: "section"` 전용 필드(본문)가 통째로
  *  사라진다 — 판별 유니온이 평평한 객체 타입으로 무너진다. `extends unknown` 조건부 타입이
  *  분배를 강제한다. */
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
-/** 화면에 내보내는 페이지 모양. 저장 문서(`SajuReadingPage`)에서 `expiresAtTs` 를 뺀 것과
- *  같다 — 그건 Firestore TTL 전용 필드라 값 자체가 화면에 필요 없을 뿐 아니라, `Timestamp`
- *  객체를 그대로 `NextResponse.json` 에 실으면 `_seconds`/`_nanoseconds` 같은 내부 모양으로
- *  직렬화된다(아래 `omitExpiresAtTs` 참고). */
-export type SajuReadingPageView = DistributiveOmit<SajuReadingPage, "expiresAtTs">;
+/** 화면에 내보내는 페이지 모양. 지금은 저장 문서(`SajuReadingPage`)와 같다 — 2026-09-27 에
+ *  만료 필드가 없어지면서 뺄 것이 사라졌다. 타입을 남겨 두는 이유는 **경계를 남기려는 것**이다:
+ *  저장 문서에 화면이 보면 안 되는 필드가 다시 생기면 여기서 빼면 되고, 화면 코드는 이 이름을
+ *  계속 가리키므로 안 고쳐도 된다. */
+export type SajuReadingPageView = SajuReadingPage;
 
 /** 사주 명식 표시용 — `SajuResult` 원본에서 화면이 실제로 그리는 것만 남긴다. 원본 타입을
  *  그대로 `export` 해 버리면 `calculate.ts` 가 필드를 늘렸을 때 여기가 조용히 따라 늘어난다 —
@@ -194,27 +193,7 @@ export type SajuReadingView = {
    *  부르므로(`storage.ts` 의 `SajuPartnerSnapshot` 주석) 명식 카드도 같은 이름을 써야 "나"와
    *  "상대방" 을 구분해서 보여줄 수 있다. 상대가 없는 상품은 `null`. */
   partnerNickname: string | null;
-  /** 보관 만료 시각(ISO).
-   *
-   *  **뷰어가 이 값을 봐야 한다.** 만료된 리포트의 `status` 는 여전히 `complete` 다 — 아무도
-   *  안 건드린 문서의 상태는 저절로 바뀌지 않으므로 만료를 상태로 표현하지 않기로 했다
-   *  (`storage.ts` 의 `isSajuReadingExpired` 머리말). 화면이 `status` 만 보면 만료된 리포트에
-   *  목차를 그려 주고, 장을 넘길 때마다 409 `expired` 를 받아 **같은 사실을 열 번 말하게 된다.**
-   *
-   *  남은 시간을 서버가 계산해 보내지 않는 이유는 `SajuReadingSummary.expiresAt` 과 같다. */
-  expiresAt: string;
 };
-
-/** `SajuReadingPage` 에서 `expiresAtTs` 만 뺀다(2026-09-26) — 이 파일이 "빼는 목록"이 아니라
- *  "내보낼 목록"으로 짜였다는 원칙(위 머리말 3번)의 유일한 예외다. `pages` 배열은 저장 문서를
- *  통째로 스프레드해서 내보내므로(§7 이 페이지 필드를 자주 늘리는데 그때마다 여기를 고치게
- *  하지 않으려는 의도적인 선택), `thesis`·`chart` 처럼 "안 늘어놓기"로 막을 수 없다 — 대신
- *  TTL 전용으로 새로 생긴 이 필드 하나만 이름으로 콕 집어 뺀다. */
-function omitExpiresAtTs(page: SajuReadingPage): SajuReadingPageView {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 뺄 값이라 의도적으로 안 쓴다
-  const { expiresAtTs, ...rest } = page;
-  return rest;
-}
 
 /**
  * `product` 가 `undefined` 일 수 있다 — 상품이 레지스트리에서 빠졌는데 그 상품으로 팔린
@@ -240,12 +219,11 @@ export function toReadingView(
       gist: s.gist,
     })),
     sectionCount: reading.outline.sections.length,
-    pages: [...pages].sort((a, b) => a.pageNumber - b.pageNumber).map(omitExpiresAtTs),
+    pages: [...pages].sort((a, b) => a.pageNumber - b.pageNumber),
     closing: reading.closing,
     image: reading.image,
     lastReadPage: reading.lastReadPage,
     userInput: reading.userInput,
-    expiresAt: reading.expiresAt,
     chart: toChartView(reading.chart),
     partnerNickname: reading.partnerBirthSnapshot?.nickname ?? null,
   };
@@ -270,11 +248,6 @@ export type SajuReadingSummary = {
   lastReadPage: number;
   /** 이미지 장이 있는가. 바이트가 아니라 **있다/없다** 만 준다. */
   hasImage: boolean;
-  /** 보관 만료 시각(ISO). 화면이 「보관만료 D-29」 배지를 그리는 근거다.
-   *
-   *  **남은 시간을 서버가 계산해서 보내지 않는다.** 보낸 순간부터 낡기 시작하고, 화면이 열려
-   *  있는 동안 그 값은 계속 틀려진다. 시각을 주고 화면이 매번 계산하는 쪽이 맞다. */
-  expiresAt: string;
 };
 
 export function toReadingSummary(reading: SajuReading): SajuReadingSummary {
@@ -287,6 +260,5 @@ export function toReadingSummary(reading: SajuReading): SajuReadingSummary {
     sectionCount: reading.outline.sections.length,
     lastReadPage: reading.lastReadPage,
     hasImage: reading.image !== null,
-    expiresAt: reading.expiresAt,
   };
 }

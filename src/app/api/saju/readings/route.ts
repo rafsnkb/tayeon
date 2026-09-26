@@ -7,7 +7,7 @@
 // `GET` 이고 공짜다 — 저장된 문서만 읽고 모델을 부르지 않는다.
 import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { isSajuReadingExpired, listSajuReadings } from "@/lib/saju/storage";
+import { listSajuReadings } from "@/lib/saju/storage";
 import { toReadingSummary } from "@/lib/saju/view";
 
 export async function GET(req: NextRequest) {
@@ -29,10 +29,8 @@ export async function GET(req: NextRequest) {
   // 빠뜨린다. 대신 리포트 **하나**를 직접 여는 `readings/[id]` 는 계속 돌려준다 — 주소를
   // 기억하거나 북마크한 사람에게 404 를 주면 "왜 없어졌지"가 되고, 뷰어가 "환불 처리된
   // 리포트예요" / "보관 기간이 지났어요"를 제대로 말해 줘야 한다.
-  const now = new Date();
-  const readable = readings.filter(
-    (r) => r.status !== "failed" && !isSajuReadingExpired(r, now)
-  );
+  // 환불된 건만 뺀다. 만료 필터는 2026-09-27 에 없어졌다 — 리포트는 무기한 보관이다.
+  const readable = readings.filter((r) => r.status !== "failed");
 
   return NextResponse.json({ readings: readable.map(toReadingSummary) });
 }

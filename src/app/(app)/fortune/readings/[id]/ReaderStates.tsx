@@ -1,13 +1,13 @@
 "use client";
 
 // 본문이 **아직 없거나 더는 없는** 장들 — 생성 중 / 실패 자리표 / 리포트 전체가 막힌 두 상태
-// (환불·만료).
+// (환불).
 //
 // ⚠️ **임시 구현 — 목업 대기 중.** 기존 토큰과 기존 화면의 패턴만 쓴다. 새 룩을 만들지 않는다.
 // 목업이 오면 이 파일들의 **안쪽만** 바뀌고 `page.tsx` 의 분기는 그대로 남는다.
 //
 // 넷을 한 파일에 둔 것은 크기가 작고 서로 닮아서다 — 둘(`ReaderPending`·`ReaderFailed`)은
-// 섹션 장 자리에서 `renderPage` 가 그리고, 둘(`ReaderRefunded`·`ReaderExpired`)은 `page.tsx`
+// 섹션 장 자리에서 `renderPage` 가 그리고, `ReaderRefunded` 는 `page.tsx`
 // 가 장 분기보다 앞에서 통째로 대신 그린다. 목업에서 서로 다른 모양이 되면 파일을 쪼개면 된다.
 import Link from "next/link";
 import type { ReaderError } from "./sajuReaderCore";
@@ -45,39 +45,6 @@ export function ReaderRefunded() {
   );
 }
 
-/**
- * 보관 기간(30일)이 지난 건. `ReaderRefunded` 와 **같은 자리, 같은 구조** — 장 분기보다 앞에서
- * 이 한 장만 그리고 넘기기 바도 숨긴다. 판정은 `isReadingExpired`(`sajuReaderCore.ts`)가 하고
- * 이 컴포넌트는 그 결과만 받는다 — 여기서 날짜 비교를 다시 하지 않는다.
- *
- * **문구가 환불과 다르다.** 환불은 "돈을 돌려받았고 할 일이 없다"이지만, 만료는 "돈은 그대로고
- * 기간이 지난 것"이다 — 사용자 잘못도 우리 잘못도 아니다. 보관함 안내가 *"30일이 지나면
- * 보관함에서 사라지고 다시 열 수 없으며, 복구되지 않습니다"* 라고 이미 예고해 둔 상태라, 여기서
- * 새삼 사과하거나 "복구 요청" 버튼을 주지 않는다 — 안 된다고 이미 말해 놓고 버튼을 주면 그
- * 고지가 거짓이 된다. 돌아갈 곳(보관함) 하나만 둔다.
- *
- * ⚠️ **임시 구현 — 목업 대기 중.** 정해지지 않은 것:
- *   - 문구의 톤(환불 화면처럼 사과를 넣을지, 담백하게 사실만 말할지)
- *   - 보관 기간이 지난 상품을 **재구매하도록 안내할지** — 지금은 링크가 없다
- */
-export function ReaderExpired() {
-  return (
-    <section className="rounded-[32px] border border-border bg-topbar p-6">
-      <div className="py-10 text-center">
-        <p className="text-lg font-bold text-bold-text">이 리포트는 보관 기간이 지났어요</p>
-        <p className="mt-3 text-sm font-semibold text-text">
-          구매하신 리포트는 30일간 보관돼요. 그 기간이 지나 이 리포트는 더 이상 열어 볼 수 없어요.
-        </p>
-        <Link
-          href="/my-readings"
-          className="mt-6 inline-block rounded-full bg-cta-fill px-6 py-3 text-sm font-bold text-cta-text"
-        >
-          보관함으로
-        </Link>
-      </div>
-    </section>
-  );
-}
 
 /** 장 제목 줄. 세 상태가 공유한다 — 제목은 늘 골격에서 오므로 본문이 없어도 보여 줄 수 있다. */
 function PageHeading({ pageNumber, title }: { pageNumber: number; title: string }) {

@@ -274,17 +274,6 @@ test("§7 에 필드가 하나 늘어도 저절로 새지 않는다", () => {
   assert.ok(!JSON.stringify(view).includes("절대 나가면 안 되는 값"));
 });
 
-test("페이지의 expiresAtTs(TTL 전용 Timestamp)는 나가지 않는다 — pages 는 통째로 스프레드해서 §7 필드 테스트가 안 잡는다", () => {
-  // `pages` 는 위 테스트와 달리 저장 문서를 통째로 스프레드해서 내보낸다(§7 필드가 늘 때마다
-  // 이 파일을 고치지 않으려는 의도적 선택, view.ts 머리말). 그래서 페이지에 새 필드가 붙으면
-  // 자동으로 새는데, `expiresAtTs` 는 실제로는 Firestore Timestamp 인스턴스라 그대로 내보내면
-  // `_seconds`/`_nanoseconds` 같은 낯선 모양으로 직렬화된다(storage.ts 의 SajuReadingPage 주석,
-  // 2026-09-26). 여기서는 "이 키 자체가 없다"만 본다 — 값이 뭐든 상관없다.
-  const page = { ...sectionPage(1), expiresAtTs: { seconds: 1234567890, nanoseconds: 0 } };
-  const view = toReadingView(reading(), [page], product());
-  assert.ok(!("expiresAtTs" in view.pages[0]));
-  assert.ok(!JSON.stringify(view).includes("1234567890"));
-});
 
 test("목차 제목은 상품에서 오고 요지는 골격에서 온다", () => {
   const view = toReadingView(reading(), [], product());

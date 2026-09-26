@@ -17,7 +17,7 @@
 //
 // 날짜는 이 저장소의 관례대로 ISO 문자열이다(Timestamp 를 쓰지 않는다 — 기존 리딩·결제 문서와
 // 같은 형식이어야 어드민·이용내역이 같은 코드로 읽는다).
-import { Timestamp, type Transaction } from "firebase-admin/firestore";
+import { type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { USERS, SAJU_READINGS, SAJU_PAGES, SAJU_ORDERS } from "@/lib/firestore/collections";
 import type { BirthInfo } from "@/lib/tarot/birthInfo";
@@ -25,7 +25,6 @@ import type { SajuChart, SajuMode } from "@/lib/saju/generate/chart";
 import type { SajuOutline } from "@/lib/saju/generate/outline";
 import type { SajuSection } from "@/lib/saju/generate/section";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
-import { SAJU_REPORT_RETENTION_DAYS } from "@/lib/legal/retention";
 
 /** 리포트 한 편의 상태.
  *
@@ -79,20 +78,17 @@ export type SajuReading = {
    *  받아 둔다. 설계 문서 §7 을 고칠 때 같이 적을 것. */
   paymentId: string | null;
   failedReason: string | null;
-  /** 보관 만료 시각(ISO). **만들 때 박고 다시 계산하지 않는다** —
-   *  `SAJU_REPORT_RETENTION_DAYS` 를 나중에 고쳐도 이미 팔린 리포트의 약속이 바뀌지 않아야
-   *  한다(그 상수 주석). 화면의 `보관만료 D-29` 배지와 만료 차단이 이 값을 본다. */
-  expiresAt: string;
-  /** 위와 같은 시각의 Firestore `Timestamp` 사본. **TTL 정책 전용이다.**
-   *
-   *  두 벌인 이유: 이 저장소는 문서의 날짜를 ISO 문자열로 쓰는데(어드민·이용내역이 같은 코드로
-   *  읽어야 한다) **Firestore TTL 은 Timestamp 타입 필드만 인식한다** — 문자열을 넣어 두면 정책을
-   *  켜도 아무것도 지워지지 않는다. 실제로 `paymentArchive.retainUntil` 이 문자열이라 5년 파기가
-   *  동작하지 않고 있었다(`src/lib/legal/retentionTimestamp.ts` 머리말, 2026-09-21 수정).
-   *  그래서 코드가 읽는 값과 TTL 이 읽는 값을 따로 둔다. **반드시 같은 시각으로 함께 쓸 것** —
-   *  쓰는 곳은 `createSajuReading` 한 곳뿐이라 어긋날 자리가 없다. */
-  expiresAtTs: Timestamp;
 };
+
+// 보관 만료 필드(`expiresAt`·`expiresAtTs`)는 **없다.** 2026-09-27 에 걷어냈다 — 리포트는
+// 타로 리딩과 같이 **회원 탈퇴 시까지** 남는다. 30일 만료를 뒀던 근거는 저장 비용 걱정이었는데
+// 실측이 틀렸다: 리포트 한 건이 100~170KB 라 10만 건을 영구 보관해도 월 4천 원이고, 한 건
+// **생성**에 224~335원이 든다. 그리고 개인정보처리방침은 이미 "대화ㆍ리딩 기록: 회원 탈퇴 시
+// 파기(별도의 보관 기간을 두지 않습니다)"라고 적고 있었다 — 사주만 예외였던 셈이다.
+//
+// ⚠️ **다시 넣지 말 것.** 넣으려면 Firestore TTL 정책(비활성화됨, 2026-09-27)과 약관·
+// 개인정보처리방침을 함께 되돌려야 하고, "왜 하필 N일인가"에 답할 근거가 필요하다.
+// "회원 탈퇴 시까지"는 표준적이라 그 설명이 필요 없다.
 
 /**
  * 저장된 페이지 한 장. `pageNumber` 는 정렬용이다(컬렉션 상수 주석 참고).
@@ -109,16 +105,10 @@ export type SajuReading = {
  * ⚠️ **호출부 주의:** 2단 생성에 넘길 `written`(`echoOf`)을 만들 때는 반드시
  * `kind === "section"` 만 골라야 한다. 실패 자리표에는 본문이 없어서 `echoOf` 에 넣으면 터진다.
  *
- * `expiresAtTs` 는 부모 리포트(`SajuReading.expiresAtTs`)와 **같은 값을 그대로 복사한 것**이다
- * (2026-09-26, TTL 서브컬렉션 확장) — 새로 계산하지 않는다. Firestore 는 부모 문서가 TTL 로
- * 지워져도 서브컬렉션을 지우지 않으므로, `pages` 컬렉션 그룹에도 자체 TTL 정책이 필요하고
- * 그 정책이 볼 필드가 이거다(`src/lib/legal/retentionTimestamp.ts` 런북 참고). ⚠️ **뷰어로
- * 내보내는 `view.ts` 의 `toReadingView` 가 이 필드를 반드시 제외해야 한다** — Firestore
- * `Timestamp` 를 그대로 JSON 에 실으면 이상한 모양(`_seconds`/`_nanoseconds`)으로 직렬화된다.
  */
 export type SajuReadingPage =
-  | ({ kind: "section"; pageNumber: number; createdAt: string; expiresAtTs: Timestamp } & SajuSection)
-  | { kind: "failed"; pageNumber: number; createdAt: string; attempts: number; expiresAtTs: Timestamp };
+  | ({ kind: "section"; pageNumber: number; createdAt: string } & SajuSection)
+  | { kind: "failed"; pageNumber: number; createdAt: string; attempts: number };
 
 /** 새 리포트 문서 id 를 미리 채번한다 — 마커와 리포트를 한 트랜잭션에서 쓰려면 id 가 먼저
  *  있어야 한다(`open.ts`). 쓰기는 일어나지 않는다. */
@@ -174,7 +164,6 @@ export async function createSajuReading(args: {
   const ref = args.id ? col.doc(args.id) : col.doc();
   const createdAt = new Date();
   const now = createdAt.toISOString();
-  const expires = new Date(createdAt.getTime() + SAJU_REPORT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const doc = {
     productSlug: args.productSlug,
     // chart.mode 와 같은 값이다(§7 이 둘을 다 적어 뒀다) — 목록·필터가 chart 전체를 읽지 않고
@@ -193,8 +182,6 @@ export async function createSajuReading(args: {
     lastReadPage: 0,
     paymentId: args.paymentId ?? null,
     failedReason: null,
-    expiresAt: expires.toISOString(),
-    expiresAtTs: Timestamp.fromDate(expires),
   };
   if (args.tx) args.tx.set(ref, doc);
   else await ref.set(doc);
@@ -385,26 +372,11 @@ export type PageGate =
   /** 앞 페이지가 아직 없다. `missing` 은 먼저 만들어야 하는 번호. */
   | { ok: false; reason: "missing_previous"; missing: number }
   /** 골격 생성이 실패한 건이라 섹션을 만들 수 없다. */
-  | { ok: false; reason: "reading_failed" }
-  /** 보관 기간이 지났다. 환불과 달리 **사용자 잘못도 우리 잘못도 아니다** — 화면이 다른 문구를
-   *  보여야 하므로 사유를 갈라 둔다. */
-  | { ok: false; reason: "expired" };
+  | { ok: false; reason: "reading_failed" };
 
-/**
- * 보관 기간이 지났는가. 리포트 문서의 `expiresAt` 만 본다.
- *
- * **`status` 에 `expired` 를 넣지 않는 이유**가 있다. 만료는 시간이 지나면 저절로 되는 일이라
- * 아무도 안 건드린 문서의 `status` 는 영원히 `complete` 로 남는다 — 그 값을 바꿔 줄 코드가
- * 없으면 상태는 거짓말을 한다. 이 저장소가 이미 같은 데 걸렸다: 이용권에 `status: "expired"` 를
- * 써 주는 코드가 없어서 **만료된 이용권이 상태만 보면 영구히 재구매를 막았다**
- * (`src/lib/payment/fulfill.ts` 의 보유 제한 주석). 그래서 만료는 상태가 아니라 시각으로 본다.
- */
-export function isSajuReadingExpired(reading: Pick<SajuReading, "expiresAt">, now: Date = new Date()): boolean {
-  const expires = Date.parse(reading.expiresAt);
-  // 값이 깨졌으면 만료로 보지 않는다 — 읽을 수 있던 리포트를 파싱 실패 때문에 못 읽게 만드는 건
-  // 사용자가 잃는 쪽이다. 만료 집행을 한 건 놓치는 편이 낫다.
-  return Number.isFinite(expires) && expires <= now.getTime();
-}
+// 만료 사유(`reason: "expired"`)와 `isSajuReadingExpired` 는 **없다**(2026-09-27) — 리포트가
+// 무기한 보관으로 바뀌면서 "기간이 지나 못 읽는" 상태 자체가 사라졌다. 환불(`status: "failed"`)
+// 은 그대로다 — 그건 시간이 아니라 사건으로 정해지는 상태다.
 
 /**
  * 페이지 `pageNumber` 를 지금 만들 수 있는가. **순수 함수다** — 읽기를 더 하지 않으므로
@@ -414,15 +386,11 @@ export function isSajuReadingExpired(reading: Pick<SajuReading, "expiresAt">, no
  * 그게 재귀적으로 1..N-1 전부를 보장하기 때문이다(1번은 앞이 골격뿐이라 조건이 없다).
  */
 export function pageGateReason(
-  reading: Pick<SajuReading, "status" | "outline" | "expiresAt">,
+  reading: Pick<SajuReading, "status" | "outline">,
   savedPageNumbers: readonly number[],
-  pageNumber: number,
-  now: Date = new Date()
+  pageNumber: number
 ): PageGate {
   if (reading.status === "failed") return { ok: false, reason: "reading_failed" };
-  // 보관 기간이 지난 리포트는 새 페이지를 만들지 않는다. 실제 삭제는 아직 없고(§11) 접근 차단만
-  // 하는 단계라, 문서가 남아 있어도 여기서 멈춘다.
-  if (isSajuReadingExpired(reading, now)) return { ok: false, reason: "expired" };
   if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > reading.outline.sections.length) {
     return { ok: false, reason: "out_of_range" };
   }
@@ -496,7 +464,6 @@ export async function saveSajuPage(args: {
       createdAt: new Date().toISOString(),
       // 부모 리포트에서 그대로 복사한다 — 이미 이 트랜잭션에서 읽어 둔 값이라 추가 조회가
       // 없다(`SajuReadingPage` 주석 참고).
-      expiresAtTs: reading.expiresAtTs,
     };
     tx.set(target, page);
     return { outcome: "created", page };
@@ -544,8 +511,6 @@ export async function saveSajuPageFailure(args: {
       createdAt: new Date().toISOString(),
       attempts: args.attempts,
       // 부모 리포트에서 그대로 복사한다(saveSajuPage 와 같은 이유) — 실패 자리표도 나중에
-      // 본문으로 바뀔 수 있는 같은 문서 자리라 만료 시각이 같아야 한다.
-      expiresAtTs: reading.expiresAtTs,
     };
     tx.set(target, page);
     return { outcome: "created", page };

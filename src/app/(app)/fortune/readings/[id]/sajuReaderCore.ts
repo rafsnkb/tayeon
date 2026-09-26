@@ -16,7 +16,7 @@ import type { SajuReadingImage } from "@/lib/saju/storage";
 import type { OutlineEntry, SajuReadingPageView, SajuReadingView } from "@/lib/saju/view";
 
 /** 저장된 섹션 본문 한 장(실패 자리표가 아닌 쪽). 화면이 실제로 받는 모양(`SajuReadingPageView`)
- *  이다 — TTL 전용 필드(`expiresAtTs`)는 `view.ts` 가 이미 빼고 내려준다(2026-09-26). */
+ *  이다 — 화면이 보면 안 되는 값은 `view.ts` 가 걸러 내려준다. */
 type SectionPage = Extract<SajuReadingPageView, { kind: "section" }>;
 
 /**
@@ -81,19 +81,6 @@ export type ReaderDeps = {
   createObjectUrl: (blob: Blob) => string;
   revokeObjectUrl: (url: string) => void;
 };
-
-/**
- * 보관 기간이 지났는가. **`storage.ts` 의 `isSajuReadingExpired` 와 판정을 반드시 같게 둔다**
- * (값이 깨졌을 때 만료로 보지 않는 규칙 포함) — 갈라지면 뷰어와 서버 게이트가 다른 답을 낸다.
- *
- * 그 함수를 그대로 가져다 쓰지 않고 여기 다시 둔 이유: `storage.ts` 는 최상단에서
- * `firebase-admin` 을 초기화하고(`@/lib/firebase/admin`), 이 파일은 클라이언트에서 돈다
- * (`page.tsx` 가 `"use client"`). import 하면 그 초기화가 그대로 브라우저 번들에 실린다.
- */
-export function isReadingExpired(view: Pick<SajuReadingView, "expiresAt">, now: Date = new Date()): boolean {
-  const expires = Date.parse(view.expiresAt);
-  return Number.isFinite(expires) && expires <= now.getTime();
-}
 
 const RETRYABLE: ReaderError = {
   message: "잠시 문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
@@ -487,12 +474,12 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
     if (disposed || !view) return;
 
     // 환불된 건(`status === "failed"`)과 만료된 건은 아무것도 새로 만들지 않는다. 화면은 이
-    // 상태를 안내 한 장으로 가리지만(`page.tsx` 의 `refunded`/`expired`), `load()` 는 화면이
+    // 상태를 안내 한 장으로 가리지만(`page.tsx` 의 `refunded`), `load()` 는 화면이
     // 무엇을 그리기로 했든 항상 이 함수를 부르므로 여기서도 막아야 한다. 안 막으면 총평(약
     // 20원)·이미지(8원)는 `ensurePage` 처럼 순서 게이트가 없어서(`produce.ts` 의 `runImage`·
     // `runClosing` 은 `pageGateReason` 을 안 거친다) 트리거 지점(§6)을 이미 지난 채로 다시
     // 열기만 해도 그대로 나간다 — 화면에 안 보인다고 돈이 안 나가는 게 아니다.
-    if (view.status === "failed" || isReadingExpired(view)) return;
+    if (view.status === "failed") return;
 
     // 목차(0)에 있으면 1번을, 섹션 N 에 있으면 N 과 N+1 을 확보한다. 버퍼는 한 장이면
     // 충분하다 — 한 장 읽는 시간(1분)이 한 장 만드는 시간(10~14초)보다 훨씬 길어서, 두 장을

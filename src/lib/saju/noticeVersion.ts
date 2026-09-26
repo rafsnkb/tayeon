@@ -20,4 +20,4 @@
 // 기산점 "안 날 또는 알 수 있었던 날" 중 "또는 알 수 있었던 날"이 빠져 있었다 — 넣었다.
 // 근거는 `refundNotice.ts`의 ①·③ 주석과 `doc/사주_미리보기_설계.md` §0.
 // ⚠️ 아직 **초안**이고 변호사 검토 전이다 — 최종본이 나오면 여기를 다시 올릴 것.
-export const REFUND_NOTICE_VERSION = "2026-09-26.3";
+export const REFUND_NOTICE_VERSION = "2026-09-27.1";

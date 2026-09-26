@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
           priceWon: data.priceWon,
           paidAt: paidAtIso,
           refunded: false,
-          badge: sajuHistoryBadge(order ?? null, paidAtIso),
+          badge: sajuHistoryBadge(order ?? null),
           // §9 의 "아무것도 안 읽지 않았는가" 판정이 아직 코드에 없다 — 여기서 자가 환불
           // 버튼을 켜면 판정 없이 버튼만 있는 상태가 된다. 지금은 보여주기만 한다
           // (2026-09-26, 어드민 쪽 수동 환불 창구와 같이 결정됨).

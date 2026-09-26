@@ -10,7 +10,6 @@ import { getSajuProduct } from "@/lib/saju/products";
 import type { SajuReadingSummary } from "@/lib/saju/view";
 import { productArt } from "../fortune/productArt";
 import { productMeta } from "../fortune/productList";
-import { expiryBadgeText } from "./expiry";
 import { STORAGE_NOTICE } from "./storageNotice";
 
 /** 운세 보관함 — 산 리포트를 다시 찾아가는 곳. 목업 New/`MyFortuneStorage_Dark`·`_Light`.
@@ -109,7 +108,6 @@ function ReadingCard({ reading, onOpen }: { reading: ReadingRow; onOpen: () => v
      이미지라 다른 물건이고, 그건 인증이 필요해서 `<img src>` 로 걸 수 없다. */
   const product = getSajuProduct(reading.productSlug);
   const art = productArt(reading.productSlug, "card");
-  const badge = expiryBadgeText(reading.expiresAt);
 
   return (
     <button
@@ -122,14 +120,6 @@ function ReadingCard({ reading, onOpen }: { reading: ReadingRow; onOpen: () => v
           <img src={art} alt="" className="h-24 w-32 rounded-md object-cover" />
         ) : (
           <div className="h-24 w-32 rounded-md bg-chip-soft" aria-hidden="true" />
-        )}
-        {/* 면색은 목업이 #ec5d59 인데 **두 모드가 같은 값**이라 토큰이 아니다. 가장 가까운
-            토큰인 `--point` 를 쓴다(측정 거리 기준). 글자는 목업이 다크 #130f0f / 라이트
-            #f9f3f3 로 **`--bg` 와 정확히 같은 쌍**이라 그대로 `text-bg` 다. */}
-        {badge && (
-          <span className="absolute bottom-1 left-1 flex h-[22px] items-center rounded-md bg-point px-1 text-xs font-bold text-bg">
-            {badge}
-          </span>
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col">

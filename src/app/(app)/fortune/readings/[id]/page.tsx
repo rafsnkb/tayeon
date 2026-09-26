@@ -21,12 +21,11 @@ import SubPageTopBar from "@/components/SubPageTopBar";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import { getSajuProduct } from "@/lib/saju/products";
 import { useSajuReader, type ReaderPage, type SajuReader } from "./useSajuReader";
-import { isReadingExpired } from "./sajuReaderCore";
 import ReaderToc from "./ReaderToc";
 import ReaderSection from "./ReaderSection";
 import ReaderImage from "./ReaderImage";
 import ReaderClosing from "./ReaderClosing";
-import { ReaderExpired, ReaderFailed, ReaderPending, ReaderRefunded } from "./ReaderStates";
+import { ReaderFailed, ReaderPending, ReaderRefunded } from "./ReaderStates";
 
 export default function FortuneReadingPage() {
   const router = useRouter();
@@ -49,11 +48,8 @@ export default function FortuneReadingPage() {
   /** 환불 처리가 끝난 건이면 장 분기로 들어가지 않는다. 목차를 그려 두고 넘길 때마다 409 를
    *  받아 알려 주면 같은 사실을 장마다 되풀이하게 된다(`ReaderRefunded` 주석). */
   const refunded = reader.view?.status === "failed";
-  /** 보관 기간(30일)이 지난 건도 같은 이유로 장 분기 밖에서 막는다(`ReaderExpired` 주석).
-   *  환불이 이미 걸렸으면 그쪽 문구가 우선이다 — 어차피 둘 다 잘 안 나지만, 둘 다 걸리는
-   *  경우 "왜 실패했는지"가 "언제 만료됐는지"보다 사용자에게 더 유용한 사실이다. */
-  const expired = !refunded && reader.view !== null && isReadingExpired(reader.view);
-  const blocked = refunded || expired;
+  // 만료(`expired`)는 2026-09-27 에 없어졌다 — 리포트는 무기한 보관이다. 막는 건 환불뿐이다.
+  const blocked = refunded;
 
   return (
     <div className="flex min-h-dvh flex-col overflow-visible bg-bg xl:h-full xl:overflow-hidden">
@@ -73,14 +69,13 @@ export default function FortuneReadingPage() {
           )}
 
           {refunded && <ReaderRefunded />}
-          {expired && <ReaderExpired />}
 
           {!blocked && reader.page && renderPage(reader.page, title, reader)}
         </div>
       </div>
 
       {/* 이동 바. 하단 고정 오버레이다 — 본문을 스크롤해도 늘 손가락이 닿는 자리에 있어야 한다.
-          환불되거나 만료된 건에서는 **숨긴다**: 넘길 장이 없고, 넘기면 장마다 같은 안내만 나온다. */}
+          환불된 건에서는 **숨긴다**: 넘길 장이 없고, 넘기면 장마다 같은 안내만 나온다. */}
       {reader.view && !reader.loadError && !blocked && (
         <div className="app-topbar-glass fixed inset-x-0 bottom-0 z-30 border-t border-border">
           <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-between gap-3 px-4">
