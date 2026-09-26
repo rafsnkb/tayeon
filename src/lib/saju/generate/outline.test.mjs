@@ -289,3 +289,32 @@ test("logSajuRefMismatches — 어긋나면 경고 하나, 맞으면 아무것�
   assert.match(warnings[0], /section=bad-section/);
   assert.match(warnings[0], /tenGod=상관/);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `person`(2026-09-27, 두 번째 바로잡음) — "내담자 또는 상대 어느 쪽에라도 있으면 통과"였던
+// 첫 버전의 검증 구멍. 본문이 내담자 얘기를 하면서 근거로는 상대방의 십신을 대도 통과했다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 이 두 사람(자기 자신 1996-04-12, 상대 1997-08-20 남성)의 실제 십신 — calculateChart 를
+// 직접 돌려 확인했다. "상관"은 self 에는 전혀 없고 partner 의 연주·일지에만 있다.
+const PARTNER_CHART = calculateChart(
+  birthInfo(),
+  "integrated",
+  TODAY,
+  { required: true, birthInfo: birthInfo({ birthDate: "1997-08-20", birthTime: "09:15", gender: "male" }) }
+);
+
+test("person 생략(=self)이면 상대에게만 있는 십신은 막는다 — 검증 구멍 회귀", () => {
+  // "상관"은 self 에 없고 partner 에게만 있다. person 을 안 쓰면 self 로 보므로 막혀야 한다.
+  assert.equal(sajuRefExists(PARTNER_CHART, { pillar: "year", tenGod: "상관" }), false);
+  assert.equal(sajuRefExists(PARTNER_CHART, { person: "self", pillar: "year", tenGod: "상관" }), false);
+});
+
+test("person: 'partner' 로 명시하면 같은 십신이 통과한다", () => {
+  assert.equal(sajuRefExists(PARTNER_CHART, { person: "partner", pillar: "year", tenGod: "상관" }), true);
+});
+
+test("상대가 없는 리포트에서 person: 'partner' 를 대면 막힌다(모순 상태도 안전하게 처리)", () => {
+  const soloChart = calculateChart(birthInfo(), "integrated", TODAY); // chart.partner === null
+  assert.equal(sajuRefExists(soloChart, { person: "partner", pillar: "year", tenGod: "정인" }), false);
+});

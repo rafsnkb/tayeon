@@ -33,9 +33,20 @@ export const SAJU_TEN_GODS = [
 ] as const;
 export type SajuTenGod = (typeof SAJU_TEN_GODS)[number];
 
+/** 이 근거가 누구의 명식인가. **생략하면 `"self"`다** — 궁합 아닌 상품 11개는 상대가 아예
+ *  없어서 매번 이 필드를 채우게 하면 순수한 잡음이고, 잡음이 늘면 모델이 다른 필드에 쓸 주의를
+ *  뺏긴다. 궁합 상품(`needsPartner: true`, 8개)에서는 사실상 필수다 — `personRule`(등장인물
+ *  블록)이 이미 "근거를 인용할 때 누구의 것인지 반드시 밝힌다"고 요구하고 있고, 이 필드가 그
+ *  말에 대응한다(2026-09-27, ①에서 `person` 없이 승인했던 설계를 검증 구멍이 발견돼 수선). */
+export type ChartPerson = "self" | "partner";
+
 /** `sajuBasis`(자유 텍스트, 프롬프트에 그대로 나가는 값)가 실제로 가리키는 명식 칸을
- *  **검증 가능한 형태**로 나란히 둔 것(2026-09-27). `sajuBasis` 를 대체하지 않는다. */
-export type SajuRef = { pillar: SajuPillarKey; tenGod: SajuTenGod };
+ *  **검증 가능한 형태**로 나란히 둔 것(2026-09-27). `sajuBasis` 를 대체하지 않는다.
+ *
+ *  ⚠️ `person` 이 없던 첫 버전은 "내담자 또는 상대 어느 쪽에라도 있으면 통과"로 검증해서
+ *  **검증 구멍**이었다 — 본문이 내담자 얘기를 하면서 근거로는 상대방의 십신을 대도 통과했다.
+ *  `person` 을 넣어 "지정된 사람의 명식에서만" 찾도록 좁혔다. */
+export type SajuRef = { person?: ChartPerson; pillar: SajuPillarKey; tenGod: SajuTenGod };
 
 /** `iztro` 패키지의 ko-KR 12궁 이름과 정확히 같다
  *  (`node_modules/iztro/lib/i18n/locales/ko-KR/palace.js`) — "궁" 접미사는 이 코드베이스가
@@ -53,7 +64,7 @@ export type ZiweiPalace = (typeof ZIWEI_PALACES)[number];
  *  목록이 없다. enum 으로 좁히면 "이 사람에게 없는 별"도 그 enum 안에서는 통과해 버려
  *  **거짓 안전**이 된다. 대신 실행 시점에 이 사람의 실제 명반과 대조한다(아래
  *  `logSajuRefMismatches`). */
-export type ZiweiRef = { palace: ZiweiPalace; star: string };
+export type ZiweiRef = { person?: ChartPerson; palace: ZiweiPalace; star: string };
 
 /** 2단이 섹션 하나를 쓸 때 받는 배정표. */
 export type OutlineSection = {
@@ -115,8 +126,16 @@ const OUTLINE_SCHEMA = {
             items: {
               type: "object",
               additionalProperties: false,
+              // `person` 은 required 가 아니다 — 생략하면 "self"로 본다(궁합 아닌 상품 11개는
+              // 이 필드가 항상 무의미해서 매번 채우게 하면 잡음이다, SajuRef 주석 참고).
               required: ["pillar", "ten_god"],
               properties: {
+                person: {
+                  type: "string",
+                  enum: ["self", "partner"],
+                  description:
+                    "이 근거가 누구의 명식인가. 궁합 상품(두 사람 명반이 모두 있는 리포트)에서만 쓴다 — 생략하면 내담자(self)로 본다. 상대방 근거를 낼 때는 반드시 'partner'를 쓸 것.",
+                },
                 pillar: {
                   type: "string",
                   enum: ["year", "month", "day", "hour"],
@@ -138,6 +157,12 @@ const OUTLINE_SCHEMA = {
               additionalProperties: false,
               required: ["palace", "star"],
               properties: {
+                person: {
+                  type: "string",
+                  enum: ["self", "partner"],
+                  description:
+                    "이 근거가 누구의 명식인가. 궁합 상품에서만 쓴다 — 생략하면 내담자(self)로 본다. 상대방 근거를 낼 때는 반드시 'partner'를 쓸 것.",
+                },
                 palace: {
                   type: "string",
                   enum: [...ZIWEI_PALACES],
@@ -290,6 +315,9 @@ export async function generateOutline(args: {
           "- 섹션마다 **서로 다른** 근거를 배정하세요. 같은 궁·같은 십신을 여러 섹션이 주력으로 쓰면 리포트가 같은 말을 열 번 하게 됩니다.",
           "- 각 섹션의 제목을 소제목으로 그대로 되풀이하지 마세요.",
           "- saju_refs/ziwei_refs 는 saju_basis/ziwei_basis 가 실제로 가리키는 명식 칸입니다. 이 사람의 실제 명식에 있는 것만 쓰세요 — 없는 궁·십신·별을 지어내지 마세요.",
+          chart.partner
+            ? "- 이 리포트는 두 사람의 명반이 모두 있습니다. saju_refs/ziwei_refs 의 person 을 반드시 채우세요 — 상대방 근거면 'partner', 생략하면 'self'로 봅니다. 내담자 얘기를 하면서 person 을 안 채우고 상대방 명식의 값을 대면 검증에서 걸립니다."
+            : "",
           product.image
             ? `- image_brief 를 채우세요. 그릴 대상: ${product.image.subject}\n  담을 요소: ${product.image.elements.join(", ")}`
             : "- 이 상품은 이미지가 없습니다. image_brief 는 null 로 두세요.",
@@ -316,8 +344,16 @@ export async function generateOutline(args: {
       gist: got.gist,
       sajuBasis: got.saju_basis,
       ziweiBasis: got.ziwei_basis,
-      sajuRefs: got.saju_refs.map((r) => ({ pillar: r.pillar as SajuPillarKey, tenGod: r.ten_god as SajuTenGod })),
-      ziweiRefs: got.ziwei_refs.map((r) => ({ palace: r.palace as ZiweiPalace, star: r.star })),
+      sajuRefs: got.saju_refs.map((r) => ({
+        person: r.person as ChartPerson | undefined,
+        pillar: r.pillar as SajuPillarKey,
+        tenGod: r.ten_god as SajuTenGod,
+      })),
+      ziweiRefs: got.ziwei_refs.map((r) => ({
+        person: r.person as ChartPerson | undefined,
+        palace: r.palace as ZiweiPalace,
+        star: r.star,
+      })),
     };
   });
 
@@ -344,43 +380,50 @@ export async function generateOutline(args: {
  * 그 자체가 알림 스팸이 될 수 있다. 나중에 셀 수 있게(상품·섹션·무엇이 어긋났는지) 구조화된
  * 한 줄만 남긴다 — 실호출 검증에서 로그를 모아 빈도를 재고, 그 결과로 알림·재시도 여부를 정한다.
  *
- * 상대 명반이 있는 상품(`needsPartner: true`)은 이 근거가 내담자 것인지 상대 것인지 스키마가
- * 구분하지 않는다(2026-09-27 승인된 설계가 `person` 필드 없이 그대로 진행하기로 함) — 그래서
- * **내담자 또는 상대 어느 쪽 명식에라도 있으면** 통과시킨다. 둘 다 없을 때만 불일치로 본다.
+ * ⚠️ 2026-09-27 두 번째 바로잡음. 처음엔 `person` 이 없어서 "내담자 또는 상대 어느 쪽
+ * 명식에라도 있으면" 통과시켰는데, 그러면 **검증 구멍**이었다 — 본문이 내담자 얘기를 하면서
+ * 근거로는 상대방의 십신을 대도 통과했다(궁합 상품 8개에서 ①이 막으려던 사고를 못 막았다).
+ * `ref.person`(생략하면 self)으로 **지정된 사람의 명식에서만** 찾도록 좁혔다.
  */
 export function logSajuRefMismatches(product: SajuProduct, chart: SajuChart, sections: OutlineSection[]): void {
   for (const section of sections) {
     for (const ref of section.sajuRefs) {
       if (!sajuRefExists(chart, ref)) {
         console.warn(
-          `[SAJU_REF_MISMATCH] product=${product.slug} section=${section.id} pillar=${ref.pillar} tenGod=${ref.tenGod}`
+          `[SAJU_REF_MISMATCH] product=${product.slug} section=${section.id} person=${ref.person ?? "self"} pillar=${ref.pillar} tenGod=${ref.tenGod}`
         );
       }
     }
     for (const ref of section.ziweiRefs) {
       if (!ziweiRefExists(chart, ref)) {
         console.warn(
-          `[SAJU_REF_MISMATCH] product=${product.slug} section=${section.id} palace=${ref.palace} star=${ref.star}`
+          `[SAJU_REF_MISMATCH] product=${product.slug} section=${section.id} person=${ref.person ?? "self"} palace=${ref.palace} star=${ref.star}`
         );
       }
     }
   }
 }
 
+/** `ref.person`(생략하면 `"self"`)이 가리키는 사람의 명반을 고른다. 상대가 없는 리포트에서
+ *  `person: "partner"` 를 대면(모순이라 정상 흐름에선 안 나야 한다) `chart.partner` 가
+ *  `null` 이라 그대로 "없음"으로 처리되고, 그 ref 는 아래에서 불일치로 잡힌다 — 그것도
+ *  맞는 동작이다(상대가 아예 없는 리포트에서 상대 근거를 대는 것 자체가 사고다). */
+function personChart(chart: SajuChart, person: ChartPerson | undefined): SajuChart["self"] | null {
+  return (person ?? "self") === "partner" ? chart.partner : chart.self;
+}
+
 export function sajuRefExists(chart: SajuChart, ref: SajuRef): boolean {
-  return [chart.self.saju, chart.partner?.saju].some((saju) => {
-    if (!saju) return false;
-    const cell = saju.tenGods[ref.pillar];
-    return cell != null && (cell.stem === ref.tenGod || cell.branch === ref.tenGod);
-  });
+  const saju = personChart(chart, ref.person)?.saju;
+  if (!saju) return false;
+  const cell = saju.tenGods[ref.pillar];
+  return cell != null && (cell.stem === ref.tenGod || cell.branch === ref.tenGod);
 }
 
 export function ziweiRefExists(chart: SajuChart, ref: ZiweiRef): boolean {
-  return [chart.self.ziwei, chart.partner?.ziwei].some((ziwei) => {
-    if (!ziwei) return false;
-    return ziwei.palaces.some((p) => {
-      const name = p.name.endsWith("궁") ? p.name : `${p.name}궁`;
-      return name === ref.palace && (p.majorStars.includes(ref.star) || p.minorStars.includes(ref.star));
-    });
+  const ziwei = personChart(chart, ref.person)?.ziwei;
+  if (!ziwei) return false;
+  return ziwei.palaces.some((p) => {
+    const name = p.name.endsWith("궁") ? p.name : `${p.name}궁`;
+    return name === ref.palace && (p.majorStars.includes(ref.star) || p.minorStars.includes(ref.star));
   });
 }
