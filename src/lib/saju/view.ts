@@ -6,15 +6,29 @@
 //    만드는 **내부 기준**이고 사용자가 읽는 총평은 3단의 `closing` 이다. 응답 JSON 에 그냥
 //    실으면 화면에 안 그려도 **네트워크 탭에 그대로 보인다** — "노출 안 함"이 지켜지지 않는다.
 //    돈 받고 파는 결론을 마지막 페이지에 두기로 한 결정이, 개발자 도구를 여는 순간 무너진다.
-// 2. **`chart` 는 계산 결과 원본이라 크다.** 재현용으로 박아 두는 값이지(§7) 뷰어가 쓰는 값이
-//    아니다. 매번 실어 보내면 응답이 수십 KB 씩 커진다.
+// 2. **`chart` 원본은 여전히 안 나간다** — 계산 결과 원본이라 크다(§7). ⚠️ **2026-09-26 사용자
+//    결정으로 전제가 바뀌었다**: "명식(사주 기둥·자미두수)을 뷰어에 보여주자, 다른 운세
+//    서비스들도 다 한다" — 그래서 **원본이 아니라 표시용 부분집합**(`SajuChartView`, 아래)을
+//    내보낸다. 원본을 그대로 스프레드하면 `expiresAtTs` 유출(`SajuReadingPageView` 주석)과
+//    같은 사고가 난다. **2026-09-27 에 한 번 더 바뀌었다**: 처음엔 원국(사주 기둥·자미두수
+//    명반)만 내보내고 `sajuFortune`·`ziweiHoroscope`(대운·세운·유년 등 시간축)는 "파생 계산
+//    이라 크다"며 뺐는데, `buildChartBlock`(chart.ts)이 **모델에는 이미 그 시간축을 주고
+//    있었다** — 화면만 못 받는 상태였다. 목업(life-overview 4~9장, 생애주기)이 전부 그
+//    시간축 얘기인데 근거 칸이 비는 걸 보고서야 드러났다. 그래서 시간축도 `SajuFortuneView`·
+//    `ZiweiHoroscopeView` 로 표시용 부분집합을 만들어 내보낸다(원본과 달리 여기 둘은 원본
+//    전체가 이미 모델이 쓰는 값과 같아서 빠지는 필드가 없다 — 그래도 원본 타입을 그대로
+//    export 하지 않는 이유는 위와 같다).
 // 3. **`paymentId` 는 화면이 쓸 일이 없다.** 결제 식별자를 필요도 없는데 클라이언트로 내보내지
 //    않는다.
 //
 // 그래서 "빼는 목록"이 아니라 **"내보낼 목록"** 으로 짰다. 빼는 목록은 §7 에 필드가 하나 늘 때
 // 조용히 새지만, 내보낼 목록은 명시하지 않으면 안 나간다.
 import type { SajuClosing } from "@/lib/saju/generate/closing";
-import type { SajuMode } from "@/lib/saju/generate/chart";
+import type { SajuChart, SajuMode, SajuPersonChart } from "@/lib/saju/generate/chart";
+import type { SajuResult } from "@/lib/saju/calculate";
+import type { SajuFortune } from "@/lib/saju/fortune";
+import type { ZiweiResult } from "@/lib/ziwei/calculate";
+import type { ZiweiHoroscope } from "@/lib/ziwei/horoscope";
 import type { SajuProduct } from "@/lib/saju/products";
 import type { SajuReading, SajuReadingImage, SajuReadingPage, SajuReadingStatus } from "@/lib/saju/storage";
 
@@ -41,6 +55,121 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  *  직렬화된다(아래 `omitExpiresAtTs` 참고). */
 export type SajuReadingPageView = DistributiveOmit<SajuReadingPage, "expiresAtTs">;
 
+/** 사주 명식 표시용 — `SajuResult` 원본에서 화면이 실제로 그리는 것만 남긴다. 원본 타입을
+ *  그대로 `export` 해 버리면 `calculate.ts` 가 필드를 늘렸을 때 여기가 조용히 따라 늘어난다 —
+ *  이 파일의 "안 늘어놓기" 원칙(위 머리말)을 명식에도 적용해 별도 타입으로 못박는다.
+ *  `timeUnknown` 은 뺀다 — 화면은 `pillars.hour === null` 로 이미 같은 사실을 안다, 값 하나를
+ *  두 가지 이름으로 들고 있을 이유가 없다.
+ *
+ *  `specialStars`·`elementCounts` 는 2026-09-27 추가다(사용자 승인 — "신살은 내용 해석에
+ *  필요하면 해"). 모델이 받는 값(`buildSajuPromptBlock`)과 정확히 같은 모양이라 빠지는
+ *  필드가 없다. */
+export type SajuPillarView = {
+  pillars: SajuResult["pillars"];
+  tenGods: SajuResult["tenGods"];
+  voidBranches: string[];
+  specialStars: SajuResult["specialStars"];
+  elementCounts: SajuResult["elementCounts"];
+};
+
+/** 자미두수 명반 표시용 — `ZiweiResult` 에서 실제로 해석에 쓰는 것만 남긴다. `sign`·`zodiac`
+ *  은 뺐다 — 계산은 되지만 `buildZiweiPromptBlock`(모델이 실제로 받는 근거)이 쓰지 않는 값이라,
+ *  화면에 내보내면 "이 정보로 해석했다"는 거짓 신뢰를 준다. */
+export type ZiweiChartView = {
+  soul: string;
+  body: string;
+  fiveElementsClass: string;
+  palaces: ZiweiResult["palaces"];
+};
+
+/** 사주 시간축(대운·세운·월운) 표시용 — `SajuFortune` 원본에서 화면이 실제로 그리는 것만
+ *  남긴다. **원본 전체가 이미 `buildSajuFortunePromptBlock` 이 쓰는 값과 같다**(파생 필드가
+ *  없다) — 그래도 원본 타입을 그대로 `export` 하지 않는 이유는 `SajuPillarView` 와 같다:
+ *  `fortune.ts` 가 나중에 표시용이 아닌 필드를 늘리면 여기가 조용히 따라 늘어나면 안 된다.
+ *
+ *  ⚠️ **2026-09-27 추가 — 전제가 바뀐 두 번째 필드다.** `SajuChartView` 를 처음 만들 때는
+ *  "화면엔 원국만, 시간축은 프롬프트 전용"이었는데, life-overview 목업의 생애주기 6개 장이
+ *  전부 대운·대한·유년 얘기인데 근거 칸이 빈 채로 나온 걸 보고 뒤집혔다 — 모델은 이미
+ *  `buildChartBlock`(chart.ts)을 통해 이 값을 받고 있었으니, 화면만 못 받던 상태였다. */
+export type SajuFortuneView = {
+  luck: SajuFortune["luck"];
+  annual: SajuFortune["annual"];
+  monthly: SajuFortune["monthly"];
+};
+
+/** 자미두수 시간축(대한·유년·사화) 표시용 — 같은 이유로 `ZiweiHoroscope` 를 그대로 안 쓴다.
+ *  이쪽도 원본 전체가 `buildZiweiHoroscopePromptBlock` 이 쓰는 값과 같다. */
+export type ZiweiHoroscopeCycleView = { stem: string; branch: string; palaceNames: string[]; mutagen: string[] };
+export type ZiweiHoroscopeView = {
+  decadal: ZiweiHoroscopeCycleView;
+  yearly: ZiweiHoroscopeCycleView;
+};
+
+/** 한 사람분의 명식(원국 + 시간축). 모드가 고르지 않은 체계는 `null` 이다 —
+ *  `SajuPersonChart` 와 같은 규칙. `sajuFortune`/`ziweiHoroscope` 도 원국과 **같은 모드
+ *  게이트**를 탄다 — 시간축은 원국 위에 얹는 것이라 원국이 없는 체계의 시간축도 없다. */
+export type SajuPersonChartView = {
+  saju: SajuPillarView | null;
+  sajuFortune: SajuFortuneView | null;
+  ziwei: ZiweiChartView | null;
+  ziweiHoroscope: ZiweiHoroscopeView | null;
+};
+
+export type SajuChartView = {
+  self: SajuPersonChartView;
+  /** 궁합 상품(`needsPartner: true`)만 값이 있다. */
+  partner: SajuPersonChartView | null;
+};
+
+function toSajuPillarView(saju: SajuResult): SajuPillarView {
+  return {
+    pillars: saju.pillars,
+    tenGods: saju.tenGods,
+    voidBranches: saju.voidBranches,
+    specialStars: saju.specialStars,
+    elementCounts: saju.elementCounts,
+  };
+}
+
+function toZiweiChartView(ziwei: ZiweiResult): ZiweiChartView {
+  return { soul: ziwei.soul, body: ziwei.body, fiveElementsClass: ziwei.fiveElementsClass, palaces: ziwei.palaces };
+}
+
+function toSajuFortuneView(fortune: SajuFortune): SajuFortuneView {
+  return { luck: fortune.luck, annual: fortune.annual, monthly: fortune.monthly };
+}
+
+function toZiweiHoroscopeView(horoscope: ZiweiHoroscope): ZiweiHoroscopeView {
+  return { decadal: horoscope.decadal, yearly: horoscope.yearly };
+}
+
+/**
+ * 한 사람분의 명식을 표시용으로 줄인다. **`mode` 를 여기서 다시 본다** — `person.saju`·
+ * `person.ziwei`·`person.sajuFortune`·`person.ziweiHoroscope` 는 `calculatePerson`(chart.ts)
+ * 이 이미 모드에 맞지 않는 쪽을 `null` 로 두지만, 그건 계산 계층의 약속이지 이 계층의 방어가
+ * 아니다. 사주 단일 상품에서 자미두수 명식(원국이든 시간축이든)이 보이면 안 낸 돈으로 산 값을
+ * 보여주는 것과 같다(이용권 게이트 우회와 같은 급의 사고) — 그래서 계산 결과가 어떻든 **여기서도
+ * 모드로 한 번 더 막는다**(2026-09-26, `buildSystemBlock` 이 같은 문제로 자기모순이던 걸
+ * 프롬프트 쪽에서 고친 것과 짝이다).
+ */
+function toPersonChartView(person: SajuPersonChart, mode: SajuMode): SajuPersonChartView {
+  const wantsSaju = mode === "saju" || mode === "integrated";
+  const wantsZiwei = mode === "ziwei" || mode === "integrated";
+  return {
+    saju: wantsSaju && person.saju ? toSajuPillarView(person.saju) : null,
+    sajuFortune: wantsSaju && person.sajuFortune ? toSajuFortuneView(person.sajuFortune) : null,
+    ziwei: wantsZiwei && person.ziwei ? toZiweiChartView(person.ziwei) : null,
+    ziweiHoroscope: wantsZiwei && person.ziweiHoroscope ? toZiweiHoroscopeView(person.ziweiHoroscope) : null,
+  };
+}
+
+function toChartView(chart: SajuChart): SajuChartView {
+  return {
+    self: toPersonChartView(chart.self, chart.mode),
+    partner: chart.partner ? toPersonChartView(chart.partner, chart.mode) : null,
+  };
+}
+
 export type SajuReadingView = {
   id: string;
   productSlug: string;
@@ -57,6 +186,14 @@ export type SajuReadingView = {
   image: SajuReadingImage | null;
   lastReadPage: number;
   userInput: string;
+  /** 명식(사주 기둥·자미두수 + 대운·세운 등 시간축) — 본문이 대는 근거를 독자가 대조할 수
+   *  있는 자리(2026-09-26 사용자 결정, "다른 운세 서비스들도 다 보여준다"). 원본이 아니라
+   *  위 `SajuChartView` 다. */
+  chart: SajuChartView;
+  /** 궁합 상품(`needsPartner: true`)에서 상대방을 부르는 이름. 본문이 이미 이 이름으로 상대를
+   *  부르므로(`storage.ts` 의 `SajuPartnerSnapshot` 주석) 명식 카드도 같은 이름을 써야 "나"와
+   *  "상대방" 을 구분해서 보여줄 수 있다. 상대가 없는 상품은 `null`. */
+  partnerNickname: string | null;
   /** 보관 만료 시각(ISO).
    *
    *  **뷰어가 이 값을 봐야 한다.** 만료된 리포트의 `status` 는 여전히 `complete` 다 — 아무도
@@ -109,6 +246,8 @@ export function toReadingView(
     lastReadPage: reading.lastReadPage,
     userInput: reading.userInput,
     expiresAt: reading.expiresAt,
+    chart: toChartView(reading.chart),
+    partnerNickname: reading.partnerBirthSnapshot?.nickname ?? null,
   };
 }
 
