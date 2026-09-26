@@ -7,6 +7,9 @@
 // 관문의 **순서와 거부 문구는 원본 그대로**다. 순서가 바뀌면 사용자가 보는 실패 사유가
 // 달라지므로(예: 금액이 틀리면서 상품도 모르는 경우) 손대지 않았다.
 import { resolvePaidProduct, type ResolvedProduct } from "@/lib/payment/products";
+// 순수 계산만 있는 모듈이다(Firestore·Anthropic import 없음) — 결제 검증 경로에 무거운 그래프를
+// 끌고 오지 않기 위해 사주 쪽이 purchase.ts / open.ts 로 갈라져 있다.
+import { resolveSajuReportProduct } from "@/lib/saju/purchase";
 import { isComboKey, type ComboKey } from "@/lib/tarot/pricing";
 
 /** fulfillPayment 가 실제로 읽는 필드만 추린 구조 타입. 포트원 SDK 응답이 이 모양을 만족하고,
@@ -118,7 +121,14 @@ export function validatePaidPayment(payment: PaymentRecord, opts: ValidateOption
   // 금액은 상품 해석에도 쓰이고(코인 7번 예외), 아래에서 다시 대조된다.
   const paidTotal = typeof payment.amount?.total === "number" ? payment.amount.total : NaN;
 
-  const product = resolvePaidProduct(customData.productId, paidTotal);
+  // 사주 리포트는 타로 상품표에 **의도적으로** 없다(src/lib/saju/purchase.ts 머리말 — 겹치면 그
+  // 결제가 코인·이용권 지급 경로로 흘러간다). 그래서 타로 해석이 실패한 **뒤에** 한 번 더 시도한다.
+  // 기존 타로 분기 안으로 들어가지 않으므로 타로 결제의 동작은 그대로다.
+  //
+  // 둘 다 아니면 아래 거절이 지금까지와 똑같이 걸린다 — 여기서 autoCancel 기본값을 뒤집으면
+  // 오타 난 상품 코드가 결제를 통과한다.
+  const product =
+    resolvePaidProduct(customData.productId, paidTotal) ?? resolveSajuReportProduct(customData.productId);
   if (!product) {
     return {
       ok: false,

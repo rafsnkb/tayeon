@@ -7,24 +7,42 @@
 //
 // 사용: node --import ./scripts/test-alias.mjs --test <파일들>  (= npm test)
 import { registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
-import { existsSync } from "node:fs";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
 const SRC = path.resolve(import.meta.dirname, "..", "src");
 
-function resolveAlias(specifier) {
-  const base = path.join(SRC, specifier.slice(2));
-  for (const candidate of [base, `${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) {
-    if (existsSync(candidate)) return pathToFileURL(candidate).href;
+// 확장자·index 후보를 순서대로 본다. **파일이 디렉터리보다 먼저다** — `@/lib/saju/products` 처럼
+// 같은 이름의 디렉터리와 파일이 함께 있을 수 있고, 디렉터리를 모듈로 열면 EISDIR 로 죽는다.
+function resolveFrom(base) {
+  for (const candidate of [`${base}.ts`, `${base}.tsx`, path.join(base, "index.ts"), base]) {
+    if (existsSync(candidate) && !isDirectory(candidate)) return pathToFileURL(candidate).href;
   }
   return null;
+}
+
+function isDirectory(candidate) {
+  try {
+    return statSync(candidate).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith("@/")) {
-      const url = resolveAlias(specifier);
+      const url = resolveFrom(path.join(SRC, specifier.slice(2)));
+      if (url) return { url, shortCircuit: true };
+    }
+    // 확장자 없는 **상대경로**도 같이 풀어 준다. 위 머리말이 말하는 문제("소스는 확장자 없이
+    // import 한다")는 `@/` 에만 있는 게 아니다 — 소스끼리는 `./single-love` 처럼 상대경로로도
+    // 부르고, 그건 node 의 ESM 해석이 그대로 실패시킨다. 그래서 별칭만 풀어 주면 그 모듈을
+    // import 하는 테스트는 파일을 열지도 못하고 죽는다(2026-09-26).
+    if ((specifier.startsWith("./") || specifier.startsWith("../")) && context.parentURL?.startsWith("file:")) {
+      const parent = path.dirname(fileURLToPath(context.parentURL));
+      const url = resolveFrom(path.resolve(parent, specifier));
       if (url) return { url, shortCircuit: true };
     }
     return nextResolve(specifier, context);

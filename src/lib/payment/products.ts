@@ -2,8 +2,10 @@
 // 정의(가격/코인수/분)로 되돌리는 로직. 서버가 결제 금액을 검증할 때 반드시 이 표에 있는
 // 가격과 실제 결제 금액이 일치하는지 대조한다 — 클라이언트가 보낸 금액은 절대 신뢰하지 않는다.
 import { COIN_PACKAGES, COUNT_PACKAGES, TIME_PASS_PACKAGES, COMBOS, type ComboKey } from "@/lib/tarot/pricing";
+// 타입만 가져온다 — 값을 가져오면 결제 모듈이 사주 쪽 import 그래프를 끌고 들어온다.
+import type { SajuMode } from "@/lib/saju/generate/chart";
 
-export type ProductType = "coin" | "countPass" | "timePass";
+export type ProductType = "coin" | "countPass" | "timePass" | "sajuReport";
 
 export type ResolvedProduct =
   | {
@@ -26,6 +28,23 @@ export type ResolvedProduct =
       priceWon: number;
       minutes: number;
       combo: ComboKey;
+      orderName: string;
+    }
+  /**
+   * 사주·자미두수 유료 리포트 한 편. **`resolveProduct` 는 이걸 절대 돌려주지 않는다** — 이
+   * 상품표는 타로 전용이고, 사주 식별자가 여기 들어오면 그 결제가 코인·이용권 지급 경로로
+   * 흘러간다(src/lib/saju/purchase.ts 머리말, purchase.test.mjs 가 그걸 지킨다).
+   *
+   * 해석은 `resolveSajuReportProduct`(같은 파일 saju 쪽)가 하고, `validatePayment` 가 타로 해석이
+   * **실패한 뒤에** 한 번 더 시도해서 이 모양으로 받는다. 이용권이 아니라 리포트를 여는 상품이라
+   * 지급 분기에서도 네 번째 갈래로 따로 선다.
+   */
+  | {
+      type: "sajuReport";
+      productId: string;
+      priceWon: number;
+      slug: string;
+      mode: SajuMode;
       orderName: string;
     };
 

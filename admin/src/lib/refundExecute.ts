@@ -1,4 +1,6 @@
+import type { DocumentReference } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { revokeSajuReading } from "@/lib/revokeSajuReading";
 import { portone } from "@/lib/payment/portone";
 import { notifyOwner } from "@/lib/notifyOwner";
 import { isWithinRefundWindow } from "@/lib/refundWindow";
@@ -9,6 +11,100 @@ export type RefundExecuteResult =
   /** `alreadyCancelled` 면 포트원에서는 이미 취소돼 있었고 여기서는 앱 상태만 맞춘 것이다. */
   | { ok: true; cancellation: unknown; alreadyCancelled: boolean }
   | { ok: false; status: number; error: string };
+
+/**
+ * 사주 리포트 결제의 환불. 이용권 회수가 없는 대신 **리포트를 잠근다.**
+ *
+ * 잠그는 일은 본체 창구(`/api/internal/saju/revoke`)가 한다 — 주문 마커를 내리고 리포트를
+ * `failed` 로 만드는 걸 한 트랜잭션으로 묶는 로직을 어드민에 복사하면 두 벌이 되고, 본체의
+ * 취소 웹훅 경로(`src/lib/payment/revoke.ts`)와 어긋나는 날 **어느 경로로 환불했는지에 따라
+ * 리포트가 잠기거나 안 잠긴다.** 그래서 `revokeSajuReading.ts` 가 창구만 부른다.
+ *
+ * 순서가 중요하다: **돈을 돌려준 뒤에 잠근다.** 반대로 하면 잠갔는데 취소가 실패해서 "돈은
+ * 그대로인데 못 읽는" 상태가 된다 — 사용자가 잃는 쪽이다. 지금 순서에서 창구가 실패하면
+ * "환불됐는데 아직 읽히는" 상태인데, 그건 운영자가 손으로 막을 수 있으므로 urgent 로 부른다.
+ */
+async function refundSajuReport(args: {
+  uid: string;
+  paymentId: string;
+  reason: string;
+  approvedBy: string | null;
+  couponCode: string | null;
+  refundRequestRef: DocumentReference;
+  paymentRef: DocumentReference;
+  userRef: DocumentReference;
+}): Promise<RefundExecuteResult> {
+  const { uid, paymentId, reason } = args;
+
+  let cancellation: unknown = null;
+  let alreadyCancelled = false;
+  try {
+    const response = await portone.cancelPayment({ paymentId, reason });
+    cancellation = response.cancellation;
+  } catch (error) {
+    if (isAlreadyCancelled(error)) {
+      console.warn("[refund] 포트원에서 이미 취소된 결제 — 앱 상태만 맞춘다", paymentId);
+      alreadyCancelled = true;
+    } else {
+      console.error("[refund] cancelPayment 실패", paymentId, error);
+      return { ok: false, status: 502, error: error instanceof Error ? error.message : "포트원 결제 취소에 실패했어요." };
+    }
+  }
+
+  const approvedByEmail = args.approvedBy
+    ? await adminAuth.getUser(args.approvedBy).then((u) => u.email ?? null).catch(() => null)
+    : null;
+  const now = new Date().toISOString();
+  const couponRef = args.couponCode ? args.userRef.collection("discountCoupons").doc(args.couponCode) : null;
+
+  await adminDb.runTransaction(async (tx) => {
+    const [refundRequestSnap, couponSnap] = await Promise.all([
+      tx.get(args.refundRequestRef),
+      couponRef ? tx.get(couponRef) : Promise.resolve(null),
+    ]);
+    tx.update(args.paymentRef, {
+      status: "refunded",
+      refundedAt: now,
+      refundReason: reason,
+      refundedByUid: args.approvedBy,
+      refundedByEmail: approvedByEmail,
+      refundedVia: args.approvedBy ? "admin" : "auto",
+      refundReconciled: alreadyCancelled,
+    });
+    // 쿠폰 복원 — 이용권 경로와 같은 이유(전자상거래법 제18조⑨·제35조). 상품 종류와 무관하다.
+    if (couponRef && couponSnap?.exists) {
+      tx.update(couponRef, { status: "unused", usedPaymentId: null, usedAt: null, restoredAt: now });
+    }
+    if (refundRequestSnap.exists && refundRequestSnap.data()?.status === "pending") {
+      tx.update(args.refundRequestRef, {
+        status: "approved",
+        approvedAt: now,
+        approvedByUid: args.approvedBy,
+        approvedVia: args.approvedBy ? "admin" : "auto",
+      });
+    }
+  });
+
+  // `locked: false` 는 실패가 아니다 — 아직 열지 않은 건이면 잠글 리포트가 없고, 그때 창구는
+  // 주문 마커만 내려 그 뒤의 열기 요청을 막는다(revokeSajuReading.ts 주석 참고).
+  const revoked = await revokeSajuReading(uid, paymentId, reason);
+  if (!revoked.ok) {
+    console.error("[refund] 사주 리포트 잠금 창구 실패 — 수동 처리 필요", paymentId, revoked.reason);
+    await notifyOwner({
+      key: `saju-revoke-failed/${paymentId}`,
+      level: "urgent",
+      title: "환불된 사주 리포트가 잠기지 않음 — 확인 필요",
+      fields: [
+        ["결제", paymentId],
+        ["사용자", uid],
+        ["실패 사유", revoked.reason],
+      ],
+      note: "**환불은 끝났지만 리포트가 계속 읽히는 상태입니다.** 본체 창구가 응답하지 않았습니다 — 해당 리포트를 직접 잠가 주세요.",
+    }).catch((error) => console.error("[refund] 사주 잠금 실패 알림 실패", paymentId, error));
+  }
+
+  return { ok: true, cancellation, alreadyCancelled };
+}
 
 /** 포트원이 "이미 취소된 결제"라고 답했는지. 운영자가 포트원 콘솔에서 직접 취소했거나, 취소는
  *  됐는데 웹훅이 우리 쪽에 닿지 못한 경우다(로컬 개발 중에는 웹훅이 아예 못 온다).
@@ -44,7 +140,9 @@ export async function executeRefund(input: {
 
   const payment = paymentSnap.data() as {
     status: string;
-    productType: "countPass" | "timePass" | "coin";
+    // "sajuReport" 는 사주·자미두수 유료 리포트다. 이용권이 아니라 **리포트 한 편**을 파는
+    // 상품이라 회수할 이용권 문서가 없고, 대신 리포트를 잠근다(아래 sajuReport 분기).
+    productType: "countPass" | "timePass" | "coin" | "sajuReport";
     countPassId: string | null;
     timePassId: string | null;
     paidAt: string;
@@ -89,6 +187,27 @@ export async function executeRefund(input: {
     : Date.now();
   if (!isWithinRefundWindow(payment.paidAt, exercisedAt)) {
     return { ok: false, status: 409, error: "결제 후 7일 이내의 이용권만 환불할 수 있어요." };
+  }
+
+  // 사주 리포트는 회수할 이용권 문서가 없다 — 아래 이용권 관문을 그대로 통과시키면 `passCollection`
+  // 이 null 이라 409 로 막혀 **환불 자체가 불가능해진다.** 그래서 여기서 갈라 나간다.
+  //
+  // ⚠️ 사주의 환불 자격 판정은 이용권과 다르다. 설계 §9 는 경계를 **"사용자가 아직 아무것도
+  // 읽지 않았는가"** 로 정했는데(읽은 뒤의 전액 환불은 부적절), 그 판정은 여기 없다 —
+  // 정책·화면과 같이 정할 일이라 발명하지 않았다. 지금은 위 7일 창(`isWithinRefundWindow`)만
+  // 적용되고, **이미 읽은 리포트도 운영자가 승인하면 환불된다.** 그 판정이 정해지면 이 분기에
+  // 넣을 것.
+  if (payment.productType === "sajuReport") {
+    return refundSajuReport({
+      uid,
+      paymentId,
+      reason,
+      approvedBy: input.approvedBy ?? null,
+      couponCode: typeof payment.couponCode === "string" && payment.couponCode ? payment.couponCode : null,
+      refundRequestRef,
+      paymentRef,
+      userRef,
+    });
   }
 
   const passCollection =

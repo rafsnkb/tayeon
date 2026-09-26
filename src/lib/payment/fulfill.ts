@@ -11,6 +11,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { portone } from "@/lib/payment/portone";
 import { validatePaidPayment } from "@/lib/payment/validatePayment";
+import type { ProductType } from "@/lib/payment/products";
 import { addMonthsClamped } from "@/lib/util/dateMath";
 import {
   COUNT_PASS_VALIDITY_MONTHS,
@@ -20,6 +21,8 @@ import {
   isHeldPass,
 } from "@/lib/tarot/pricing";
 import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES, PAYMENT_INTENTS, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
+// 주문 마커만 건드린다 — 계산·골격은 여기서 돌리지 않는다(아래 sajuReport 갈래 주석 참고).
+import { markSajuOrderPaid } from "@/lib/saju/storage";
 import { notifyOwner } from "@/lib/notify/owner";
 
 /** 운영자가 환불을 검토할 때 필요한 결제수단만 보관한다. 카드 전체 번호·계좌번호는 저장하지 않는다. */
@@ -93,7 +96,7 @@ function wonLabel(payment: { amount?: { total?: number } | null }): string {
 }
 
 export type FulfillOutcome =
-  | { kind: "fulfilled"; alreadyFulfilled: boolean; uid: string; productType: "coin" | "countPass" | "timePass" }
+  | { kind: "fulfilled"; alreadyFulfilled: boolean; uid: string; productType: ProductType }
   | { kind: "not_paid"; status: string }
   /** 이미 같은 종류의 이용권을 보유 중이라 지급하지 않고 결제를 자동 취소한 경우. */
   | { kind: "duplicate_cancelled"; uid: string; cancelled: boolean }
@@ -146,6 +149,16 @@ export async function fulfillPayment(
       : null;
   // 이 결제에 쓰인 할인쿠폰. 지급이 확정될 때 같은 트랜잭션에서 소진한다.
   const couponCode = typeof intentData?.couponCode === "string" && intentData.couponCode ? intentData.couponCode : null;
+  // 이용약관·청약철회 제한 동의 기록(사주 리포트에만 있다). prepare 가 검증해서 주문 내역에 실어 둔 것을
+  // 그대로 결제 문서로 옮긴다 — **여기가 보존 원본이다.** 주문 내역은 TTL 대상이고, 주문 마커는
+  // 회원 탈퇴 때 지워지는데, 이 기록은 반대로 5년 보존 대상이다(전자상거래법 시행령 제6조제1항
+  // 제2호 "계약 또는 청약철회 등에 관한 기록"). 결제 문서는 탈퇴 시 paymentArchive 로 복사되므로
+  // 여기 두면 그 의무가 자동으로 충족된다.
+  const purchaseConsent =
+    intentData?.purchaseConsent &&
+    typeof (intentData.purchaseConsent as { consentedAt?: unknown }).consentedAt === "string"
+      ? (intentData.purchaseConsent as Record<string, unknown>)
+      : null;
 
   const checked = validatePaidPayment(payment, {
     expectedUid,
@@ -270,6 +283,9 @@ export async function fulfillPayment(
       paidAt: payment.paidAt,
       fulfilledAt: new Date().toISOString(),
       fulfilledVia: via,
+      // 필드 자체를 조건부로 넣는다 — 타로 결제 문서의 모양을 바꾸지 않기 위해서다(null 을 넣으면
+      // 기존 문서와 달라진다). 사주 리포트만 이 필드를 갖는다.
+      ...(purchaseConsent ? { purchaseConsent } : {}),
     });
 
     if (product.type === "coin") {
@@ -304,6 +320,15 @@ export async function fulfillPayment(
         paymentId,
         createdAt: new Date().toISOString(),
       });
+    } else if (product.type === "sajuReport") {
+      // 네 번째 갈래. 위 세 갈래와 달리 **이용권을 지급하지 않는다** — 사주는 리포트 한 편을
+      // 여는 상품이라 코인·횟수제·시간제 어디에도 들어가지 않는다(src/lib/saju/purchase.ts).
+      //
+      // 여기서 하는 일은 주문 마커를 "결제됨"으로 올리는 것뿐이다. 계산 + 골격이 실측 29초라
+      // (설계 §2) 이 트랜잭션에 넣으면 결제 확정 웹훅을 29초 잡게 되고, 타임아웃과 재시도가
+      // 겹쳐 **같은 결제가 두 번 이행될 수 있다.** 실제로 여는 건 사용자가 결과 화면에 들어올 때
+      // openSajuReading(src/lib/saju/open.ts)이 한다.
+      markSajuOrderPaid(tx, uid, paymentId, payment.paidAt ?? null);
     }
 
     if (couponRef) {

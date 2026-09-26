@@ -9,6 +9,13 @@
 // fulfill.ts와 같은 원칙: 웹훅 본문을 신뢰하지 않고 paymentId로 포트원에 재조회해서 실제 취소
 // 상태만 근거로 회수한다.
 import { adminDb } from "@/lib/firebase/admin";
+import type { ProductType } from "@/lib/payment/products";
+import {
+  markSajuOrderRefunded,
+  markSajuReadingFailed,
+  sajuOrderRef,
+  type SajuOrder,
+} from "@/lib/saju/storage";
 import { portone } from "@/lib/payment/portone";
 import { USERS, PAYMENTS, TIME_PASSES, COUNT_PASSES, USER_DISCOUNT_COUPONS } from "@/lib/firestore/collections";
 
@@ -74,7 +81,7 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
     }
     const paymentData = paymentSnap.data() as {
       status?: string;
-      productType?: "coin" | "countPass" | "timePass";
+      productType?: ProductType;
       countPassId?: string | null;
       timePassId?: string | null;
       couponCode?: string | null;
@@ -104,6 +111,13 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
       : null;
     const couponSnap = couponRef ? await tx.get(couponRef) : null;
 
+    // 사주 리포트는 회수할 이용권이 없다 — 대신 **리포트를 잠근다.** 환불받고도 계속 읽히면
+    // 돈만 돌려주고 물건은 그대로 준 셈이 된다. 어느 리포트인지는 결제 문서가 모른다(리포트는
+    // 결제 뒤 열기 단계에서 만들어진다) — 주문 마커가 `readingId` 를 갖고 있다.
+    const sajuOrderSnap =
+      paymentData.productType === "sajuReport" ? await tx.get(sajuOrderRef(uid, paymentId)) : null;
+    const sajuReadingId = (sajuOrderSnap?.data() as SajuOrder | undefined)?.readingId ?? null;
+
     let passStatusBefore: string | null = null;
     if (passRef && passSnap?.exists) {
       passStatusBefore = (passSnap.data()?.status as string | undefined) ?? null;
@@ -127,6 +141,15 @@ export async function revokeCancelledPayment(paymentId: string): Promise<RevokeO
     // 쿠폰의 것이라 이미 지났으면 되돌려도 어차피 못 쓰고, 그 판정은 사용 시점이 한다.
     if (couponRef && couponSnap?.exists) {
       tx.update(couponRef, { status: "unused", usedPaymentId: null, usedAt: null, restoredAt: now });
+    }
+
+    // 마커를 먼저 내린다 — 환불이 열기보다 먼저 온 경우(결제 직후 취소)에는 잠글 리포트가 아직
+    // 없고, 마커가 paid 로 남아 있으면 그 뒤에 들어온 열기 요청이 환불된 결제로 리포트를 만든다.
+    if (sajuOrderSnap?.exists) {
+      markSajuOrderRefunded(tx, uid, paymentId);
+    }
+    if (sajuReadingId) {
+      markSajuReadingFailed(uid, sajuReadingId, "결제 취소로 회수됨", tx);
     }
 
     tx.update(paymentRef, {
