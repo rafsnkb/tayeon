@@ -163,6 +163,7 @@ export function BirthDateField({
   onChange,
   required,
   calendarMode = "solar",
+  label = "생년월일",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -170,6 +171,9 @@ export function BirthDateField({
   /** 음력이면 달마다 29/30일이고, 윤달은 있는 달이 정해져 있다. 양력 일수를 쓰면 없는 날짜가
    *  저장된다(계산은 src/lib/tarot/birthWheel.ts, 음력 표는 manseryeok 이 들고 있다). */
   calendarMode?: CalendarMode;
+  /** 유료 운세 구매 화면만 "상대방 생년월일" 이다 — 그 화면은 내 정보와 상대 정보가 한
+   *  카드 안에 있어서 누구 것인지 라벨이 말해 줘야 한다. `BirthTimeField` 와 같은 장치다. */
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const thisYear = new Date().getFullYear();
@@ -194,7 +198,7 @@ export function BirthDateField({
 
   return (
     <>
-      <FieldLabel required={required}>생년월일</FieldLabel>
+      <FieldLabel required={required}>{label}</FieldLabel>
       <WheelField text={value ? value.replaceAll("-", ".") : ""} placeholder="YYYY.MM.DD" onClick={() => setOpen(true)} />
       {open && (
         <WheelPicker

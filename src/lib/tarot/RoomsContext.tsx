@@ -18,6 +18,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import type { ComboKey, CountPassBalance } from "@/lib/tarot/pricing";
 import { DEFAULT_TONE, isToneKey, type ToneKey } from "@/lib/tarot/tone";
+import type { BirthInfo } from "@/lib/tarot/birthInfo";
 
 export type Room = { id: string; title: string; updatedAt: string };
 export type ActiveTimePass = {
@@ -74,7 +75,11 @@ type MeResponse = {
   activeCountPass?: ActiveCountPass | null;
   /** 서버가 내린 "생년월일 정보가 갖춰졌는가" 판정(isValidBirthInfo). */
   birthInfoComplete?: boolean;
-  birthInfo?: { timeUnknown?: boolean } | null;
+  /** 내 출생 정보 **전체**. 바로 위 `partner` 와 같은 이유로 좁히지 않는다(2026-09-26) —
+   *  서버는 Firestore 의 birthInfo 객체를 통째로 내려주는데(api/user/me/route.ts), 예전처럼
+   *  `timeUnknown` 한 필드만 받아 적으면 유료 운세 구매 화면이 §10 판매 제약(성별 필수 ·
+   *  시간 모름이면 자미두수·통합 불가)을 판정하려고 같은 데이터를 한 번 더 받아 오게 된다. */
+  birthInfo?: BirthInfo | null;
   /** 궁합 상대. **필드를 좁히지 말 것**(2026-09-26) — 서버는 Firestore 의 partner 객체를
    *  통째로 내려주는데(api/user/me/route.ts) 여기서 두 필드만 받아 적으면, 그 값이 필요한
    *  화면(/compatibility)이 같은 데이터를 `/api/user/partner` 로 **한 번 더** 받아 오게 된다. */
@@ -95,6 +100,10 @@ type RoomsContextValue = {
   activeCountPass: ActiveCountPass | null;
   hasBirthInfo: boolean;
   myTimeUnknown: boolean;
+  /** 내 출생 정보 전체(없으면 null). `/api/user/me` 가 이미 실어다 준다 — 유료 운세 구매
+   *  화면이 §10 판매 제약을 판정하는 데 쓴다. `myTimeUnknown` 은 이 값의 한 필드지만, 이미
+   *  여러 화면이 쓰고 있어 그대로 둔다. */
+  myBirthInfo: BirthInfo | null;
   hasPartner: boolean;
   partnerTimeUnknown: boolean;
   /** 궁합 상대 프로필 전체. `/api/user/me` 가 이미 실어다 주므로 `/compatibility` 가
@@ -147,6 +156,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
   const [activeCountPass, setActiveCountPass] = useState<ActiveCountPass | null>(null);
   const [hasBirthInfo, setHasBirthInfo] = useState(false);
   const [myTimeUnknown, setMyTimeUnknown] = useState(false);
+  const [myBirthInfo, setMyBirthInfo] = useState<BirthInfo | null>(null);
   const [hasPartner, setHasPartner] = useState(false);
   const [partner, setPartner] = useState<Partner | null>(null);
   const [partnerTimeUnknown, setPartnerTimeUnknown] = useState(false);
@@ -223,6 +233,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
     // 서버 검사(isValidBirthInfo)와 어긋나 "버튼은 눌리는데 409" 가 된다(2026-09-25).
     setHasBirthInfo(Boolean(data.birthInfoComplete));
     setMyTimeUnknown(Boolean(data.birthInfo?.timeUnknown));
+    setMyBirthInfo(data.birthInfo ?? null);
     setHasPartner(Boolean(data.partner?.nickname));
     setPartner(data.partner ?? null);
     setPartnerTimeUnknown(Boolean(data.partner?.nickname) && !data.partner?.birthTime);
@@ -445,6 +456,7 @@ export function RoomsProvider({ children }: { children: ReactNode }) {
         activeCountPass,
         hasBirthInfo,
         myTimeUnknown,
+        myBirthInfo,
         hasPartner,
         partner,
         partnerTimeUnknown,

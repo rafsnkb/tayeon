@@ -22,6 +22,7 @@ import {
   SearchIcon,
   InvitePersonIcon,
   CartIcon,
+  SajuIcon,
   CardIcon,
   TicketIcon,
   ListIcon,
@@ -222,8 +223,14 @@ export default function MyPage() {
             <ListRow icon={<InvitePersonIcon className="h-4 w-5" />} label="친구 초대하기" onClick={() => router.push("/invite")} />
           </Section>
 
-          <Section title="이용권">
+          {/* 섹션 이름이 「이용권」에서 **「이용권 · 운세」** 로 바뀌고 두 번째 줄에 운세 보관함이
+              들어간다(목업 New/`MyPage_Dark`·`MyPage_Light`, 2026-09-26). 나머지 네 줄은 순서까지
+              기존 그대로라 여기 말고 어긋나는 데가 없다.
+              보관함은 결제 화면의 환불 안내가 이미 "마이 페이지→운세 보관함"이라고 약속한
+              화면이다. 그 말이 가리킬 곳이 없었다(문장 정본은 `refundNotice.ts`). */}
+          <Section title="이용권 · 운세">
             <ListRow icon={<CartIcon className="h-5 w-5" />} label="횟수제 · 시간제 이용권 구입" onClick={() => router.push(withReturnTo("/charge", "/me"))} />
+            <ListRow icon={<SajuIcon className="h-5 w-5" />} label="운세 보관함" onClick={() => router.push("/my-readings")} />
             <ListRow icon={<CardIcon className="h-4 w-5" />} label="결제 내역" onClick={() => router.push("/purchase-history")} />
             <ListRow icon={<ListIcon className="h-5 w-3.5" />} label="내 보유 이용권" onClick={() => router.push("/my-passes")} />
             <ListRow icon={<TicketIcon className="h-4 w-5" />} label="쿠폰함" onClick={() => router.push("/coupons")} />

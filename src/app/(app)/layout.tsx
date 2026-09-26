@@ -9,7 +9,9 @@ import { DEFAULT_ROOM_TITLE } from "@/lib/tarot/room";
 import { BrandBi } from "@/components/BrandBi";
 import TestAccountLogin from "@/components/TestAccountLogin";
 import { kakaoAuthorizeUrl } from "@/components/LoginPanel";
+import Link from "next/link";
 import { NewChatIcon, ChevronRightIcon, BellIcon } from "./tarot/icons";
+import { FORTUNE_FILTERS, fortuneFilterIcon, fortuneListHref } from "./fortune/filters";
 
 const SIDEBAR_COLLAPSED_KEY = "tayeon-sidebar-collapsed";
 
@@ -36,7 +38,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   //
   // 이 둘을 한 변수로 묶으면 대화방에서 드로어가 통째로 사라진다(2026-09-24 분리 중 실제로 냄).
   const isMainRoute = pathname === "/";
-  const isChatRoute = isMainRoute || pathname.startsWith("/tarot/");
+  // 운세(사주) 상품 목록도 같은 껍데기를 쓴다(2026-09-26). 목업 New/`Fortune_Home_*` 의 상단바에
+  // 햄버거가 있어서 드로어가 붙어야 하고, 가게 진열대라 비로그인도 머물 수 있어야 한다 —
+  // 서브페이지 취급을 하면 둘 다 안 된다. 드로어 **내용**은 아직 타로 것 그대로다: 목업
+  // `MenuOpen_Fortune_*` 의 8줄(전체·신규 + 카테고리 6개, `public/icons/fortune_category_*`)은
+  // 아직 만들지 않았다.
+  //
+  // **목록 한 장만이다** — `/fortune/readings/[id]`(리포트 읽기)는 다른 화면이라 여기 걸지 않는다.
+  const isFortuneRoute = pathname === "/fortune";
+  const isChatRoute = isMainRoute || pathname.startsWith("/tarot/") || isFortuneRoute;
   const {
     user,
     profileImage,
@@ -73,8 +83,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // 이동합니다"라고 약속한 것과도 어긋났다. /login 자체는 (app) 그룹 밖이라 친구초대
   // 링크(/login?ref=)와 카카오 실패 콜백(/login?error=)은 그대로 살아있다.
   useEffect(() => {
-    if (authChecked && !user && !isMainRoute) router.replace("/");
-  }, [authChecked, user, isMainRoute, router]);
+    if (authChecked && !user && !isMainRoute && !isFortuneRoute) router.replace("/");
+  }, [authChecked, user, isMainRoute, isFortuneRoute, router]);
 
   useEffect(() => onOpenMenu(() => setMenuOpen(true)), []);
 
@@ -222,8 +232,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
+          {/* 운세 드로어에는 「새 대화」가 없다. 대신 로고 아래 선은 남는다 — 실측(3배 목업)
+              로고 잉크 바닥 40, 선 62, 첫 줄 원의 위 80, 첫 구분선 137. 아래 `FortuneMenu` 의
+              `pt-[9px]` 와 줄 높이 66 이 그 숫자와 맞물린다. */}
+          {user && isFortuneRoute && (
+            <div className="border-b border-border pb-[14px]" aria-hidden="true" />
+          )}
           {/* 비로그인 드로어에는 새 대화 버튼도, 그 아래 선도 없다(MenuOpen - NotLogin). */}
-          {user && (
+          {user && !isFortuneRoute && (
             <div className="border-b border-border px-4 pb-[14px] pt-[37px]">
               <button
                 type="button"
@@ -284,6 +300,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <TestAccountLogin />
             </div>
           </div>
+        ) : isFortuneRoute ? (
+          <FortuneMenu collapsed={sidebarCollapsed} onPick={() => setMenuOpen(false)} />
         ) : (
         /* 스크롤은 이 목록만 한다 — 위의 새 대화·선과 아래의 마이페이지·이용권은 고정이다.
            실측: "최근 대화" top 151.7(선에서 11.7), 첫 행 top 178.3, 행 높이 48 간격 4,
@@ -400,6 +418,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           (2026-09-14 발견, 사용자 피드백: "상단바가 왜 안 고쳐지냐") — 제거함. */}
       <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
         {children}
+      </div>
+    </div>
+  );
+}
+
+/** 운세 모드의 메뉴 드로어 — 목업 New/`MenuOpen_Fortune_Dark`·`MenuOpen_Fortune_Light`.
+ *
+ *  타로 드로어의 "최근 대화" 자리에 **여덟 줄**(전체·신규 + 카테고리 6개)이 들어간다. 고른
+ *  카테고리는 목록 화면의 필터로 이어져야 해서 주소로 넘긴다(`/fortune?c=love`) — 화면 안
+ *  상태로는 드로어에서 목록까지 닿지 못한다.
+ *
+ *  실측(목업 3배): 줄 높이 66(원 48 + 위아래 9), 구분선은 줄 사이에만, 원 지름 48 `--chip-soft`,
+ *  아이콘 잉크 18(83px 에셋의 잉크가 90% 라 20px 로 그린다), 라벨 16px `--chip-soft-text` 가
+ *  원에서 8 떨어짐, 오른쪽 셰브런 9x18.
+ *
+ *  아이콘이 래스터라 `currentColor` 를 못 따라가서 모드별 파일을 두 장 겹치고 하나를 숨긴다
+ *  (`BrandBi` 와 같은 방식). 파일명↔한국어 매핑은 `fortune/filters.ts` 한 곳에만 있다 —
+ *  상품 정의에는 아이콘 경로를 넣지 않는다(설계 §3).
+ *
+ *  **로고 위치는 목업과 다르다.** `MenuOpen_Fortune_*` 은 로고가 왼쪽 정렬인데, 타로 드로어
+ *  (`MenuOpen_*`)는 가운데다. 헤더는 두 모드가 공유하고, 토글만 눌렀는데 로고가 옆으로 뛰는
+ *  건 더 이상해서 가운데를 유지했다. 같은 이유로 목업이 드로어 머리에 그려 둔 타로/운세 토글도
+ *  넣지 않았다 — 실제로는 드로어가 상단바를 덮으므로 토글이 두 벌이 된다. */
+function FortuneMenu({ collapsed, onPick }: { collapsed: boolean; onPick: () => void }) {
+  return (
+    <div className="flex-1 overflow-y-auto px-4 pt-[9px]">
+      <div className={collapsed ? "xl:hidden" : ""}>
+        {FORTUNE_FILTERS.map((item, index) => {
+          const icon = fortuneFilterIcon(item.key);
+          return (
+            <Link
+              key={item.key}
+              href={fortuneListHref(item.key)}
+              onClick={onPick}
+              className={`flex h-[66px] items-center gap-2 ${
+                index === FORTUNE_FILTERS.length - 1 ? "" : "border-b border-border"
+              }`}
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-chip-soft">
+                <img src={icon.light} alt="" className="h-5 w-5 dark:hidden" />
+                <img src={icon.dark} alt="" className="hidden h-5 w-5 dark:block" />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-base font-semibold text-chip-soft-text">
+                {item.label}
+              </span>
+              <ChevronRightIcon className="h-[18px] w-[9px] shrink-0 text-chip-soft-text" />
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

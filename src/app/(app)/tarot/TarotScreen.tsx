@@ -11,7 +11,7 @@ import { openMenu } from "@/lib/ui/menuBus";
 import ConfirmModal from "@/components/ConfirmModal";
 import RoomLimitModal from "@/components/RoomLimitModal";
 import SuspensionModal, { parseSuspensionError, type SuspensionInfo } from "@/components/SuspensionModal";
-import { BrandBi } from "@/components/BrandBi";
+import { TarotFortuneToggle } from "@/components/TarotFortuneToggle";
 import { MainCompanyInfo } from "@/components/MainCompanyInfo";
 import LoginModal from "@/components/LoginModal";
 import {
@@ -976,13 +976,12 @@ function TarotChat() {
             타연 워드마크를 중앙에 보여주고, 방 컨트롤(이름변경/삭제/새대화/이용권뱃지)도 감춘다. */}
         {isMain ? (
           <>
-            <button
-              type="button"
-              onClick={openMenu}
-              className="flex flex-1 items-center justify-center"
-            >
-              <BrandBi className="h-6 w-12" />
-            </button>
+            {/* 메인 상단바 한가운데는 **「타로 / 운세」 토글**이다(2026-09-26, 목업 New/`Main_Dark`
+                ·`Main_Fortune_Dark`). 예전엔 여기가 타연 워드마크였는데, 사주 서비스가 붙으면서
+                시안이 그 자리를 토글로 바꿨다 — 워드마크는 메뉴 드로어 머리에 그대로 있다. */}
+            <div className="flex flex-1 items-center justify-center">
+              <TarotFortuneToggle active="tarot" />
+            </div>
             {/* 워드마크를 **바의 한가운데**에 놓기 위한 빈 칸 — 왼쪽에 있는 것과 같은 폭이어야
                 한다. flex-1 은 "왼쪽 것을 뺀 나머지"의 가운데를 잡으므로, 짝이 없으면 그 폭의
                 절반만큼 오른쪽으로 밀린다(2026-09-25 실측: 모바일 32px, 데스크탑 8px).
