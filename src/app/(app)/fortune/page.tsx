@@ -1,20 +1,21 @@
 import { Suspense } from "react";
-import { FortuneEntry } from "./FortuneEntry";
+import { FortuneScreen } from "./FortuneScreen";
 
-/** 운세(사주·자미두수)의 입구. **로그인 여부로 두 화면이 갈린다**(2026-09-26 사용자 결정):
+/** 운세(사주·자미두수)의 입구. **로그인 여부와 상관없이 한 화면이다**(2026-09-27 사용자 결정).
  *
- *    · 비로그인 → 소개 화면 `Main_Fortune_*`("내 운세 보러가기" → 로그인)
- *    · 로그인   → 상품 목록 `Fortune_Home_*`
+ *  예전에는 비로그인에게 소개 화면(`Main_Fortune_*`)을, 로그인에게 목록(`Fortune_Home_*`)을
+ *  주느라 컴포넌트가 셋이었다(`FortuneEntry`가 갈랐다). 없앴다 — **타로 쪽이 이미 화면 하나로
+ *  둘 다 받고 있었고**(`TarotScreen`), 비로그인에게 실제 상품과 가격을 보여주는 편이 카피만
+ *  읽히는 화면보다 설득력이 있다. 로그인은 살 때 필요하고 그 문은 상세 화면이 들고 있다.
  *
- *  라우트를 둘로 쪼개지 않고 한 주소에서 가른 이유: 주소를 직접 친 비로그인 사용자를 어디로
- *  보낼지가 그냥 풀린다 — 튕겨내지 않고 소개 화면을 보여주면 되고, 로그인하는 순간 같은
- *  주소가 목록이 된다. 토글도 분기를 몰라도 된다.
+ *  소개 화면이 하던 일 둘은 `FortuneScreen` 안으로 옮겼다 — 여섯 줄 카피는 `FortunePitch`
+ *  (목록 위, 비로그인 전용), 사업자정보는 맨 아래 `MainCompanyInfo`(로그인 무관).
  *
  *  목록이 `useSearchParams`(`?c=love`)를 읽으므로 Suspense 경계가 필요하다. */
 export default function FortunePage() {
   return (
     <Suspense fallback={null}>
-      <FortuneEntry />
+      <FortuneScreen />
     </Suspense>
   );
 }

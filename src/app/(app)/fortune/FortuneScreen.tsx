@@ -9,6 +9,8 @@ import { discountedAmount } from "@/lib/payment/discountCoupon";
 import { FORTUNE_FILTERS, fortuneFilterFromKey, fortuneListHref } from "./filters";
 import { productMeta, productsFor } from "./productList";
 import { productArt } from "./productArt";
+import { MainCompanyInfo } from "@/components/MainCompanyInfo";
+import { FortunePitch } from "./FortunePitch";
 import { MenuIcon } from "../tarot/icons";
 
 /** 사주·자미두수 상품 목록. 화면 이름은 **운세**, 도메인 이름은 **사주**다 — 라우트는
@@ -26,6 +28,12 @@ import { MenuIcon } from "../tarot/icons";
  *    · 썸네일 128x96 rounded-md, 글 칸과 8 벌어짐
  *    · 카테고리 줄 14px `--placeholder` / 제목 18px Bold 줄높이 22 / 가격 18px Bold 우측 하단
  *
+ *  **비로그인도 이 화면을 본다**(2026-09-27 사용자 결정). 예전에는 소개 화면(`FortuneIntro`)이
+ *  따로 갈라져 있었는데 없앴다 — 타로 쪽이 이미 화면 하나로 둘 다 받고 있었고(`TarotScreen`),
+ *  실제 상품·가격을 보여주는 편이 카피만 읽히는 화면보다 설득력이 있다. 소개 화면이 하던 두
+ *  가지는 각각 자리를 옮겼다: 여섯 줄 카피는 `FortunePitch`(목록 위), 사업자정보는 맨 아래
+ *  `MainCompanyInfo`.
+ *
  *  **선택된 필터는 URL 에 있다**(`?c=love`). 메뉴 드로어의 운세 8줄이 같은 주소로 들어오기
  *  때문이다 — 화면 안 상태로만 두면 드로어에서 고른 카테고리가 목록에 닿지 못한다. */
 
@@ -34,8 +42,12 @@ export function FortuneScreen() {
   const searchParams = useSearchParams();
   const filter = fortuneFilterFromKey(searchParams.get("c"));
   const products = productsFor(filter);
-  // 할인쿠폰은 사주에도 적용된다(2026-09-27 사용자 결정 — 아래 ProductCard 주석 참고).
-  const { activeCoupon } = useRooms();
+  // `activeCoupon` — 할인쿠폰은 사주에도 적용된다(2026-09-27 사용자 결정, 아래 ProductCard 주석).
+  //
+  // `authChecked` — 이게 참이 되기 전에는 소개 블록을 **그리지 않는다**. `!user` 를 그냥
+  // 믿으면 이미 로그인한 사람에게도 세션 복원 수백 ms 동안 "로그인하세요" 블록이 번쩍인다
+  // (없어진 `FortuneEntry` 가 같은 이유로 들고 있던 가드를 여기로 옮겼다).
+  const { activeCoupon, user, authChecked } = useRooms();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -59,6 +71,12 @@ export function FortuneScreen() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl px-4 pb-8 pt-4">
+          {authChecked && !user && (
+            <div className="mb-6">
+              <FortunePitch />
+            </div>
+          )}
+
           {/* 칩은 아이콘 없이 글자만이다 — `public/icons/fortune_category_*` 는 메뉴 드로어의
               8줄용이고(설계 §3), 목업의 칩에는 아이콘이 없다.
               누르면 주소가 바뀐다. `replace` 라서 칩을 열 번 눌러도 뒤로가기 한 번이면 나간다. */}
@@ -102,6 +120,14 @@ export function FortuneScreen() {
               아직 준비 중인 카테고리예요.
             </p>
           )}
+
+          {/* 사업자정보. 전자상거래법 제10조①·시행규칙 제7조①의 표시 의무가 **초기 화면**
+              기준이고, 운세 홈은 토글로 갈리는 두 초기 화면 중 하나다. 소개 화면이 들고 있던
+              것을 그대로 옮겨 왔다 — **비로그인에게도 보여야 하므로 로그인 분기 밖에 둔다**
+              (`TarotScreen` 이 같은 이유로 `user` 블록 밖에 두는 것과 같다). */}
+          <div className="mt-8">
+            <MainCompanyInfo />
+          </div>
         </div>
       </div>
     </div>
