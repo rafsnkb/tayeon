@@ -47,6 +47,20 @@ const SLUGS = [
 
 fs.mkdirSync(OUT, { recursive: true });
 
+// 원본이 **전부 있는지 먼저 본다**(2026-09-26). 전에는 없는 파일을 만나면 sharp 가 그 자리에서
+// 예외를 던지고 스크립트가 멈췄다 — 19개 중 15번째가 없으면 앞 14개만 구워진 채로 끝나고,
+// 무엇이 빠졌는지는 그 한 개만 알려 줬다. 새 상품 그림을 여러 장 받는 상황에서 제일 나쁜
+// 모양이다(한 장 받아서 돌리고 또 멈추고를 반복하게 된다).
+//
+// 아무것도 굽기 전에 **빠진 것을 한 번에** 알려주고 멈춘다. 절반만 구운 `public/fortune/` 을
+// 남기지 않는 것도 목적이다 — 그 상태로 커밋되면 화면에서 몇 장만 자리표로 뜬다.
+const absent = SLUGS.filter((slug) => !fs.existsSync(`${SRC_DIR}/fortune_prizeimage_${slug}.png`));
+if (absent.length > 0) {
+  console.error(`원본이 없는 슬러그 ${absent.length}개 — ${SRC_DIR}/ 에 받아 두고 다시 돌릴 것:`);
+  for (const slug of absent) console.error(`  fortune_prizeimage_${slug}.png`);
+  process.exit(1);
+}
+
 (async () => {
   let hero = 0;
   let card = 0;
