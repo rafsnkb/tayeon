@@ -6,6 +6,7 @@ import { SearchIcon } from "@/app/(app)/tarot/icons";
 import ModalShell, { ModalButton } from "@/components/ModalShell";
 import { BIRTH_YEAR_MIN, dayCount, monthChoices, toBirthDate } from "@/lib/tarot/birthWheel";
 import type { CalendarMode } from "@/lib/tarot/birthInfo";
+import { SlidingSegments } from "@/components/SlidingSegments";
 
 /* 생년월일시 입력 폼이 쓰는 작은 컨트롤들. 가입(`/signup`)·내 정보(`/me/profile`)·
  * 궁합(`/compatibility`) 세 화면이 거의 같은 폼을 그리는데, 이것들이 **세 곳에 각자 복사**돼
@@ -33,25 +34,37 @@ export function ToggleGroup<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const selected = options.findIndex((opt) => opt.value === value);
+
   return (
-    <div className="flex gap-2 pt-2">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`h-12 flex-1 rounded-2xl text-lg font-semibold ${
-            value === opt.value
-              ? "border border-point-strong bg-point text-white"
-              : // 고르지 않은 쪽은 연한 면이다(목업 MyProfile_*, 2026-09-25 실측: 라이트
-                // #e7e2e1 = --chip-soft 정확히 일치). 예전엔 --chip-fill(라이트에서 진한
-                // 회색) 위에 흰 글자라, 밝은 카드 위에 검은 버튼이 얹힌 꼴이었다.
-                "bg-chip-soft text-chip-soft-text"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div className="pt-2">
+      {/* 트랙이 없는 세그먼트다 — 칸이 `gap-2` 로 벌어져 있어서, 알약은 그 **간격을 건너뛰며**
+          미끄러진다(`SlidingSegments` 가 gap 을 계산에 넣는다). 고르지 않은 칸은 연한 면을
+          그대로 깔아 두고(목업 MyProfile_*, 라이트 #e7e2e1 = --chip-soft 정확히 일치) 그 위로
+          알약이 지나간다. 예전엔 --chip-fill(라이트에서 진한 회색) 위에 흰 글자라, 밝은 카드
+          위에 검은 버튼이 얹힌 꼴이었다. */}
+      <SlidingSegments
+        count={options.length}
+        index={selected}
+        gap={8}
+        className="flex gap-2"
+        indicatorClassName="rounded-2xl border border-point-strong bg-point"
+      >
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            // 선택된 칸에 배경을 주지 않는다 — 알약이 뒤에 깔려 있어서 배경을 칠하면 그걸 가린다.
+            // `relative` 는 알약(absolute) 위로 글자를 올리기 위한 것이다.
+            className={`relative h-12 flex-1 rounded-2xl text-lg font-semibold transition-colors motion-reduce:transition-none ${
+              value === opt.value ? "text-white" : "bg-chip-soft text-chip-soft-text"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </SlidingSegments>
     </div>
   );
 }
