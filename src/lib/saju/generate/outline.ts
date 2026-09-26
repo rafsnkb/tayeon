@@ -10,6 +10,7 @@
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { anthropic } from "@/lib/anthropic";
 import type { SajuProduct } from "@/lib/saju/products";
+import { SAJU_PERSONAS } from "@/lib/saju/personas";
 import { buildChartBlock, type SajuChart } from "./chart";
 
 /** 사주 상품 텍스트 생성 모델. 원가가 판매가의 2% 수준이라 Haiku 로 아낄 이유가 없고,
@@ -98,16 +99,36 @@ export function buildSystemBlock(product: SajuProduct, chart: SajuChart, today: 
   const personRule = chart.partner
     ? "내담자와 상대방 두 사람의 명반이 모두 있다. 근거를 인용할 때 누구의 것인지 반드시 밝힌다."
     : "이 리포트에는 내담자 한 사람의 명반만 있다. 다른 사람(상대·연인·가족)을 이야기하더라도 그 사람의 명반을 인용하지 말 것 — 그 사람의 명반은 여기 없다. 상대에 대한 서술은 내담자의 명반에서 읽히는 관계 성향으로만 쓴다.";
+  // ⚠️ 2026-09-26 바로잡음. **`personRule` 이 계산만 되고 실제로 프롬프트에 안 들어가고
+  // 있었다** — 아래 return 배열에 줄이 없었다. `needsPartner: false` 상품 다수에서 "없는
+  // 상대 명반을 인용하지 말라"는 안전 규칙이 한 번도 전달된 적이 없었다는 뜻이다. 짝사랑
+  // 리포트가 "상대분의 명반을 보니" 같은 문장을 낼 수 있는 상태였다 — 사용자가 바로 알아채는
+  // 사고다(상대 생년월일을 준 적이 없다). `lint` 의 "정의했는데 안 쓴다" 경고가 계속 알려주고
+  // 있었는데 경고 22개에 묻혀서 아무도 못 봤다.
+
+  // 2026-09-26 바로잡음. **단일 모드에서 자기모순이 있었다** — `modeRule` 이 "자미두수 용어를
+  // 쓰지 말 것"이라 해 놓고 바로 아래 `## 자미두수 중점` 이 궁·주성 이름을 대며 그 체계를 쓰라고
+  // 말했다. 모순된 지시를 받으면 모델이 어느 쪽을 따를지 복불복이라, 사주만 산 사용자가 궁
+  // 이름이 나오는 리포트를 받을 수 있었다 — 그 사용자는 자미두수 값을 안 냈으니 환불 사유다.
+  // 그래서 안 고른 체계의 중점 블록은 아예 안 넣는다(빈 줄로 남기지 않는다 — 있으나 마나 한
+  // 문단이 아니라 "이 체계는 이 리포트에 없다"는 사실 자체를 프롬프트에서 지운다).
+  const sajuFocusBlock = chart.mode !== "ziwei" ? `## 사주 중점\n${product.sajuFocus}` : null;
+  const ziweiFocusBlock = chart.mode !== "saju" ? `## 자미두수 중점\n${product.ziweiFocus}` : null;
+  // `crossPoints` 의 내용은 대부분 모드 중립적인 "무엇을 짚어야 하는가" 우선순위라 단일 모드
+  // 에서도 쓸모가 있다 — 통째로 빼지 않고 **제목만** 모드에 맞춘다. "통합 교차 포인트"라는
+  // 제목은 통합 모드에서만 맞는 말이다(단일 모드엔 교차할 두 번째 체계가 없다).
+  const crossPointsBlock = `## ${chart.mode === "integrated" ? "통합 교차 포인트" : "이 리포트가 짚어야 할 것"}\n${product.crossPoints}`;
 
   return [
     `# 상품: ${product.title}`,
     `목적: ${product.purpose}`,
     "",
+    // `modeRule` 과 `personRule` 은 붙어 있어야 읽힌다 — 둘 다 "이 리포트에 없는 것을 이름
+    // 대고 금지한다"는 같은 종류의 규칙이다(위 personRule 주석 참고).
     `## 분석 모드\n${modeRule}`,
+    `## 등장인물\n${personRule}`,
     "",
-    `## 사주 중점\n${product.sajuFocus}`,
-    `## 자미두수 중점\n${product.ziweiFocus}`,
-    `## 통합 교차 포인트\n${product.crossPoints}`,
+    ...[sajuFocusBlock, ziweiFocusBlock, crossPointsBlock].filter((b) => b !== null),
     // 상품별 해석 제약(기획의 `분석 방식`). 지금은 성향 궁합 하나뿐이지만 안전 제약이라
     // 문체 규칙보다 앞에 둔다 — 뒤쪽 지시가 앞쪽을 덮는 일이 없도록.
     product.constraints ? `## 이 상품의 해석 제약\n${product.constraints}` : "",
@@ -115,9 +136,11 @@ export function buildSystemBlock(product: SajuProduct, chart: SajuChart, today: 
     buildChartBlock(chart, today),
     "",
     "## 문체",
-    // 어미를 기계적으로 금지하면 모델이 금지 목록을 피하려고 해요체를 통째로 버리고 "~한다"
-    // 문어체로 도망간다(§5 주의 2, 해요체 0% 가 실제로 나왔다). "유지하되 굴려라"로 써야 한다.
-    "- 해요체를 유지한다. 같은 종결어미를 연달아 쓰지 말고 해요체 안에서 굴린다.",
+    // 첫 줄은 상품의 페르소나(personas.ts)가 정한다 — 상품마다 목소리가 다르다(2026-09-26
+    // 사용자 결정). 나머지 두 줄은 페르소나와 무관한 품질 규칙이라 고정이다. 페르소나의
+    // `styleDirective` 도 같은 이유로 금지 목록이 아니라 긍정문으로 쓰여 있다 — 어미를
+    // 기계적으로 금지하면 모델이 그 문체를 통째로 버리고 도망간다(§5 주의 2, 해요체 0% 실측).
+    `- ${SAJU_PERSONAS[product.persona].styleDirective}`,
     "- 전문 용어는 근거를 말할 때만 쓰고, 바로 쉬운 말로 풀어 준다.",
     "- 퍼센트나 점수로 일치도를 말하지 않는다. 근거 없는 수치다.",
   ].join("\n");

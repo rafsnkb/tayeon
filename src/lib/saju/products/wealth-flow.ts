@@ -41,4 +41,5 @@ export const WEALTH_FLOW: SajuProduct = {
 
   image: null,
   needsPartner: false,
+  persona: "pragmatic-strategist",
 };

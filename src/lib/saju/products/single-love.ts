@@ -74,4 +74,5 @@ export const SINGLE_LOVE: SajuProduct = {
 
   // 솔로 상품이라 상대의 생년월일시를 받지 않는다. 짝사랑·궁합 상품은 여기가 true 가 된다.
   needsPartner: false,
+  persona: "warm-romantic-friend",
 };

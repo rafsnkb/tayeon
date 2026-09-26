@@ -42,4 +42,5 @@ export const INTIMACY_COMPATIBILITY: SajuProduct = {
 
   image: null,
   needsPartner: true,
+  persona: "warm-playful-flirt",
 };

@@ -38,4 +38,5 @@ export const CAREER_FIT: SajuProduct = {
 
   image: null,
   needsPartner: false,
+  persona: "energetic-coach",
 };

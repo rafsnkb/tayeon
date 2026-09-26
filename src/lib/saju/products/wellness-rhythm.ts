@@ -35,4 +35,5 @@ export const WELLNESS_RHYTHM: SajuProduct = {
 
   image: null,
   needsPartner: false,
+  persona: "gentle-caretaker",
 };

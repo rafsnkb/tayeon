@@ -38,4 +38,5 @@ export const PERSONALITY_COMPATIBILITY: SajuProduct = {
 
   image: null,
   needsPartner: true,
+  persona: "fair-mediator",
 };

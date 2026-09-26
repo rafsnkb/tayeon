@@ -35,4 +35,5 @@ export const SITUATIONSHIP_READING: SajuProduct = {
 
   image: null,
   needsPartner: true,
+  persona: "witty-bestie",
 };

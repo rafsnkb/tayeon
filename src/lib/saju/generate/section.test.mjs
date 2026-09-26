@@ -124,3 +124,70 @@ test("단일 모드의 빈 칸이 첫 문장·어미를 오염시키지 않는�
   assert.equal(echo.firstSentence, "흐름이 열려요.");
   assert.deepEqual(echo.endings, ["열려요", "강해요"]);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 레지스터별 어미(페르소나 초안, 2026-09-26) — 아직 상품에 안 붙었지만 정규식은 여기서 고정한다.
+// 페르소나마다 정규식을 만들지 않고 레지스터 3종(해요체·격식체·반말)으로 묶었다(§5 처방 ①+④).
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("기본값은 해요체다 — register 를 안 넘겨도 지금까지와 같다", () => {
+  const echo = echoOf(section({ summary: "흐름이 좋아요." }));
+  assert.deepEqual(echo.endings, ["좋아요"]);
+});
+
+test("격식체 종결어미를 뽑는다", () => {
+  const echo = echoOf(
+    section({ summary: "흐름이 안정적입니다.", actionGuide: "미리 준비하시길 권합니다." }),
+    "formal-hamnida"
+  );
+  assert.deepEqual(echo.endings, ["적입니다", "권합니다"]);
+});
+
+test("짧은 격식체 어미(합니다·됩니다)도 놓치지 않는다", () => {
+  // {2} 로 고정하면 앞 글자가 하나뿐인 이 흔한 짧은 어미들을 놓친다 — 앵커(`니다`)가 이미
+  // 판별 근거라 앞자리를 늘려도 새 오탐이 생기지 않는다.
+  const echo = echoOf(section({ summary: "이 조합은 잘 맞습니다.", actionGuide: "대화가 필요합니다." }), "formal-hamnida");
+  assert.deepEqual(echo.endings, ["맞습니다", "요합니다"]);
+});
+
+test("문어체·평서문(필요하다·좋다)은 격식체 어미로 잡지 않는다", () => {
+  // 이게 "다 한 글자만 앵커로 쓰면 안 되는" 이유의 회귀 테스트다 — `니다` 두 글자를 요구하지
+  // 않으면 이 평서문들이 격식체로 잘못 잡힌다.
+  const echo = echoOf(
+    section({ summary: "지금은 대화가 필요하다.", actionGuide: "그 편이 좋다." }),
+    "formal-hamnida"
+  );
+  assert.deepEqual(echo.endings, []);
+});
+
+test("격식체가 없으면 빈 배열이다", () => {
+  const echo = echoOf(section({ summary: "흐름이 열려요.", actionGuide: "먼저 연락해 보세요." }), "formal-hamnida");
+  assert.deepEqual(echo.endings, []);
+});
+
+test("반말 종결어미를 뽑는다", () => {
+  const echo = echoOf(
+    section({ summary: "이건 진심이 아니거든.", actionGuide: "먼저 연락해 보는 게 낫잖아." }),
+    "banmal"
+  );
+  assert.deepEqual(echo.endings, ["아니거든", "낫잖아"]);
+});
+
+test("반말 앵커(거든·잖아·더라)는 앞 두 글자까지 문맥으로 담는다", () => {
+  // 격식체와 같은 이유로 {0,2} 다 — 앵커 자체가 판별 근거라 앞자리를 늘려도 새 오탐이 없다.
+  const echo = echoOf(section({ summary: "그렇거든.", actionGuide: "예뻤더라." }), "banmal");
+  assert.deepEqual(echo.endings, ["그렇거든", "예뻤더라"]);
+});
+
+test("한 글자짜리 반말 어미(야·지·네)는 의도적으로 안 잡는다", () => {
+  // "편지." 처럼 그 글자로 끝나는 일반 명사와 구분이 안 돼서 뺐다(위 ENDING_PATTERNS 주석).
+  // 이 테스트는 "버그"가 아니라 **계약**이다 — 나중에 누가 반말 어미를 넓히다가 이 명사
+  // 충돌을 다시 만들지 않도록 박아 둔다.
+  const echo = echoOf(section({ summary: "오늘 편지를 받았지.", actionGuide: "기분 좋네." }), "banmal");
+  assert.deepEqual(echo.endings, []);
+});
+
+test("반말이 없으면 빈 배열이다", () => {
+  const echo = echoOf(section({ summary: "흐름이 좋아요." }), "banmal");
+  assert.deepEqual(echo.endings, []);
+});

@@ -21,6 +21,7 @@
 //    뒤 페이지가 전부 막힌다 — §7 「실패한 페이지도 문서로 남긴다」 참고.
 import { notifyOwner } from "@/lib/notify/owner";
 import { getSajuProduct } from "@/lib/saju/products";
+import { SAJU_PERSONAS } from "@/lib/saju/personas";
 import { echoOf, generateSection, type SectionEcho } from "@/lib/saju/generate/section";
 import { generateClosing } from "@/lib/saju/generate/closing";
 import type { SajuClosing } from "@/lib/saju/generate/closing";
@@ -29,6 +30,7 @@ import { putSajuImageBytes, sajuImageUrl } from "@/lib/saju/imageStore";
 import {
   getSajuReading,
   getSajuReadingWithPages,
+  isSajuReadingExpired,
   pageGateReason,
   saveSajuClosing,
   saveSajuImage,
@@ -76,7 +78,9 @@ export type ProduceClosingResult =
   /** 섹션이 **전부** 실패 자리표다. 받아 쓸 결론이 하나도 없다. */
   | { outcome: "all_sections_failed" }
   /** 상품이 레지스트리에서 빠졌다. 총평도 상품의 문체 규칙 위에서 쓰이므로 만들 수 없다. */
-  | { outcome: "product_gone" };
+  | { outcome: "product_gone" }
+  /** 환불됐거나 보관 기간이 지난 건이다. 저장된 건 계속 읽히지만 **새로 만들지 않는다.** */
+  | { outcome: "not_producible" };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 진행 중인 생성 공유
@@ -100,6 +104,21 @@ function share<T>(key: string, start: () => Promise<T>): Promise<T> {
   });
   inFlight.set(key, started);
   return started;
+}
+
+/**
+ * **더 만들면 안 되는 건인가.** 환불됐거나 보관 기간이 지난 리포트다.
+ *
+ * 페이지 생성은 `pageGateReason` 이 이미 막는데, **총평과 이미지는 그 게이트를 안 거친다.**
+ * 그래서 이미지를 쓰는 상품의 만료·환불된 리포트를 **열기만 해도** 총평(약 20원)과
+ * 이미지(8원)가 실제로 만들어졌다. 화면이 안 보여준다고 돈이 안 나가는 게 아니다 —
+ * 화면 쪽 가드는 다른 클라이언트나 직접 호출로 우회된다.
+ *
+ * 판정은 `storage.ts` 의 것을 그대로 쓴다. 깨진 `expiresAt` 을 만료로 보지 않는 규칙까지
+ * 거기 있으므로 여기서 날짜 비교를 다시 쓰면 그 규칙이 갈라진다.
+ */
+function mustNotProduce(reading: Pick<SajuReading, "status" | "expiresAt">): boolean {
+  return reading.status === "failed" || isSajuReadingExpired(reading);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,13 +178,20 @@ async function runPage(args: {
   const product = getSajuProduct(reading.productSlug);
   if (!product) return { outcome: "product_gone" };
 
+  // 이 상품의 페르소나가 어떤 문체로 끝맺는가(personas.ts). `echoOf`(반복 방지 추출)와
+  // `generateSection`(반복 방지 지시문) 양쪽에 같은 값을 넘겨야 한다 — 둘이 다른 레지스터를
+  // 보면 추출은 한 문체로, 지시는 다른 문체로 나가는 모순이 생긴다.
+  const endingRegister = SAJU_PERSONAS[product.persona].endingRegister;
+
   // 앞 섹션이 **실제로 쓴 것**만 넘긴다(§5). 실패 자리표는 쓴 게 없으므로 빼야 한다 —
   // 넣으면 `echoOf` 가 없는 본문을 읽는다.
   const written: SectionEcho[] = pages
     .filter((p): p is Extract<SajuReadingPage, { kind: "section" }> => p.kind === "section")
     .sort((a, b) => a.pageNumber - b.pageNumber)
     .filter((p) => p.pageNumber < pageNumber)
-    .map(echoOf);
+    // `.map(echoOf)` 로 직접 넘기면 안 된다 — `Array.prototype.map` 이 두 번째 인자로 넘기는
+    // 인덱스(number)가 `echoOf` 의 `register`(`SajuEndingRegister`) 자리에 들어간다.
+    .map((p) => echoOf(p, endingRegister));
 
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= SECTION_MAX_ATTEMPTS; attempt += 1) {
@@ -178,6 +204,7 @@ async function runPage(args: {
         written,
         userInput: reading.userInput,
         today: new Date(),
+        endingRegister,
       });
       const saved = await saveSajuPage({ uid, id, pageNumber, section });
       // `exists` 면 그 사이 다른 경로가 먼저 저장했다는 뜻이다. 저장된 쪽이 이긴다.
@@ -238,7 +265,9 @@ async function runClosing(args: { uid: string; id: string }): Promise<ProduceClo
   if (!loaded) return { outcome: "not_found" };
   const { reading, pages } = loaded;
 
+  // 이미 만든 총평은 계속 돌려준다 — 읽는 것은 막지 않는다. 막는 건 **새로 만드는 것**이다.
   if (reading.closing) return { outcome: "ready", closing: reading.closing };
+  if (mustNotProduce(reading)) return { outcome: "not_producible" };
 
   const total = reading.outline.sections.length;
   // 실패 자리표도 "끝난 것"으로 센다. 3회까지 실패한 섹션은 다시 시도하지 않기로 했으므로
@@ -294,7 +323,9 @@ export type ProduceImageResult =
   | { outcome: "ready"; image: SajuReadingImage }
   | { outcome: "not_found" }
   /** 이미지를 지원하지 않는 상품이다(19개 중 3개만 지원). */
-  | { outcome: "unsupported" };
+  | { outcome: "unsupported" }
+  /** 환불됐거나 보관 기간이 지난 건이다. 다시 그리지 않는다. */
+  | { outcome: "not_producible" };
 
 /**
  * 이미지를 만들어 저장한다. **부를 때마다 새로 그린다** — 다시 뽑기가 기능이기 때문이다(§8,
@@ -313,6 +344,8 @@ async function runImage(args: { uid: string; id: string }): Promise<ProduceImage
 
   const reading = await getSajuReading(uid, id);
   if (!reading) return { outcome: "not_found" };
+
+  if (mustNotProduce(reading)) return { outcome: "not_producible" };
 
   const product = getSajuProduct(reading.productSlug);
   if (!product?.image) return { outcome: "unsupported" };

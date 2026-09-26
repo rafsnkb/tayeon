@@ -35,4 +35,5 @@ export const REUNION_READING: SajuProduct = {
 
   image: null,
   needsPartner: true,
+  persona: "honest-confidante",
 };

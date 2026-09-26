@@ -35,4 +35,5 @@ export const COUPLE_COMPATIBILITY: SajuProduct = {
 
   image: null,
   needsPartner: true,
+  persona: "warm-romantic-friend",
 };

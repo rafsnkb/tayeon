@@ -14,6 +14,7 @@
 // 근거가 없었다 — 청소년보호법의 「청소년유해매체물」은 심의기관이 결정·고시한 것만이고 해당이
 // 없다. 실제 이유는 설계 §1 의 "카드사 심사 중 결제 상품 목록 변경 리스크"였고 그 전제가 없어졌다.
 // 대신 성인 전용으로 읽히던 문구를 그 두 파일에서 함께 고쳤다.
+import type { SajuPersonaKey } from "@/lib/saju/personas";
 import { NEW_YEAR_FORTUNE } from "./new-year-fortune";
 import { LIFE_OVERVIEW } from "./life-overview";
 import { SINGLE_LOVE } from "./single-love";
@@ -77,6 +78,9 @@ export type SajuProduct = {
   /** 이미지 지원 상품(솔로·결혼 시기·자녀)만 값을 갖는다. 나머지는 null(기획 4행 44). */
   image: null | { subject: string; elements: string[] };
   needsPartner: boolean;
+  /** 이 상품의 목소리(`src/lib/saju/personas.ts`). 상품이 태어날 때부터 갖는 것이라 사용자가
+   *  고르지 않는다 — 이 상품을 사면 이 목소리로만 나온다(2026-09-26 사용자 결정). */
+  persona: SajuPersonaKey;
   /** 이 상품에만 붙는 해석 제약. 기획이 상품 블록에 `분석 방식` 으로 적어 둔 문장이 여기 온다.
    *  지금은 성향 궁합 하나뿐인데(별도 테스트를 제공하지 않고 성향을 추정해 해석하며, 실제
    *  선호·경계는 당사자 간 대화로 확인해야 한다), **모델에게 반드시 전달돼야 하는 안전 제약**이라

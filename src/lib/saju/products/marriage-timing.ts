@@ -44,4 +44,5 @@ export const MARRIAGE_TIMING: SajuProduct = {
     elements: ["배우자상", "안정감", "관계의 분위기", "화풍"],
   },
   needsPartner: false,
+  persona: "warm-romantic-friend",
 };

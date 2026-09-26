@@ -50,4 +50,5 @@ export const FAMILY_PLANNING: SajuProduct = {
     elements: ["가족의 정서", "돌봄 방식", "생활 장면", "화풍"],
   },
   needsPartner: true,
+  persona: "gentle-caretaker",
 };

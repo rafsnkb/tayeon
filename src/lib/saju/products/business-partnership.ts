@@ -38,4 +38,5 @@ export const BUSINESS_PARTNERSHIP: SajuProduct = {
 
   image: null,
   needsPartner: true,
+  persona: "pragmatic-strategist",
 };

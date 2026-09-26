@@ -9,6 +9,7 @@
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { anthropic } from "@/lib/anthropic";
 import type { SajuProduct } from "@/lib/saju/products";
+import type { SajuEndingRegister } from "@/lib/saju/personas";
 import type { SajuChart } from "./chart";
 import { SAJU_TEXT_MODEL, buildSystemBlock, type SajuOutline } from "./outline";
 
@@ -78,8 +79,12 @@ export async function generateSection(args: {
   written: SectionEcho[];
   userInput: string;
   today: Date;
+  /** 이 상품의 페르소나가 어떤 문체로 끝맺는가(`personas.ts`). 호출자(`produce.ts`)가
+   *  `SAJU_PERSONAS[product.persona].endingRegister` 를 조회해 넘긴다. 기본값(해요체)은
+   *  이 인자를 안 넘기는 다른 호출자(테스트 등)를 위한 것이지, 실제 배선을 위한 값이 아니다. */
+  endingRegister?: SajuEndingRegister;
 }): Promise<SajuSection> {
-  const { product, chart, outline, index, written, userInput, today } = args;
+  const { product, chart, outline, index, written, userInput, today, endingRegister = "formal-yo" } = args;
   const plan = outline.sections[index];
   const defined = product.sections[index];
   if (!plan || !defined) throw new Error(`SECTION_OUT_OF_RANGE:${index}`);
@@ -89,13 +94,15 @@ export async function generateSection(args: {
   const alreadyWritten = written.length
     ? [
         "## 앞에서 이미 쓴 것 (되풀이하지 말 것)",
-        ...written.map(
-          (w, i) => `${i + 1}. ${w.title} — "${w.firstSentence}" (쓴 어미: ${w.endings.join(", ")})`
-        ),
+        ...written.map((w, i) => {
+          // 이 섹션에서 어미가 하나도 안 잡혔으면 안전망 문구로 대신한다 — "(쓴 어미: )"처럼
+          // 빈 목록을 그대로 보여주면 모델이 "이 섹션은 어미가 없었다"로 읽어 아무 도움도
+          // 안 된다.
+          const endingNote = w.endings.length ? `쓴 어미: ${w.endings.join(", ")}` : GENERIC_VARIETY_HINT;
+          return `${i + 1}. ${w.title} — "${w.firstSentence}" (${endingNote})`;
+        }),
         "",
-        // 어미를 **금지 목록**으로 주면 모델이 목록을 피하려고 해요체를 통째로 버리고 문어체로
-        // 도망간다(§5 주의 2, 실측에서 해요체 0% 가 나왔다). 그래서 "피하라"가 아니라 "굴려라"다.
-        "위에 쓴 종결어미가 또 나오지 않게 **해요체 안에서** 다르게 굴려 주세요. 해요체를 벗어나지는 마세요.",
+        VARY_WITHIN_REGISTER[endingRegister],
       ].join("\n")
     : "";
 
@@ -155,12 +162,58 @@ export async function generateSection(args: {
   };
 }
 
-/** 다음 섹션에게 넘길 요약을 만든다. 전문이 아니라 제목·첫 문장·종결어미만 간다. */
-export function echoOf(section: SajuSection): SectionEcho {
+/**
+ * 레지스터별 종결어미 정규식. 페르소나(`personas.ts`, 10종)마다 만들지 않고
+ * **레지스터 셋 3개**로 묶었다 — 페르소나가 늘어도 정규식은 늘지 않는다.
+ *
+ * 전부 "좁게 잡는다"는 같은 원칙이다. 놓친 어미는 `echoOf` 호출자 쪽의 일반 안내
+ * ("표현을 다양하게 굴려 주세요" 식)가 안전망으로 받고(§5 처방 ④), 잘못 넓혀서 명사를 어미로
+ * 잡는 것보다 그쪽이 낫다 — 없는 어미를 "피하라"고 모델에게 거짓 정보를 주는 게 더 나쁘다.
+ *
+ * - `formal-yo`(해요체): 기존 그대로 — `[가-힣]{2}요`. 실측으로 이미 검증됨(§5, 46%→70%).
+ * - `formal-hamnida`(격식체): 앵커가 `다` 한 글자가 아니라 **`니다` 두 글자**다. `다` 한 글자만
+ *   쓰면 "필요하다"·"좋다"처럼 문어체·평서문(격식체가 아니다)까지 격식체 어미로 잘못 잡는다.
+ *   `니다`는 합쇼체 종결(`합니다`·`습니다`·`됩니다`)에서만 나와서 안전하다. 앞자리는 `{0,2}`로
+ *   느슨하게 뒀다 — `{2}`로 고정하면 "합니다."·"됩니다." 처럼 앞 글자가 하나뿐인 흔한 짧은
+ *   어미까지 놓친다(앵커 `니다` 자체가 판별 근거라 앞자리를 늘려도 새 오탐이 생기지 않는다).
+ * - `banmal`(반말): 가장 좁게 잡았다. `거든`·`잖아`·`더라` **세 개만** 앵커로 쓴다. 한 글자짜리
+ *   어미(`야`·`지`·`네`)는 그 글자로 끝나는 일반 명사와 구분이 안 된다 — "편지."가 `지`로 끝나는
+ *   반말 어미로 잘못 잡히는 식이다(§5 "형태소 분석까지 갈 일이 아니다"의 반대 극단). `~야.`·
+ *   `~어.` 같은 흔한 반말 어미를 놓치는 대가를 감수한다 — 19개 중 8개가 반말 페르소나다
+ *   (`witty-bestie`·`warm-romantic-friend`·`honest-confidante`·`fair-mediator`). 실호출
+ *   데이터가 쌓이면 이 표가 충분히 넓은지 다시 볼 것.
+ */
+const ENDING_PATTERNS: Record<SajuEndingRegister, RegExp> = {
+  "formal-yo": /[가-힣]{2}요[.!?]/g,
+  "formal-hamnida": /[가-힣]{0,2}니다[.!?]/g,
+  banmal: /[가-힣]{0,2}(?:거든|잖아|더라)[.!?]/g,
+};
+
+/** "어미를 유지하되 그 안에서 굴려라" 지시문, 레지스터별. 금지 목록이 아니라 유지+변주로
+ *  쓴다 — 안 그러면 모델이 그 레지스터를 통째로 버리고 도망간다(§5 주의 2, 해요체 0% 실측). */
+const VARY_WITHIN_REGISTER: Record<SajuEndingRegister, string> = {
+  "formal-yo": "위에 쓴 종결어미가 또 나오지 않게 **해요체 안에서** 다르게 굴려 주세요. 해요체를 벗어나지는 마세요.",
+  "formal-hamnida":
+    "위에 쓴 종결어미가 또 나오지 않게 **격식체(~합니다) 안에서** 다르게 굴려 주세요. 격식체를 벗어나지는 마세요.",
+  banmal: "위에 쓴 종결어미가 또 나오지 않게 **반말 안에서** 다르게 굴려 주세요. 반말을 벗어나지는 마세요.",
+};
+
+/** 앞 섹션에서 어미가 하나도 안 잡혔을 때 쓰는 안전망. `ENDING_PATTERNS` 가 좁아서 못 잡은
+ *  것일 수도, 실제로 그 섹션이 아무 종결어미도 안 썼을 수도 있다 — 어느 쪽이든 "다양하게
+ *  쓰라"는 일반 지시는 안전하다. 구체적 어미 목록을 보여준 것만큼 효과가 있다는 근거는 없다
+ *  (§5 가 측정한 건 구체적 어미를 보여준 효과이지 일반 지시의 효과가 아니다) — 그래도 아무
+ *  지시가 없는 것보다는 낫다. */
+const GENERIC_VARIETY_HINT = "표현이 단조롭지 않게 문장 끝을 다양하게 써 주세요.";
+
+/** 다음 섹션에게 넘길 요약을 만든다. 전문이 아니라 제목·첫 문장·종결어미만 간다.
+ *
+ *  `register` 는 이 상품의 페르소나가 어떤 문체로 끝맺는지다(`personas.ts` 의
+ *  `SajuPersona.endingRegister`). **`produce.ts` 가 실제로 넘긴다** — 기본값 `formal-yo` 는
+ *  이제 테스트 편의용일 뿐이고, 생성 경로는 이 인자를 빼놓지 않는다. 기본값에 기대는 새
+ *  호출부를 만들지 말 것: 반말·격식체 상품 10개에서 조용히 해요체 정규식이 돌게 된다. */
+export function echoOf(section: SajuSection, register: SajuEndingRegister = "formal-yo"): SectionEcho {
   const body = `${section.summary} ${section.sajuBasis} ${section.ziweiBasis} ${section.actionGuide}`;
   const firstSentence = section.summary.split(/(?<=[.!?])\s/)[0] ?? section.summary;
-  // 해요체 종결어미만 센다. 문장 끝의 `…요.` 앞 두 글자를 어미로 본다 — 형태소 분석까지 갈 일이
-  // 아니고, 목적이 "같은 어미가 반복되는가"를 모델에게 보여주는 것뿐이다.
-  const endings = [...new Set((body.match(/[가-힣]{2}요[.!?]/g) ?? []).map((m) => m.slice(0, -1)))];
+  const endings = [...new Set((body.match(ENDING_PATTERNS[register]) ?? []).map((m) => m.slice(0, -1)))];
   return { title: section.title, firstSentence, endings: endings.slice(0, 6) };
 }

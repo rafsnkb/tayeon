@@ -36,4 +36,5 @@ export const RELATIONSHIP_DESTINY: SajuProduct = {
 
   image: null,
   needsPartner: false,
+  persona: "calm-mentor",
 };
