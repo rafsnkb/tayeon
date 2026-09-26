@@ -525,7 +525,7 @@ export async function POST(req: NextRequest) {
        *   때까지 기다렸다가, 마커면 떼어 내고 그 뒤부터 흘린다.
        * - 꼬리: [SUMMARY]/[TOPIC]/[SUGGESTIONS] 는 서버만 쓰는 블록이다. 마커 최대 길이만큼 항상
        *   남겨 두고(마커가 청크 경계에서 잘려도 새어 나가지 않는다), 마커가 보이면 그 앞에서 멈춘다. */
-      async function generate(push: (text: string) => void) {
+      async function generate(push: (text: string) => void, attemptNo: number) {
         const HEAD_HOLD = Math.max(NO_CHARGE_MARKER.length, GUIDANCE_MARKER.length);
         const TAIL_HOLD = Math.max(
           HISTORY_SUMMARY_MARKER.length,
@@ -591,6 +591,9 @@ export async function POST(req: NextRequest) {
           weekday: part("weekday"), hour: Number(part("hour")),
           gender: userData?.birthInfo?.gender ?? "unknown",
           birthYear: typeof userData?.birthInfo?.birthDate === "string" ? Number(userData.birthInfo.birthDate.slice(0, 4)) : null,
+          // 재시도가 있으면 한 리딩이 이벤트를 2개 남긴다 — 몇 번째 시도였는지 없으면 토큰 합계가
+          // "리딩 수 × 평균"으로 읽히지 않는다. 사용자가 실제로 받은 쪽은 아래 final:true 로 표시한다.
+          spread, attempt: attemptNo, verdict: null, final: false,
         });
 
         const rawInterpretation = raw;
@@ -719,7 +722,20 @@ export async function POST(req: NextRequest) {
             ? (rawTopic as (typeof TOPIC_CATEGORIES)[number])
             : "기타"
           : null;
-        await usageEventRef.update({ topic });
+        // 무과금 판정의 근거를 그대로 남긴다(2026-09-26). 전수 집계에서 무과금이 25.7%(241건 중
+        // 62건)로 나왔는데, 그 대부분이 어뷰즈도 안내도 아닌 "안전망이 리딩이 아니라고 본" 경우였고
+        // 어느 검사에서 걸렸는지가 문서에 안 남아 있어 사후 분류가 불가능했다. markerRaw 는 모델이
+        // 실제로 박은 마커, abuseConfirmed 는 그게 키워드 게이트(looksLikeInjection)를 통과해
+        // 어뷰즈로 확정된 것 — 게이트가 얼마나 강등시키는지 세려면 둘이 따로 있어야 한다.
+        const verdict = {
+          attempt: attemptNo,
+          cardsOk, sajuOk, ziweiOk,
+          drawnCardCount: drawnCards.length,
+          mentionedDrawnCardCount,
+          markerRaw: markedNoCharge ? "no_charge" : markedGuidance ? "guidance" : null,
+          abuseConfirmed,
+        };
+        await usageEventRef.update({ topic, verdict });
         const suggestions =
           cardsOk && suggestionsIdx !== -1
             ? afterTopic
@@ -740,6 +756,8 @@ export async function POST(req: NextRequest) {
           ziweiOk,
           markedNoCharge: abuseConfirmed,
           markedGuidance: markedGuidance || (markedNoCharge && !abuseConfirmed),
+          verdict,
+          usageEventRef,
         };
       }
 
@@ -761,12 +779,12 @@ export async function POST(req: NextRequest) {
       // 끝나야 알 수 있고, 그때는 이미 사용자가 읽고 있다. 그래서 **드러내 놓고** 다시 만든다:
       // 한 번 더 생성하되 그건 흘려보내지 않고, **다시 만든 쪽이 온전할 때만** 교체 이벤트를 보낸다.
       // 재시도가 더 나빠지면 처음 것을 그대로 둔다 — 멀쩡한 답을 망가진 답으로 바꾸지 않기 위해서다.
-      let attempt = await generate(pushText);
+      let attempt = await generate(pushText, 1);
       const structurallyBroken = (a: typeof attempt) =>
         !a.markedNoCharge && !a.markedGuidance && !(a.cardsOk && a.sajuOk && a.ziweiOk);
       if (structurallyBroken(attempt)) {
         send({ t: "redo" });
-        const retry = await generate(() => {});
+        const retry = await generate(() => {}, 2);
         if (!structurallyBroken(retry)) {
           attempt = retry;
           send({ t: "replace", v: retry.interpretation });
@@ -789,14 +807,28 @@ export async function POST(req: NextRequest) {
       const sajuFree = Boolean(cardsOk && includeSaju && !attempt.sajuOk);
       const ziweiFree = Boolean(cardsOk && includeZiwei && !attempt.ziweiOk);
 
-      const cards = cardsOk
-        ? drawnCards.map((d) => ({
-            id: d.card.id,
-            nameKo: d.card.nameKo,
-            nameEn: d.card.nameEn,
-            reversed: d.reversed,
-          }))
-        : [];
+      // 실제로 뽑힌 카드는 무과금이어도 남긴다(2026-09-26). cards 는 "사용자에게 리딩으로 제공된
+      // 카드"라 무과금이면 비어야 하는데(히스토리·이용내역이 그 의미로 읽는다), 그 결과 안전망이
+      // 리딩을 버린 경우 "무슨 카드가 뽑혔는데 답변이 그걸 안 짚었나"를 확인할 증거가 통째로
+      // 사라졌다 — 오탐인지 모델 실수인지 구분이 안 됐다. 그래서 진단용으로 따로 둔다.
+      const drawnCardsSnapshot = drawnCards.map((d) => ({
+        id: d.card.id,
+        nameKo: d.card.nameKo,
+        nameEn: d.card.nameEn,
+        reversed: d.reversed,
+      }));
+      const cards = cardsOk ? drawnCardsSnapshot : [];
+
+      // 사용자가 실제로 받은 쪽 이벤트에만 최종 결과를 붙인다(재시도가 있으면 이벤트가 2개다).
+      // 순수 계측이라 실패해도 리딩을 망치지 않게 삼킨다 — 여기서 던지면 토큰은 이미 썼는데
+      // 차감 트랜잭션 전에 리딩이 버려진다.
+      await attempt.usageEventRef
+        .update({
+          final: true,
+          charged: cardsOk,
+          outcome: cardsOk ? "charged" : flaggedForAbuse ? "abuse" : guidanceOnly ? "guidance" : "slip",
+        })
+        .catch(() => {});
 
       const now = new Date().toISOString();
 
@@ -819,6 +851,9 @@ export async function POST(req: NextRequest) {
         cost: 0,
         countPassId: chargedPassId,
         cards,
+        // 진단용(위 drawnCardsSnapshot 주석 참고). cards 와 달리 무과금이어도 채워진다.
+        drawnCards: drawnCardsSnapshot,
+        verdict: attempt.verdict,
         includeSaju: sajuCharged,
         includeZiwei: ziweiCharged,
         includeCompatibility: compatibilityCharged,
