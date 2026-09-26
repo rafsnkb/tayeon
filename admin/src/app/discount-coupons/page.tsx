@@ -60,6 +60,8 @@ export default function DiscountCouponsPage() {
    *  최종 판정은 어디까지나 발급 트랜잭션이 한다 — 여기 표시는 미리 알려 주는 것뿐이다. */
   const [codeTaken, setCodeTaken] = useState(false);
   const [generating, setGenerating] = useState(false);
+  /** 방금 복사한 코드. 목록이 여러 줄이라 "복사됨"이 어느 줄 것인지 분간돼야 한다. */
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [discountPercent, setDiscountPercent] = useState("30");
   const [startsAt, setStartsAt] = useState("");
@@ -150,6 +152,20 @@ export default function DiscountCouponsPage() {
     });
     const result = await response.json().catch(() => ({}));
     if (response.ok) setCodeTaken(Boolean(result.taken));
+  }
+
+  /** 코드를 클립보드로. 배포는 이 코드를 SNS 글에 붙여 넣는 일이라 손으로 옮겨 적을 이유가 없다.
+   *
+   *  navigator.clipboard 는 보안 컨텍스트에서만 동작한다(localhost 와 https 는 해당). 그래도
+   *  권한 거부 등으로 실패할 수 있으므로, 조용히 아무 일도 안 일어난 것처럼 두지 않고 알린다. */
+  async function copyCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 2000);
+    } catch {
+      setError("클립보드에 복사하지 못했습니다. 코드를 직접 선택해 복사해주세요.");
+    }
   }
 
   async function toggleDisabled(coupon: Coupon) {
@@ -250,7 +266,17 @@ export default function DiscountCouponsPage() {
                           <p className="font-semibold text-[#44374D]">{coupon.name || "(이름 없음)"}</p>
                           <span className={`rounded-full px-2.5 py-1 text-xs ${STATE_STYLE[coupon.state]}`}>{STATE_LABEL[coupon.state]}</span>
                         </div>
-                        <p className="mt-1 font-mono text-xs tracking-wider text-[#817789]">{coupon.code}</p>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <p className="font-mono text-xs tracking-wider text-[#817789]">{coupon.code}</p>
+                          <button
+                            type="button"
+                            onClick={() => copyCode(coupon.code)}
+                            aria-label={`${coupon.code} 코드 복사`}
+                            className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-[#8D8296] transition hover:bg-[#F2EFF4] hover:text-[#4B3959]"
+                          >
+                            {copiedCode === coupon.code ? "복사됨" : "복사"}
+                          </button>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-semibold text-[#B81D6E]">{coupon.discountPercent}%</p>
