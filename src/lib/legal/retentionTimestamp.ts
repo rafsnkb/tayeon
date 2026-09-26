@@ -15,7 +15,13 @@
 // 정책을 켜도 아무것도 삭제되지 않는다(실제로 paymentArchive.retainUntil이 문자열이라 5년
 // 파기가 동작하지 않고 있었다 — 2026-09-21 수정). 만료 필드는 반드시 이 헬퍼로 만들 것.
 //
-// ── TTL 정책을 콘솔에서 실제로 켜는 절차 (2026-09-26, 확인만 하고 걸지는 않음) ──────────
+// ── TTL 정책을 켜는 절차 (2026-09-26 — 사주 3개까지 **실제로 걸었다**) ──────────────────
+//
+// 현재 ACTIVE 인 정책은 8개다: `sajuReadings`·`pages`·`assets` × `expiresAtTs`,
+// `paymentArchive.retainUntil`, 그리고 `friends`·`rateLimits`·`refundRequests`·`signupGrants`·
+// `supportInquiries` × `expiresAt`. 확인: `gcloud firestore fields ttls list --project=<id>`.
+// 이 헬퍼로 안 만든 만료 필드는 전수 감사했고(2026-09-26) 전부 Timestamp 였다 — 아래 문자열
+// 함정에 걸린 것은 `paymentArchive.retainUntil` 한 건뿐이었고 그건 고쳤다.
 //
 // 이 저장소 전체의 절차다 — 사주 리포트(`expiresAtTs`)만이 아니라 이 헬퍼로 만든 모든 만료
 // 필드(`paymentArchive.retainUntil` 등)에 똑같이 적용된다. 콘솔 접근·정책 적용은 **사용자
