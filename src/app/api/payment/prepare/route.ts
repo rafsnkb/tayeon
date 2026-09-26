@@ -12,6 +12,7 @@ import {
 import { recordSajuOrderIntent } from "@/lib/saju/storage";
 import { getSajuProduct } from "@/lib/saju/products";
 import { isValidPartner, partnerToBirthInfo } from "@/lib/tarot/partner";
+import { whyUnsellable } from "@/lib/saju/generate/chart";
 import { adminDb } from "@/lib/firebase/admin";
 import { COMBOS, isComboKey, isHeldPass } from "@/lib/tarot/pricing";
 import { isValidBirthInfo } from "@/lib/tarot/birthInfo";
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
   // 얼마를 깎을지는 서버가 정한다 — 그쪽을 믿으면 금액을 조작할 수 있다. `couponCode` 는
   // 식별자일 뿐이고, 서버는 이 uid 의 보유분에서 그 코드를 다시 찾아 상태·기간을 직접
   // 검증한 뒤 할인율도 그 문서에서 읽는다(2026-09-27 사용자 결정 — 2장 이상이면 사용자가 고른다).
-  const { productId, combo, useCoupon, couponCode: rawCouponCode, userInput, consent } = (await req.json()) as {
+  const { productId, combo, useCoupon, couponCode: rawCouponCode, userInput, consent, partner: partnerInput } = (await req.json()) as {
     productId?: string;
     combo?: string;
     useCoupon?: boolean;
@@ -79,6 +80,17 @@ export async function POST(req: NextRequest) {
     couponCode?: string;
     /** 사주 리포트 상품에서 사용자가 적어 넣은 사연(상품의 userInputPrompt 에 대한 답). */
     userInput?: string;
+    /** 궁합 상품에서 **이번 구매에 쓸** 상대 정보.
+     *
+     *  저장된 프로필(`users/{uid}.partner`)이 아니라 몸체로 받는 이유: 구매 화면이 상대
+     *  닉네임·생년월일시를 **그 자리에서 고칠 수 있게** 되어 있다(목업 `Fortune_Select_*` 의
+     *  「상대방 닉네임 (변경 가능)」, 「내가 등록한 상대방 프로필 정보를 사용할게요」 체크).
+     *  고친 값은 프로필에 저장되지 않으므로, 여기서 안 받으면 **사용자가 화면에서 본 것과
+     *  다른 사람으로 리포트가 나간다.**
+     *
+     *  당연히 **믿고 쓰지는 않는다** — 아래에서 `isValidBirthInfo` 로 다시 재고, 판매 제약도
+     *  이 값으로 다시 건다. 안 보내면 저장된 프로필로 떨어진다. */
+    partner?: { nickname?: unknown; birthInfo?: unknown };
     /** [필수] 동의 둘 — 이용약관 + 청약철회 제한 안내. 사주 리포트 상품에서만 요구한다.
      *  화면이 보내는 필드명이 `consent` 다(src/app/(app)/fortune/[slug]/FortuneDetailScreen.tsx). */
     consent?: PurchaseConsentInput;
@@ -110,11 +122,21 @@ export async function POST(req: NextRequest) {
     }
     // 상대 스냅샷에는 **닉네임까지** 담는다 — 본문이 상대를 그 이름으로 부르는데, 나중에 프로필
     // 닉네임이 바뀌면 저장된 리포트와 어긋난다(storage.ts 의 SajuPartnerSnapshot 주석).
+    // 몸체로 온 상대 정보가 우선이고, 없으면 저장된 프로필로 떨어진다. 두 경로 모두 **여기서**
+    // 유효성을 다시 잰다 — 화면이 이미 막고 있지만 이 엔드포인트는 직접 두드릴 수 있다.
+    const typedPartner =
+      partnerInput && isValidBirthInfo(partnerInput.birthInfo)
+        ? {
+            nickname:
+              typeof partnerInput.nickname === "string" ? partnerInput.nickname.trim().slice(0, 40) : "",
+            birthInfo: partnerInput.birthInfo,
+          }
+        : null;
     const rawPartner = userData?.partner;
-    const partner = isValidPartner(rawPartner) ? rawPartner : null;
-    const partnerBirthInfo = partner ? partnerToBirthInfo(partner) : null;
+    const saved = isValidPartner(rawPartner) ? rawPartner : null;
+    const savedBirthInfo = saved ? partnerToBirthInfo(saved) : null;
     const partnerSnapshot =
-      partner && partnerBirthInfo ? { nickname: partner.nickname, birthInfo: partnerBirthInfo } : null;
+      typedPartner ?? (saved && savedBirthInfo ? { nickname: saved.nickname, birthInfo: savedBirthInfo } : null);
     const reason = whyNotPurchasable({
       product: sajuProduct,
       mode: product.mode,
@@ -122,6 +144,20 @@ export async function POST(req: NextRequest) {
       hasPartnerBirthInfo: Boolean(partnerSnapshot),
     });
     if (reason) return NextResponse.json({ error: reason, code: "NOT_PURCHASABLE" }, { status: 409 });
+
+    // **상대 쪽에도 같은 제약을 건다.** `whyNotPurchasable` 은 상대 정보가 "있는지"만 보는데,
+    // 상대의 시진이 없으면 상대의 명궁이 통째로 다른 궁으로 가서 리포트가 어긋난다 — 내 쪽과
+    // 똑같은 사고다. 화면은 이미 이 검사를 하고 있고(`FortuneDetailScreen`), 여기 없으면
+    // 그 검사가 화면에만 있는 셈이 된다.
+    if (sajuProduct.needsPartner && partnerSnapshot) {
+      const theirs = whyUnsellable(partnerSnapshot.birthInfo, product.mode);
+      if (theirs) {
+        return NextResponse.json(
+          { error: `상대방 — ${theirs}`, code: "NOT_PURCHASABLE" },
+          { status: 409 }
+        );
+      }
+    }
 
     // [필수] 동의 둘(이용약관·청약철회 제한)은 **결제를 열기 전에** 받아야 하고, 받은 사실이
     // 기록으로 남아야 한다 — 제한을 주장할 때 증명책임이 우리 쪽이다(purchase.ts 의

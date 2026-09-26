@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSajuProduct } from "@/lib/saju/products";
-import { FortuneDetailScreen } from "./FortuneDetailScreen";
+import { FortuneDetail } from "./FortuneDetail";
 
 /** 운세 상품 한 개의 상세·구매 화면(목업 New/`Fortune_Select_Dark`·`_Light`).
  *
@@ -18,5 +18,5 @@ export default async function FortuneProductPage({
   const { slug } = await params;
   const product = getSajuProduct(slug);
   if (!product) notFound();
-  return <FortuneDetailScreen product={product} />;
+  return <FortuneDetail product={product} />;
 }

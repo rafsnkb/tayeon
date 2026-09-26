@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { CompanyFooter } from "@/components/CompanyFooter";
 import { useRooms } from "@/lib/tarot/RoomsContext";
 import type { SajuProduct } from "@/lib/saju/products";
 import { whyUnsellable, type SajuMode } from "@/lib/saju/generate/chart";
@@ -11,6 +12,7 @@ import { SAJU_MODES, whyNotPurchasable } from "@/lib/saju/purchase";
 import { REFUND_NOTICE_VERSION } from "@/lib/saju/noticeVersion";
 import { TERMS_EFFECTIVE_DATE } from "@/lib/legal/content";
 import { ProductHero } from "./ProductHero";
+import { ProductReviews } from "./ProductReviews";
 import { SectionOutline } from "./SectionOutline";
 import { RequiredInputs } from "./RequiredInputs";
 import { PurchaseNotice } from "./PurchaseNotice";
@@ -37,17 +39,24 @@ import type { ConsentKey, FortunePurchaseRequest } from "./purchaseRequest";
  *  보는데, 궁합 상품에서 상대의 시진이 틀리면 상대의 명궁이 통째로 다른 궁으로 가서 리포트가
  *  어긋나는 건 내 쪽과 똑같다 — 목업도 상대 시간칸 아래에 그 경고문을 달아 두었다.
  *
- *  ── 결제는 실행하지 않는다 ─────────────────────────────────────────────────
- *  버튼은 `FortunePurchaseRequest` 를 만들어 `onPurchase` 로 넘길 뿐이고, 이 화면을 여는
- *  `page.tsx` 는 그 콜백을 주지 않는다. 결제 경로는 `src/lib/saju/purchase.ts` 끝의
- *  「결제 확정 경로」 절이 정해진 뒤에 붙는다. */
+ *  ── 결제는 이 파일이 실행하지 않는다 ───────────────────────────────────────
+ *  버튼은 `FortunePurchaseRequest` 를 만들어 `onPurchase` 로 넘길 뿐이다. 실제 네 걸음
+ *  (prepare → 결제창 → complete → 리포트 열기)은 `useFortunePurchase.ts` 에 있고, 둘을 잇는
+ *  것은 `FortuneDetail.tsx` 다(2026-09-27 연결됨).
+ *
+ *  **경계를 유지하려고 갈라 둔 것이다.** 이 화면은 판매 제약·동의·입력을 다루고, 돈이 움직이는
+ *  코드는 한 파일에 모여 있다 — 목업이 바뀌어 이 화면을 다시 그려도 결제 경로는 안 건드린다. */
 export function FortuneDetailScreen({
   product,
   onPurchase,
+  busy = false,
 }: {
   product: SajuProduct;
-  /** 아직 아무도 넘기지 않는다 — 위 머리말 참고. */
   onPurchase?: (request: FortunePurchaseRequest) => void;
+  /** 결제가 진행 중인가. 버튼을 잠그는 데만 쓴다 — 두 번 눌러 결제창이 두 번 뜨는 걸 막는다.
+   *  `useFortunePurchase` 도 자기 쪽에서 한 번 더 막지만(`if (phase) return`), 눌리는 버튼이
+   *  아무 반응도 안 하는 것보다 **잠긴 버튼**이 낫다. */
+  busy?: boolean;
 }) {
   const { myBirthInfo, partner } = useRooms();
 
@@ -117,6 +126,7 @@ export function FortuneDetailScreen({
   }
 
   const canSubmit =
+    !busy &&
     !blockedReason[effectiveMode] &&
     agreedAt.terms !== null &&
     agreedAt.refundLimit !== null &&
@@ -151,6 +161,9 @@ export function FortuneDetailScreen({
       <div className="scroll-gutter-stable flex-1 overflow-visible pt-16 xl:overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl">
           <ProductHero product={product} />
+          {/* 후기는 히어로 바로 아래다(목업 `Fortune_Select_*`) — 상품 설명·목차보다 먼저
+              읽힌다. 후기가 없으면 이 구역은 스스로 사라진다. */}
+          <ProductReviews slug={product.slug} />
           <SectionOutline product={product} />
           <RequiredInputs
             product={product}
@@ -164,6 +177,14 @@ export function FortuneDetailScreen({
             onUserInputChange={setUserInput}
           />
           <PurchaseNotice />
+          {/* 사업자정보. **이 화면이 제13조①의 대상이다** — 전자상거래법 제13조 제1항은
+              "재화등의 거래에 관한 **청약을 받을 목적으로** 표시·광고를 할 때" 상호·대표자
+              성명·주소·전화·이메일·통신판매업 신고번호를 넣으라고 한다. 가격을 걸고 결제
+              버튼을 두는 이 화면이 정확히 그 자리인데 빠져 있었다(2026-09-27 발견).
+              이용권 구입 화면(`/charge`)이 이미 같은 이유로 같은 컴포넌트를 쓴다. */}
+          <div className="px-4 pt-4">
+            <CompanyFooter />
+          </div>
           <ModePanel
             product={product}
             mode={effectiveMode}
