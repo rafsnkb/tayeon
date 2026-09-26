@@ -22,6 +22,7 @@ import { ComboAllowanceList } from "@/components/ComboAllowanceCard";
 import PassArtCard, { PassArtHero } from "@/components/PassArtCard";
 import { REFUND_WINDOW_DAYS } from "@/lib/payment/refundPolicy";
 import SubPageTopBar from "@/components/SubPageTopBar";
+import { SlidingSegments } from "@/components/SlidingSegments";
 import { CompanyFooter } from "@/components/CompanyFooter";
 import { buildPortoneCustomer } from "@/lib/payment/customer";
 import { useRooms } from "@/lib/tarot/RoomsContext";
@@ -40,6 +41,11 @@ type SelectedProduct = { kind: "count"; pkg: CountPackage } | { kind: "time"; pk
 /** `/api/user/discount-coupons` 가 주는 쿠폰함 한 장 — 여기서 쓰는 필드만 뽑아 둔다. */
 type WalletCoupon = { code: string; name: string; discountRate: number; endsAt: string; usable: boolean };
 
+/** 「보유 쿠폰」 카드 한 줄이 쓰는 것. `WalletCoupon` 보다 좁게 잡는 이유는 첫 줄이 쿠폰함
+ *  응답이 아니라 `useRooms().activeCoupon` 에서 올 수도 있어서다 — 그쪽에는 `endsAt`·`usable`
+ *  이 없다. 두 출처를 한 배열에 담으려면 **공통분모**가 타입이어야 한다. */
+type CouponRow = { code: string; name: string; discountRate: number };
+
 /** 목록 카드의 제목·설명. 목업 문구를 그대로 따른다. */
 const timePassName = (minutes: number) => `${minutes}분 무제한 이용권`;
 const timePassCaption = (combo: ComboKey) =>
@@ -52,6 +58,13 @@ const formatWon = (won: number) => `₩${won.toLocaleString("ko-KR")}`;
 const formatWonSuffix = (won: number) => `${won.toLocaleString("ko-KR")}원`;
 
 const TIME_DURATIONS: TimeDuration[] = [15, 30, 60];
+
+/** 하단 탭. 예전엔 JSX 안에 인라인 배열이었는데, 알약 위치를 인덱스로 잡게 되면서 **순서가
+ *  의미를 갖는 값**이 됐다 — 렌더 중에 매번 새로 만들지 않고 밖으로 뺀다. */
+const CHARGE_TABS = [
+  ["count", "횟수제 이용권"],
+  ["time", "시간제 이용권"],
+] as const satisfies readonly (readonly [Tab, string])[];
 
 /** 피그마 "Screen / Buy - Coin"·"Buy - CountPurchase". 포트원 V2 결제창을 직접 호출해 횟수제·
  * 시간제 이용권을 구매한다. 횟수제는 2026-09-18부터 구매 시점에 조합(타로전용/+사주/+자미두수/
@@ -107,12 +120,16 @@ export default function ChargePage() {
       cancelled = true;
     };
   }, [selected, user]);
-  // 고를 게 있을 때만(2장 이상) 픽커를 보여준다. 그 전까지는 `coupon`(서버 기본 선택) 그대로다.
-  const showCouponPicker = (usableCoupons?.length ?? 0) >= 2;
-  const selectedCouponCode = couponCode ?? coupon?.code ?? null;
-  const displayedCoupon = showCouponPicker
-    ? (usableCoupons!.find((c) => c.code === selectedCouponCode) ?? coupon)
-    : coupon;
+  /** 카드에 그릴 줄들. 쿠폰함 조회가 **끝나기 전에도** 한 줄은 그려야 한다 — `coupon`(서버가
+   *  미리 골라 실어 준 가장 유리한 하나)이 진입 시점부터 있어서, 여기서 빈 카드를 먼저 그리면
+   *  화면이 「쿠폰 없음 → 한 장 나타남」으로 한 번 튄다. */
+  const couponRows: CouponRow[] = usableCoupons ?? (coupon ? [coupon] : []);
+  // 서버에 `couponCode` 를 실어 보낼지의 기준. 한 장뿐이면 보낼 게 없다 — 서버가 그 한 장을
+  // 스스로 고르고, 화면이 고른 코드를 얹으면 "무엇을 쓸지"를 클라이언트가 정하는 셈이 된다.
+  const showCouponPicker = couponRows.length >= 2;
+  const selectedCouponCode = couponCode ?? coupon?.code ?? couponRows[0]?.code ?? null;
+  const displayedCoupon =
+    couponRows.find((c) => c.code === selectedCouponCode) ?? coupon;
   const hasBirthTime = hasBirthInfo && !myTimeUnknown;
   const heldCountPass = countPasses.find(
     (pass) => pass.source === "purchase" && HELD_PASS_STATUSES.includes(pass.status)
@@ -329,65 +346,59 @@ export default function ChargePage() {
               끌 수 있어야 하는 이유: 쿠폰은 1 회용인데 자동 적용이라, 3,000 원 상품에 30% 를
               태우면 900 원 깎고 사라진다. 11 만원 상품에 쓸 기회가 없어지는 셈이다.
 
-              실측(scale 3): 카드 폭 378 · 모서리 24 · 높이 80 · 면 --topbar(정확 일치),
-              토글 56x29 · 오른쪽 안쪽 여백 24 · 켜짐 트랙 --point(정확 일치). */}
-          {selected && displayedCoupon && (
+              **여러 장을 보유하면 한 카드에 줄로 쌓인다**(목업 2026-09-27 갱신분). 줄마다 토글이
+              붙지만 **동시에 켜지는 것은 하나뿐**이다 — 중복 사용이 없으므로(2026-09-27 사용자
+              결정) 토글은 "적용/해제"가 아니라 **"이걸로 고른다"**에 가깝다. 그래서 라디오처럼
+              배타로 동작하되, 켜져 있는 줄을 다시 누르면 전부 꺼져 정가로 돌아간다.
+
+              굳이 라디오가 아니라 토글로 그린 이유: 라디오는 "하나는 반드시 골라야 한다"고
+              읽힌다. 여기서는 **아무것도 안 쓰는 선택**이 정당하다(위 3,000원 문단).
+
+              실측(scale 3, Dark·Light 두 벌 동일): 카드 폭 380 · 모서리 24 · 테두리 --border,
+              면 --topbar(정확 일치) · 줄 높이 80 · 줄 사이 구분선 --border,
+              안쪽 여백 왼 24 / 오른 16 · 토글 72x32, 손잡이 24 에 안쪽 4,
+              켜짐 트랙 --point(정확 일치) · 꺼짐 트랙 --chip-soft(라이트 #e7e2e1 정확 일치). */}
+          {selected && couponRows.length > 0 && (
             <section>
               <p className="mb-2 text-base font-bold text-bold-text">보유 쿠폰</p>
-              <div className="flex h-20 items-center justify-between gap-3 rounded-3xl bg-topbar px-6">
-                <span className="truncate text-base font-bold text-bold-text">
-                  {displayedCoupon.name || displayedCoupon.code}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={useCoupon}
-                  aria-label={`${displayedCoupon.name || displayedCoupon.code} 적용`}
-                  onClick={() => setUseCoupon((on) => !on)}
-                  className={`relative h-[29px] w-14 shrink-0 rounded-full transition-colors ${
-                    useCoupon ? "bg-point" : "bg-chip-fill"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-[3px] h-[23px] w-[23px] rounded-full bg-white transition-[left] ${
-                      useCoupon ? "left-[27px]" : "left-[3px]"
-                    }`}
-                  />
-                </button>
-              </div>
-              {/* 2장 이상 보유했을 때만 어느 걸 쓸지 고르게 한다(2026-09-27 사용자 결정). 디자인이
-                  아직 없어서 기존 토큰만으로 최소한으로 그린다 — 시안이 나오면 교체될 자리다. */}
-              {useCoupon && showCouponPicker && (
-                <div className="mt-2 space-y-2 rounded-3xl bg-topbar p-4">
-                  {usableCoupons!.map((c) => {
-                    const isSelected = c.code === selectedCouponCode;
-                    return (
+              <div className="overflow-hidden rounded-3xl border border-border bg-topbar">
+                {couponRows.map((c, i) => {
+                  const on = useCoupon && c.code === selectedCouponCode;
+                  return (
+                    <div
+                      key={c.code}
+                      className={`flex h-20 items-center justify-between gap-3 pl-6 pr-4 ${
+                        i > 0 ? "border-t border-border" : ""
+                      }`}
+                    >
+                      <span className="truncate text-base font-bold text-bold-text">
+                        {c.name || c.code}
+                      </span>
                       <button
-                        key={c.code}
                         type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        onClick={() => setCouponCode(c.code)}
-                        className="flex w-full items-center gap-3 text-left"
+                        role="switch"
+                        aria-checked={on}
+                        aria-label={`${c.name || c.code} 적용`}
+                        onClick={() => {
+                          // 켜진 줄을 다시 누르면 해제(정가), 아니면 그 줄로 갈아탄다.
+                          if (on) return setUseCoupon(false);
+                          setCouponCode(c.code);
+                          setUseCoupon(true);
+                        }}
+                        className={`relative h-8 w-[72px] shrink-0 rounded-full transition-colors ${
+                          on ? "bg-point" : "bg-chip-soft"
+                        }`}
                       >
                         <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-point ${
-                            isSelected ? "" : "bg-transparent"
+                          className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-[left] ${
+                            on ? "left-11" : "left-1"
                           }`}
-                        >
-                          {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-point" />}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-bold-text">
-                          {c.name || c.code}
-                        </span>
-                        <span className="shrink-0 text-sm font-semibold text-icon-muted">
-                          {Math.round(c.discountRate * 100)}%
-                        </span>
+                        />
                       </button>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           )}
 
@@ -475,20 +486,27 @@ export default function ChargePage() {
       </div>
       {!selected && tab === "time" && (
         <div className="pointer-events-none fixed inset-x-0 bottom-24 z-20 flex justify-center px-4">
-          <div className="pointer-events-auto flex w-full max-w-2xl rounded-full bg-chip-soft p-1.5">
+          {/* `padding={6}` 은 트랙의 `p-1.5` 와 같은 값이다 — 어긋나면 알약이 글자에서 밀린다. */}
+          <SlidingSegments
+            count={TIME_DURATIONS.length}
+            index={TIME_DURATIONS.indexOf(timeDuration)}
+            padding={6}
+            className="pointer-events-auto flex w-full max-w-2xl rounded-full bg-chip-soft p-1.5"
+            indicatorClassName="rounded-full bg-point"
+          >
             {TIME_DURATIONS.map((d) => (
               <button
                 key={d}
                 type="button"
                 onClick={() => setTimeDuration(d)}
-                className={`h-9 flex-1 rounded-full text-sm font-bold ${
-                  timeDuration === d ? "bg-point text-white" : "text-placeholder"
+                className={`relative h-9 flex-1 rounded-full text-sm font-bold transition-colors motion-reduce:transition-none ${
+                  timeDuration === d ? "text-white" : "text-placeholder"
                 }`}
               >
                 {d}분
               </button>
             ))}
-          </div>
+          </SlidingSegments>
         </div>
       )}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-topbar p-4">
@@ -527,20 +545,26 @@ export default function ChargePage() {
             </button>
           </div>
         ) : (
-          <div className="mx-auto flex w-full max-w-2xl rounded-full bg-chip-soft p-2">
-            {([["count", "횟수제 이용권"], ["time", "시간제 이용권"]] as const).map(([key, label]) => (
+          <SlidingSegments
+            count={CHARGE_TABS.length}
+            index={CHARGE_TABS.findIndex(([key]) => key === tab)}
+            padding={8}
+            className="mx-auto flex w-full max-w-2xl rounded-full bg-chip-soft p-2"
+            indicatorClassName="rounded-full bg-point"
+          >
+            {CHARGE_TABS.map(([key, label]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setTab(key)}
-                className={`h-10 flex-1 rounded-full text-base font-bold ${
-                  tab === key ? "bg-point text-white" : "text-placeholder"
+                className={`relative h-10 flex-1 rounded-full text-base font-bold transition-colors motion-reduce:transition-none ${
+                  tab === key ? "text-white" : "text-placeholder"
                 }`}
               >
                 {label}
               </button>
             ))}
-          </div>
+          </SlidingSegments>
         )}
       </div>
       {noBirthTimeOpen && <NoBirthTimePopup onClose={() => setNoBirthTimeOpen(false)} />}
