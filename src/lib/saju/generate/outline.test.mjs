@@ -7,7 +7,7 @@
 // 교체가 반영이 안 되는 회귀를 여기서 막는다.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSystemBlock } from "./outline.ts";
+import { buildSystemBlock, sajuRefExists, ziweiRefExists, logSajuRefMismatches } from "./outline.ts";
 import { calculateChart } from "./chart.ts";
 import { getSajuProduct } from "@/lib/saju/products";
 
@@ -190,4 +190,102 @@ test("등장인물 블록은 분석 모드 블록 바로 뒤에 온다", () => {
   // 둘 사이에 다른 "## " 헤딩이 끼어들지 않는다 — 붙어 있어야 한다는 요구사항 그대로.
   const between = block.slice(modeIdx + "## 분석 모드".length, personIdx);
   assert.doesNotMatch(between, /## /);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `## 근거 인용 규칙`(2026-09-27) — 목업을 실제 명식과 대조하다 나온 인용 오류 회귀
+// (없는 궁·없는 십신을 근거로 든 사례, 사주담 대조 작업).
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("근거 인용 규칙 블록이 모드와 무관하게 들어간다", () => {
+  for (const mode of ["saju", "ziwei", "integrated"]) {
+    const chart = calculateChart(birthInfo(), mode, TODAY);
+    const block = buildSystemBlock(SINGLE_LOVE, chart, TODAY);
+    assert.match(block, /## 근거 인용 규칙/, mode);
+    assert.match(block, /실제로 있는 궁·십신·별만 인용/, mode);
+    assert.match(block, /시간축.*실제로 있는 해/, mode);
+  }
+});
+
+test("근거 인용 규칙은 명식 블록보다 앞에 온다", () => {
+  // "아래 명식에" 라고 가리키므로 순서가 뒤집히면 지시가 허공을 가리킨다.
+  const chart = calculateChart(birthInfo(), "integrated", TODAY);
+  const block = buildSystemBlock(SINGLE_LOVE, chart, TODAY);
+  const rulesIdx = block.indexOf("## 근거 인용 규칙");
+  const chartIdx = block.indexOf("## 사주 원국"); // buildChartBlock 의 실제 첫 헤딩(chart.ts) —
+  // "## 사주 중점"과 헷갈리면 안 되므로 전체를 매칭한다.
+  assert.ok(rulesIdx >= 0 && chartIdx >= 0);
+  assert.ok(rulesIdx < chartIdx);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// `sajuRefExists`/`ziweiRefExists`/`logSajuRefMismatches`(2026-09-27) — 구조화된
+// 근거 참조가 실제 명식과 대조되는지. 목업 대조에서 나온 실제 사고 두 건(없는 궁 "교우궁",
+// 없는 십신 "상관"·"인성")을 그대로 재현해서 검증한다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 이 사람(1996-04-12 14:30 여성, integrated)의 실제 십신·궁 배치 — calculateChart 를 직접
+// 돌려 확인한 값이다(지어내지 않았다). year: 정인/편재, month: 정재/겁재, day: 일간/편관,
+// hour: 식신/비견. 노복궁: 자미·파군. 관록궁: 천기.
+const REF_CHART = calculateChart(birthInfo(), "integrated", TODAY);
+
+test("sajuRefExists — 실제 있는 십신은 통과한다(천간·지지 둘 다)", () => {
+  assert.equal(sajuRefExists(REF_CHART, { pillar: "year", tenGod: "정인" }), true); // 천간
+  assert.equal(sajuRefExists(REF_CHART, { pillar: "month", tenGod: "겁재" }), true); // 지지
+  assert.equal(sajuRefExists(REF_CHART, { pillar: "hour", tenGod: "식신" }), true);
+});
+
+test("sajuRefExists — 그 사람에게 없는 십신은 막는다 (목업 사고 재현: '상관' 0개)", () => {
+  // 이 사람의 tenGods 전체(정인·편재·정재·겁재·일간·편관·식신·비견)에 '상관'이 없다.
+  assert.equal(sajuRefExists(REF_CHART, { pillar: "year", tenGod: "상관" }), false);
+  assert.equal(sajuRefExists(REF_CHART, { pillar: "day", tenGod: "상관" }), false);
+});
+
+test("ziweiRefExists — 실제 있는 별·궁 조합은 통과한다", () => {
+  assert.equal(ziweiRefExists(REF_CHART, { palace: "노복궁", star: "자미" }), true);
+  assert.equal(ziweiRefExists(REF_CHART, { palace: "관록궁", star: "천기" }), true);
+});
+
+test("ziweiRefExists — 궁은 있어도 별이 거기 없으면 막는다 (목업 사고 재현: 궁-별 불일치)", () => {
+  // 천기는 관록궁에 있지 노복궁에 없다.
+  assert.equal(ziweiRefExists(REF_CHART, { palace: "노복궁", star: "천기" }), false);
+});
+
+test("ziweiRefExists — 우리 12궁에 없는 이름('교우궁')은 애초에 매칭될 수 없다", () => {
+  // 타입 시스템이 이미 막지만(ZiweiPalace 열거형에 "교우궁"이 없다), 런타임 대조로도
+  // 한 번 더 확인한다 — 어떤 별을 대도 "교우궁"과 일치하는 궁 이름 자체가 없다.
+  assert.equal(ziweiRefExists(REF_CHART, { palace: "노복궁", star: "없는별" }), false);
+});
+
+test("logSajuRefMismatches — 어긋나면 경고 하나, 맞으면 아무것도 안 남긴다", () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (msg) => warnings.push(msg);
+  try {
+    const product = getSajuProduct("single-love");
+    logSajuRefMismatches(product, REF_CHART, [
+      {
+        id: "ok-section",
+        gist: "",
+        sajuBasis: "",
+        ziweiBasis: "",
+        sajuRefs: [{ pillar: "year", tenGod: "정인" }],
+        ziweiRefs: [{ palace: "노복궁", star: "자미" }],
+      },
+      {
+        id: "bad-section",
+        gist: "",
+        sajuBasis: "",
+        ziweiBasis: "",
+        sajuRefs: [{ pillar: "year", tenGod: "상관" }],
+        ziweiRefs: [],
+      },
+    ]);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(warnings.length, 1, "맞는 것까지 경고하거나, 어긋난 것을 놓치면 안 된다");
+  assert.match(warnings[0], /SAJU_REF_MISMATCH/);
+  assert.match(warnings[0], /section=bad-section/);
+  assert.match(warnings[0], /tenGod=상관/);
 });

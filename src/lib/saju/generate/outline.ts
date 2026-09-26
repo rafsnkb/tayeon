@@ -17,6 +17,44 @@ import { buildChartBlock, type SajuChart } from "./chart";
  *  Haiku 는 시스템 블록이 2,048토큰 미만이면 캐시가 아예 안 걸린다(§5). */
 export const SAJU_TEXT_MODEL = "claude-sonnet-5";
 
+/** 사주 네 기둥 자리. `SajuResult.pillars`/`tenGods` 의 키와 같다(`calculate.ts`). */
+export type SajuPillarKey = "year" | "month" | "day" | "hour";
+
+/** `manseryeok` 패키지의 `TenGod` 유니온과 정확히 같다(`node_modules/manseryeok/dist/types.d.ts`).
+ *  그 패키지가 값 목록을 export 하지 않아서(타입만 .d.ts 에 있다) 여기 다시 적는다 — 라이브러리가
+ *  이 열 개를 바꾸면 같이 갱신해야 한다.
+ *
+ *  **카테고리명("인성"·"재성"·"식상"·"관성"·"비겁")은 일부러 뺐다.** 목업을 실제 명식과
+ *  대조하다 "그 사람은 인성이 0개인데 '인성'을 근거로 든" 사고가 났다(2026-09-27) — 카테고리는
+ *  구체적으로 어느 항목(편인/정인)을 가리키는지 모호해서 검증할 수 없다. 카테고리로 말하고
+ *  싶으면 자유 텍스트인 `sajuBasis` 에만 쓰고, `sajuRefs` 는 구체적 열 개 중 하나만 쓴다. */
+export const SAJU_TEN_GODS = [
+  "비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인",
+] as const;
+export type SajuTenGod = (typeof SAJU_TEN_GODS)[number];
+
+/** `sajuBasis`(자유 텍스트, 프롬프트에 그대로 나가는 값)가 실제로 가리키는 명식 칸을
+ *  **검증 가능한 형태**로 나란히 둔 것(2026-09-27). `sajuBasis` 를 대체하지 않는다. */
+export type SajuRef = { pillar: SajuPillarKey; tenGod: SajuTenGod };
+
+/** `iztro` 패키지의 ko-KR 12궁 이름과 정확히 같다
+ *  (`node_modules/iztro/lib/i18n/locales/ko-KR/palace.js`) — "궁" 접미사는 이 코드베이스가
+ *  이미 정규화해 붙이는 방식과 맞췄다(`ziwei/calculate.ts` 의 `label` 계산 참고).
+ *
+ *  **신궁(身宮)은 뺐다.** 독립된 궁이 아니라 12궁 중 하나 위에 겹치는 표시라, 겹친 궁의
+ *  이름으로 인용해야 맞다. */
+export const ZIWEI_PALACES = [
+  "명궁", "형제궁", "부처궁", "자녀궁", "재백궁", "질액궁",
+  "천이궁", "노복궁", "관록궁", "전택궁", "복덕궁", "부모궁",
+] as const;
+export type ZiweiPalace = (typeof ZIWEI_PALACES)[number];
+
+/** `star`(주성·보조성 이름)는 열거형으로 안 좁힌다 — 사람마다 실제 배치가 달라 보편 고정
+ *  목록이 없다. enum 으로 좁히면 "이 사람에게 없는 별"도 그 enum 안에서는 통과해 버려
+ *  **거짓 안전**이 된다. 대신 실행 시점에 이 사람의 실제 명반과 대조한다(아래
+ *  `logSajuRefMismatches`). */
+export type ZiweiRef = { palace: ZiweiPalace; star: string };
+
 /** 2단이 섹션 하나를 쓸 때 받는 배정표. */
 export type OutlineSection = {
   id: string;
@@ -25,6 +63,10 @@ export type OutlineSection = {
   /** 이 섹션에서 쓸 사주 근거(십신·궁·운). 단일 자미두수 모드에서는 빈 문자열. */
   sajuBasis: string;
   ziweiBasis: string;
+  /** `sajuBasis`/`ziweiBasis` 가 실제로 가리키는 명식 칸(2026-09-27). 안 쓰는 체계면 빈 배열
+   *  — `sajuBasis`/`ziweiBasis` 문자열이 빈 것과 같은 조건이다. */
+  sajuRefs: SajuRef[];
+  ziweiRefs: ZiweiRef[];
 };
 
 export type SajuOutline = {
@@ -50,10 +92,10 @@ const OUTLINE_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "gist", "saju_basis", "ziwei_basis"],
+        required: ["id", "gist", "saju_basis", "ziwei_basis", "saju_refs", "ziwei_refs"],
         properties: {
           id: { type: "string", description: "주어진 섹션 id 를 그대로 쓸 것. 새로 만들지 말 것." },
-          gist: { type: "string", description: "이 섹션이 무슨 말을 할지 한 문장. 해요체." },
+          gist: { type: "string", description: "이 섹션이 무슨 말을 할지 한 문장. 이 리포트의 문체를 그대로 따를 것." },
           saju_basis: {
             type: "string",
             description:
@@ -63,6 +105,51 @@ const OUTLINE_SCHEMA = {
             type: "string",
             description:
               "이 섹션에서만 쓸 자미두수 근거(궁·주성·사화 중 해당하는 것). 자미두수를 쓰지 않는 모드면 빈 문자열.",
+          },
+          // 2026-09-27. `saju_basis`/`ziwei_basis` 는 자유 텍스트라 화면·코드가 "이 섹션이
+          // 명식의 어느 칸을 쓰는지" 알 수 없었다 — 목업 대조에서 없는 궁·없는 십신을 근거로
+          // 든 사고가 났다. 이 참조는 그 텍스트를 대체하지 않고 **검증 가능한 형태로 나란히**
+          // 둔 것이다(`OutlineSection.sajuRefs`/`ziweiRefs` 주석 참고).
+          saju_refs: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["pillar", "ten_god"],
+              properties: {
+                pillar: {
+                  type: "string",
+                  enum: ["year", "month", "day", "hour"],
+                  description: "saju_basis 가 가리키는 사주 기둥(연/월/일/시).",
+                },
+                ten_god: {
+                  type: "string",
+                  enum: [...SAJU_TEN_GODS],
+                  description: "그 기둥의 십신. 이 사람의 사주에 실제로 있는 것만 — 지어내지 말 것.",
+                },
+              },
+            },
+            description: "saju_basis 가 실제로 가리키는 명식 칸. 사주를 쓰지 않는 모드면 빈 배열.",
+          },
+          ziwei_refs: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["palace", "star"],
+              properties: {
+                palace: {
+                  type: "string",
+                  enum: [...ZIWEI_PALACES],
+                  description: "ziwei_basis 가 가리키는 궁.",
+                },
+                star: {
+                  type: "string",
+                  description: "그 궁에 실제로 있는 별 이름. 이 사람의 명반에 없는 별을 지어내지 말 것.",
+                },
+              },
+            },
+            description: "ziwei_basis 가 실제로 가리키는 명식 칸. 자미두수를 쓰지 않는 모드면 빈 배열.",
           },
         },
       },
@@ -119,6 +206,22 @@ export function buildSystemBlock(product: SajuProduct, chart: SajuChart, today: 
   // 제목은 통합 모드에서만 맞는 말이다(단일 모드엔 교차할 두 번째 체계가 없다).
   const crossPointsBlock = `## ${chart.mode === "integrated" ? "통합 교차 포인트" : "이 리포트가 짚어야 할 것"}\n${product.crossPoints}`;
 
+  // 2026-09-27. 목업에 실제 명식을 대조하다 드러난 인용 오류 2건(사주담 대조 작업, sub_4) —
+  // 명식에 없는 궁(예: "교우궁" — 우리 12궁 이름은 "노복궁"이다)과 없는 십신(그 사람에게
+  // 없는 "상관"·"인성")을 근거로 든 사례가 나왔다. `buildChartBlock` 이 명식을 이미 싣고
+  // 있는데도 이런다 — 프롬프트 지시 하나만으로는 부족해서 **구조화된 참조**(설계 문서 §11의
+  // 「명식 인용 검증」 논의)가 별도로 필요하지만, 그거와 무관하게 여기 한 줄은 지금 넣는다.
+  //
+  // 두 번째 줄(실제 연도로 짚기)은 전혀 다른 문제다 — `buildChartBlock` 이 세운·유년의
+  // 시간축을 이미 싣고 있는데 본문이 "하반기쯤"처럼 흐려서 시기 상품의 유일한 우위(타로가
+  // 못 하는 "언제")를 못 살리고 있었다(사주담 대조: "2030년은 편재가 들어와…" 식으로 연도를
+  // 직접 짚는다). 없는 확신을 만들라는 게 아니라 **시간축에 실제로 있는 해만** 짚으라는 것.
+  const citationRulesBlock = [
+    "## 근거 인용 규칙",
+    "- 아래 명식에 실제로 있는 궁·십신·별만 인용한다. 없는 것을 지어내지 않는다.",
+    "- 시간축(세운·유년)에 실제로 있는 해가 근거일 때는 '하반기쯤'처럼 흐리지 말고 그 해를 직접 짚는다. 다만 시간축에 없는 해를 단정하지 않는다.",
+  ].join("\n");
+
   return [
     `# 상품: ${product.title}`,
     `목적: ${product.purpose}`,
@@ -132,6 +235,8 @@ export function buildSystemBlock(product: SajuProduct, chart: SajuChart, today: 
     // 상품별 해석 제약(기획의 `분석 방식`). 지금은 성향 궁합 하나뿐이지만 안전 제약이라
     // 문체 규칙보다 앞에 둔다 — 뒤쪽 지시가 앞쪽을 덮는 일이 없도록.
     product.constraints ? `## 이 상품의 해석 제약\n${product.constraints}` : "",
+    "",
+    citationRulesBlock,
     "",
     buildChartBlock(chart, today),
     "",
@@ -184,6 +289,7 @@ export async function generateOutline(args: {
           "## 요구사항",
           "- 섹션마다 **서로 다른** 근거를 배정하세요. 같은 궁·같은 십신을 여러 섹션이 주력으로 쓰면 리포트가 같은 말을 열 번 하게 됩니다.",
           "- 각 섹션의 제목을 소제목으로 그대로 되풀이하지 마세요.",
+          "- saju_refs/ziwei_refs 는 saju_basis/ziwei_basis 가 실제로 가리키는 명식 칸입니다. 이 사람의 실제 명식에 있는 것만 쓰세요 — 없는 궁·십신·별을 지어내지 마세요.",
           product.image
             ? `- image_brief 를 채우세요. 그릴 대상: ${product.image.subject}\n  담을 요소: ${product.image.elements.join(", ")}`
             : "- 이 상품은 이미지가 없습니다. image_brief 는 null 로 두세요.",
@@ -210,8 +316,12 @@ export async function generateOutline(args: {
       gist: got.gist,
       sajuBasis: got.saju_basis,
       ziweiBasis: got.ziwei_basis,
+      sajuRefs: got.saju_refs.map((r) => ({ pillar: r.pillar as SajuPillarKey, tenGod: r.ten_god as SajuTenGod })),
+      ziweiRefs: got.ziwei_refs.map((r) => ({ palace: r.palace as ZiweiPalace, star: r.star })),
     };
   });
+
+  logSajuRefMismatches(product, chart, sections);
 
   return {
     sections,
@@ -219,4 +329,58 @@ export async function generateOutline(args: {
     usedMetaphors: parsed.used_metaphors,
     imageBrief: parsed.image_brief,
   };
+}
+
+/**
+ * `sajuRefs`/`ziweiRefs`가 이 사람의 실제 명식에 있는지 대조한다. **검사만 하고 막지 않는다**
+ * (2026-09-27 사용자 결정, B안) — 얼마나 자주 어긋나는지 모르는 채로 재시도를 걸면 편당
+ * 비용이 예측 불가가 된다. 실호출 검증에서 빈도를 재고 그때 재시도가 필요한지 정한다.
+ *
+ * §9 의 `kind: "failed"` 자리표를 안 쓰는 이유: 그건 "모델 호출 자체가 실패"용이다. 이건
+ * **읽을 수 있는 본문이 이미 있는** 상태라 전제가 다르다 — 멀쩡한 글을 "생성 실패" 화면으로
+ * 바꾸면 사용자 경험이 더 나빠진다.
+ *
+ * `console.warn` 만 쓰고 `notifyOwner` 를 안 쓴 이유: 빈도를 모르는 채로 실시간 알림을 걸면
+ * 그 자체가 알림 스팸이 될 수 있다. 나중에 셀 수 있게(상품·섹션·무엇이 어긋났는지) 구조화된
+ * 한 줄만 남긴다 — 실호출 검증에서 로그를 모아 빈도를 재고, 그 결과로 알림·재시도 여부를 정한다.
+ *
+ * 상대 명반이 있는 상품(`needsPartner: true`)은 이 근거가 내담자 것인지 상대 것인지 스키마가
+ * 구분하지 않는다(2026-09-27 승인된 설계가 `person` 필드 없이 그대로 진행하기로 함) — 그래서
+ * **내담자 또는 상대 어느 쪽 명식에라도 있으면** 통과시킨다. 둘 다 없을 때만 불일치로 본다.
+ */
+export function logSajuRefMismatches(product: SajuProduct, chart: SajuChart, sections: OutlineSection[]): void {
+  for (const section of sections) {
+    for (const ref of section.sajuRefs) {
+      if (!sajuRefExists(chart, ref)) {
+        console.warn(
+          `[SAJU_REF_MISMATCH] product=${product.slug} section=${section.id} pillar=${ref.pillar} tenGod=${ref.tenGod}`
+        );
+      }
+    }
+    for (const ref of section.ziweiRefs) {
+      if (!ziweiRefExists(chart, ref)) {
+        console.warn(
+          `[SAJU_REF_MISMATCH] product=${product.slug} section=${section.id} palace=${ref.palace} star=${ref.star}`
+        );
+      }
+    }
+  }
+}
+
+export function sajuRefExists(chart: SajuChart, ref: SajuRef): boolean {
+  return [chart.self.saju, chart.partner?.saju].some((saju) => {
+    if (!saju) return false;
+    const cell = saju.tenGods[ref.pillar];
+    return cell != null && (cell.stem === ref.tenGod || cell.branch === ref.tenGod);
+  });
+}
+
+export function ziweiRefExists(chart: SajuChart, ref: ZiweiRef): boolean {
+  return [chart.self.ziwei, chart.partner?.ziwei].some((ziwei) => {
+    if (!ziwei) return false;
+    return ziwei.palaces.some((p) => {
+      const name = p.name.endsWith("궁") ? p.name : `${p.name}궁`;
+      return name === ref.palace && (p.majorStars.includes(ref.star) || p.minorStars.includes(ref.star));
+    });
+  });
 }
