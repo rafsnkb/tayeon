@@ -41,11 +41,34 @@ function paymentMethodSummary(method: unknown): { type: string; label: string } 
 }
 
 /** 포트원이 "이미 취소된 결제"라고 답했는지. 웹훅 재시도로 같은 건을 두 번 취소하려 할 때
- *  실패로 보지 않기 위한 판정 — admin/src/lib/refundExecute.ts 의 같은 이름 함수와 쌍이다. */
-function isAlreadyCancelled(error: unknown): boolean {
+ *  실패로 보지 않기 위한 판정 — admin/src/lib/refundExecute.ts 의 같은 이름 함수와 쌍이다.
+ *  `refundUnopenable.ts` 도 재사용한다(같은 앱 안이라 거기서는 복사하지 않는다). */
+export function isAlreadyCancelled(error: unknown): boolean {
   const data = (error as { data?: { type?: unknown } })?.data;
   if (data?.type === "PAYMENT_ALREADY_CANCELLED") return true;
   return /already cancelled/i.test(error instanceof Error ? error.message : String(error));
+}
+
+/**
+ * 이 쿠폰이 이 결제에 쓰일 수 없는 이유. 쓸 수 있으면 null.
+ *
+ * 결제창을 두 개 띄워 같은 쿠폰으로 둘 다 결제하면(fulfillPayment 트랜잭션의 "쿠폰 소진" 주석
+ * 참고) 먼저 도착한 쪽이 소진하고, 나중 것이 여기서 걸린다. 트랜잭션 안에서 읽은 쿠폰 문서를
+ * 그대로 좁혀 테스트할 수 있도록 순수 함수로 뺐다 — `openGateReason`(saju/purchase.ts)과 같은
+ * 이유다.
+ *
+ * `couponDoc` 이 `null` 이면 "이 결제가 애초에 쿠폰을 안 썼다"는 뜻이라 무조건 통과다.
+ */
+export function couponConflictReason(
+  couponDoc: { exists: boolean; status?: unknown; usedPaymentId?: unknown } | null,
+  paymentId: string
+): string | null {
+  if (!couponDoc) return null;
+  if (!couponDoc.exists) return "주문에 적힌 할인쿠폰이 사라져 지급하지 않음";
+  if (couponDoc.status === "used" && couponDoc.usedPaymentId !== paymentId) {
+    return "결제에 사용하기로 한 할인쿠폰이 이미 다른 결제에 쓰여 지급하지 않음";
+  }
+  return null;
 }
 
 /**
@@ -100,6 +123,9 @@ export type FulfillOutcome =
   | { kind: "not_paid"; status: string }
   /** 이미 같은 종류의 이용권을 보유 중이라 지급하지 않고 결제를 자동 취소한 경우. */
   | { kind: "duplicate_cancelled"; uid: string; cancelled: boolean }
+  /** 결제에 적힌 할인쿠폰을 쓸 수 없어서(소진됨·사라짐) 지급하지 않고 결제를 자동 취소한 경우
+   *  — `duplicate_cancelled` 와 같은 처리, 사유만 다르다(2026-09-26). */
+  | { kind: "coupon_conflict_cancelled"; uid: string; cancelled: boolean }
   | { kind: "rejected"; reason: string };
 
 /**
@@ -181,6 +207,46 @@ export async function fulfillPayment(
 
   const couponRef = couponCode ? userRef.collection(USER_DISCOUNT_COUPONS).doc(couponCode) : null;
 
+  // 좁혀진(narrowed) `payment` 를 값으로 미리 꺼내 둔다 — 아래 `blockedPaymentDoc` 처럼 별도
+  // 함수(클로저) 안에서 `payment.channel` 등을 다시 읽으면 TypeScript 가 위 PAID 체크로 좁힌
+  // 타입을 잃고 원래의 유니온(Payment | FailedPayment)으로 되돌린다(함수 경계를 넘는 narrowing은
+  // 보존되지 않는다). 값을 미리 뽑아 두면 그 값 자체의 구체적인 타입만 넘어간다.
+  const paymentChannelType = payment.channel?.type ?? null;
+  const paymentIsTest = payment.channel?.type === "TEST";
+  const paymentMethodInfo = paymentMethodSummary(payment.method);
+  const paymentPaidAt = payment.paidAt;
+
+  // 지급하지 않고 결제를 취소할 때 payments 문서에 남기는 공통 모양(duplicate·coupon_conflict가
+  // 함께 쓴다). 결제 내역(`/api/user/purchase-history`)이 paidAt 으로 정렬하는데 그 필드가 없는
+  // 문서는 Firestore 가 결과에서 통째로 제외한다(2026-09-24) — 그래서 지급 안 한 건도 꼭 채운다.
+  function blockedPaymentDoc(
+    status: "duplicate_cancelled" | "coupon_conflict_cancelled",
+    blockedReason: string,
+    extra?: Record<string, unknown>
+  ) {
+    return {
+      status,
+      productId: product.productId,
+      productType: product.type,
+      // priceWon 은 **실제로 승인된 금액**이다 — 정가가 아니다(2026-09-25). 환불 자동승인이
+      // 포트원 실결제액과 이 값을 대조하고, 리워드 합산도 이 값을 쓴다. 정가는 listPriceWon.
+      priceWon: paidWon,
+      listPriceWon: product.priceWon,
+      // 서버가 정한 주문명을 쓴다. payment.orderName 은 결제창을 띄울 때 브라우저가 넘긴
+      // 값이라 사용자가 바꿀 수 있고, 그게 어드민 화면과 알림에 "상품"으로 그대로 표시된다
+      // (2026-09-24). 금액·상품은 이미 productId 로 검증했으므로 이름도 그쪽을 따른다.
+      orderName: product.orderName,
+      channelType: paymentChannelType,
+      isTest: paymentIsTest,
+      paymentMethod: paymentMethodInfo,
+      paidAt: paymentPaidAt,
+      blockedAt: new Date().toISOString(),
+      blockedReason,
+      blockedVia: via,
+      ...extra,
+    };
+  }
+
   const outcome = await adminDb.runTransaction(async (tx): Promise<"already" | "duplicate" | "coupon_conflict" | "granted"> => {
     const paymentSnap = await tx.get(paymentRef);
     if (paymentSnap.exists) {
@@ -193,17 +259,21 @@ export async function fulfillPayment(
     // 결제하면 prepare 는 양쪽 모두에 할인을 적어 주는데(그 시점엔 아직 안 쓴 쿠폰이다),
     // 먼저 도착한 쪽이 소진하고 나면 나머지는 받을 자격이 없던 할인이 된다. 그 건은 지급하지
     // 않고 돈을 돌려준다 — 보유 제한(duplicate)과 같은 처리다.
+    //
+    // ⚠️ 2026-09-26 까지는 이 분기가 "지급하지 않는다"만 하고 실제로 돌려주지 않았다 — 트랜잭션의
+    // 모든 쓰기 앞에서 그냥 return 해 버려서 payments 문서조차 안 생기고, 호출부는 이 갈래를
+    // 구분하지 않아 최종적으로 { kind: "fulfilled" }로 떨어져 사용자에게 PAID 를 알렸다. 돈은
+    // 승인된 채 남고, 포트원 취소도 알림도 없고, 결제 내역에도 안 떠서 사용자가 환불을 요청할
+    // 창구가 없는 상태였다. 아래 `couponConflictReason` 판정 + `blockedPaymentDoc` 기록 +
+    // 트랜잭션 밖의 자동 취소(“duplicate”와 공유)가 그 세 가지를 채운다.
     const couponSnap = couponRef ? await tx.get(couponRef) : null;
-    if (couponRef && couponSnap) {
-      const couponData = couponSnap.data();
-      if (!couponSnap.exists) {
-        console.error("[coupon] 주문에 적힌 쿠폰이 없다 — 지급하지 않는다", paymentId, couponCode);
-        return "coupon_conflict";
-      }
-      if (couponData?.status === "used" && couponData?.usedPaymentId !== paymentId) {
-        console.error("[coupon] 이미 소진된 쿠폰으로 들어온 결제", paymentId, couponCode, couponData?.usedPaymentId);
-        return "coupon_conflict";
-      }
+    const couponBlockReason = couponSnap
+      ? couponConflictReason({ exists: couponSnap.exists, ...couponSnap.data() }, paymentId)
+      : null;
+    if (couponBlockReason) {
+      console.error("[coupon] 지급 조건 불일치로 지급하지 않는다", paymentId, couponCode, couponBlockReason);
+      tx.set(paymentRef, blockedPaymentDoc("coupon_conflict_cancelled", couponBlockReason, { couponCode }));
+      return "coupon_conflict";
     }
 
     // 약관상 구매한 횟수제ㆍ시간제 이용권은 각각 1개까지만 보유할 수 있다. prepare에서 한 번
@@ -228,26 +298,7 @@ export async function fulfillPayment(
       });
       if (conflict) {
         console.error("[payment] 보유 제한 위반 — 지급하지 않고 결제를 취소한다", paymentId, product.type);
-        tx.set(paymentRef, {
-          status: "duplicate_cancelled",
-          productId: product.productId,
-          productType: product.type,
-          // priceWon 은 **실제로 승인된 금액**이다 — 정가가 아니다(2026-09-25). 환불 자동승인이
-          // 포트원 실결제액과 이 값을 대조하고, 리워드 합산도 이 값을 쓴다. 정가는 listPriceWon.
-          priceWon: paidWon,
-          listPriceWon: product.priceWon,
-          // 서버가 정한 주문명을 쓴다. payment.orderName 은 결제창을 띄울 때 브라우저가 넘긴
-          // 값이라 사용자가 바꿀 수 있고, 그게 어드민 화면과 알림에 "상품"으로 그대로 표시된다
-          // (2026-09-24). 금액·상품은 이미 productId 로 검증했으므로 이름도 그쪽을 따른다.
-          orderName: product.orderName,
-          channelType: payment.channel?.type ?? null,
-          isTest: payment.channel?.type === "TEST",
-          paymentMethod: paymentMethodSummary(payment.method),
-          paidAt: payment.paidAt,
-          blockedAt: new Date().toISOString(),
-          blockedReason: "이미 같은 종류의 이용권을 보유 중이어서 지급하지 않음",
-          blockedVia: via,
-        });
+        tx.set(paymentRef, blockedPaymentDoc("duplicate_cancelled", "이미 같은 종류의 이용권을 보유 중이어서 지급하지 않음"));
         return "duplicate";
       }
     }
@@ -338,15 +389,26 @@ export async function fulfillPayment(
     return "granted";
   });
 
-  if (outcome === "duplicate") {
+  if (outcome === "duplicate" || outcome === "coupon_conflict") {
     // 돈은 이미 승인된 상태라 거절만 하면 "결제했는데 아무것도 못 받는" 상태가 된다. 자동으로
-    // 취소해서 환불까지 끝낸다.
+    // 취소해서 환불까지 끝낸다. 사유 문구만 갈래별로 다르다 — 나머지는 duplicate 쪽 로직
+    // 그대로다(2026-09-26 coupon_conflict 추가. duplicate 의 문구·필드는 한 글자도 안 바뀌었다).
+    const cancelReason =
+      outcome === "duplicate"
+        ? "이용권 보유 제한(1개)으로 지급 불가 — 자동 취소"
+        : "할인쿠폰 사용 조건 불일치로 지급 불가 — 자동 취소";
     const cancelled = await portone
-      .cancelPayment({ paymentId, reason: "이용권 보유 제한(1개)으로 지급 불가 — 자동 취소" })
+      .cancelPayment({ paymentId, reason: cancelReason })
       .then(() => true)
       .catch((error) => {
         if (isAlreadyCancelled(error)) return true;
-        console.error("[payment] 보유 제한 자동 취소 실패 — 수동 환불 필요", paymentId, error);
+        console.error(
+          outcome === "duplicate"
+            ? "[payment] 보유 제한 자동 취소 실패 — 수동 환불 필요"
+            : "[payment] 쿠폰 충돌 자동 취소 실패 — 수동 환불 필요",
+          paymentId,
+          error
+        );
         return false;
       });
     // 취소 실패는 돈이 묶인 상태다. 예전엔 console.error 한 줄이 전부라 아무도 몰랐고, 결제
@@ -356,19 +418,27 @@ export async function fulfillPayment(
       .catch((error) => console.error("[payment] 취소 결과 기록 실패", paymentId, error));
     if (!cancelled) {
       await notifyOwner({
-        key: `duplicate-cancel-failed/${paymentId}`,
+        key: `${outcome}-cancel-failed/${paymentId}`,
         level: "urgent",
-        title: `🚨 중복 이용권 자동 취소 실패 · ${wonLabel(payment)}`,
+        title:
+          outcome === "duplicate"
+            ? `🚨 중복 이용권 자동 취소 실패 · ${wonLabel(payment)}`
+            : `🚨 쿠폰 충돌 결제 자동 취소 실패 · ${wonLabel(payment)}`,
         fields: [
           ["결제", paymentId],
           ["사용자", uid],
           ["상품", String(payment.orderName ?? "-")],
           ["경로", via],
         ],
-        note: "**돈은 받았는데 이용권은 지급되지 않은 상태입니다.** 포트원 콘솔에서 직접 취소해 주세요.",
-      }).catch((error) => console.error("[payment] 중복 취소 실패 알림 실패", paymentId, error));
+        note:
+          outcome === "duplicate"
+            ? "**돈은 받았는데 이용권은 지급되지 않은 상태입니다.** 포트원 콘솔에서 직접 취소해 주세요."
+            : "**돈은 받았는데 할인쿠폰 충돌로 지급되지 않은 상태입니다.** 포트원 콘솔에서 직접 취소해 주세요.",
+      }).catch((error) => console.error("[payment] 자동 취소 실패 알림 실패", paymentId, error));
     }
-    return { kind: "duplicate_cancelled", uid, cancelled };
+    return outcome === "duplicate"
+      ? { kind: "duplicate_cancelled", uid, cancelled }
+      : { kind: "coupon_conflict_cancelled", uid, cancelled };
   }
 
   return { kind: "fulfilled", alreadyFulfilled: outcome === "already", uid, productType: product.type };

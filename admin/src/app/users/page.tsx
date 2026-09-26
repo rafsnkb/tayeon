@@ -78,6 +78,8 @@ const PAYMENT_STATUS_LABEL: Record<string, string> = {
 
   duplicate_cancelled: "중복 취소",
 
+  coupon_conflict_cancelled: "쿠폰 충돌 취소",
+
 };
 
 const passStatusLabel = (status: string, forced?: boolean) =>
@@ -103,7 +105,16 @@ type UserOverview = {
   reviewReadingsTotal: number;
   purchasedPasses: PassItem[];
   rewardPasses: PassItem[];
-  livePayments: Array<{ id: string; orderName: string | null; priceWon: number; status: string; paidAt: string | null }>;
+  livePayments: Array<{
+    id: string;
+    productId: string | null;
+    productType: string | null;
+    orderName: string | null;
+    priceWon: number;
+    status: string;
+    paidAt: string | null;
+    refundedAt: string | null;
+  }>;
   suspensionLog: Array<{ id: string; action: string; reason: string | null; durationDays: number | null; suspendedUntil: string | null; createdAt: string | null }>;
 };
 
@@ -565,6 +576,48 @@ function UserOverviewPanel({
   const [modalReading, setModalReading] = useState<ReviewReading | null>(null);
   const [reviewBusy, setReviewBusy] = useState<string | null>(null);
   const [reviewAllBusy, setReviewAllBusy] = useState(false);
+  const [sajuRefundBusy, setSajuRefundBusy] = useState<string | null>(null);
+
+  /** 사주 리포트 결제 환불 — 백엔드(`executeRefund` → `refundSajuReport`)는 이미 있고 여기가
+   *  그 유일한 UI 다(2026-09-26). 사주는 이용권 문서가 없어 `HeldPassesPanel` 의 `refund(pass)`
+   *  가 물려 있는 이용권 목록에 안 나타나므로, 같은 API 를 여기 "LIVE 결제 내역" 행에서 부른다.
+   *
+   *  확인 절차는 이용권 환불과 같은 무게로 맞춘다 — 사유를 `prompt` 로 받고 `confirm` 으로
+   *  한 번 더 막는다. 실제로 돈이 나가는 동작이라 버튼 하나로 바로 실행되면 안 된다.
+   *
+   *  ⚠️ 7일 창(`executeRefund` 의 `isWithinRefundWindow`)이 사주에도 그대로 걸린다 — §9 의
+   *  "아무것도 안 읽었는가" 경계가 아직 코드에 없어서다(2026-09-26 결정, 그대로 둔다). 7일이
+   *  지난 건은 서버가 그 사유로 거절하고, 아래는 그 사유 문자열을 그대로 보여준다. */
+  async function refundSajuPayment(payment: UserOverview["livePayments"][number]) {
+    const admin = auth.currentUser;
+    if (!admin) return;
+    const reason = prompt("환불 사유를 입력하세요. (사용자에게 노출되지 않지만 기록에 남습니다)");
+    if (!reason?.trim()) return;
+    if (!confirm("결제를 실제로 취소하고 리포트를 잠급니다. 진행할까요?")) return;
+    setSajuRefundBusy(payment.id);
+    try {
+      const token = await admin.getIdToken();
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/refund-payment`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ paymentId: payment.id, reason: reason.trim() }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(body.error ?? "환불에 실패했습니다.");
+        return;
+      }
+      if (body.alreadyCancelled) {
+        alert("포트원에서 이미 취소된 결제였습니다. 앱 기록만 맞췄습니다(추가 환불은 일어나지 않았습니다).");
+      }
+      onUpdate(uid, (prev) => ({
+        ...prev,
+        livePayments: prev.livePayments.map((p) => (p.id === payment.id ? { ...p, status: "refunded" } : p)),
+      }));
+    } finally {
+      setSajuRefundBusy(null);
+    }
+  }
 
   async function reviewOne(reading: ReviewReading) {
     const admin = auth.currentUser;
@@ -648,7 +701,29 @@ function UserOverviewPanel({
           <h3 className="text-sm font-semibold text-[#45394F]">LIVE 결제 내역</h3>
           {overview.livePayments.length === 0 ? <p className="mt-3 text-xs text-[#A299AA]">LIVE 결제가 없습니다.</p> : (
             <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto text-xs">
-              {overview.livePayments.map((payment) => <li key={payment.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#FAF8FB] px-3 py-2"><span className="truncate text-[#665A70]">{payment.orderName ?? payment.id}</span><span className="shrink-0 font-medium text-[#4B3D56]">{won(payment.priceWon)} · {paymentStatusLabel(payment.status)}</span></li>)}
+              {overview.livePayments.map((payment) => {
+                // 사주 리포트는 이용권이 없어 HeldPassesPanel 의 환불 버튼이 안 닿는다 —
+                // 여기가 유일한 실행 창구다(위 refundSajuPayment 주석 참고).
+                const sajuRefundable = payment.productType === "sajuReport" && payment.status === "fulfilled";
+                return (
+                  <li key={payment.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#FAF8FB] px-3 py-2">
+                    <span className="truncate text-[#665A70]">{payment.orderName ?? payment.id}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="font-medium text-[#4B3D56]">{won(payment.priceWon)} · {paymentStatusLabel(payment.status)}</span>
+                      {sajuRefundable && (
+                        <button
+                          type="button"
+                          onClick={() => refundSajuPayment(payment)}
+                          disabled={sajuRefundBusy === payment.id}
+                          className="rounded-full border border-[#E4DDE9] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#B81D6E] disabled:opacity-50"
+                        >
+                          {sajuRefundBusy === payment.id ? "처리 중..." : "환불"}
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

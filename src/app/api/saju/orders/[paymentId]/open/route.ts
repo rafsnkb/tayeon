@@ -19,7 +19,7 @@
 // 보장한다). 그래서 화면이 실패 시 그냥 다시 불러도 된다.
 import { NextRequest, NextResponse } from "next/server";
 import { getUidFromRequest } from "@/lib/auth/verifyRequest";
-import { notifyOwner } from "@/lib/notify/owner";
+import { refundUnopenableSajuOrder } from "@/lib/payment/refundUnopenable";
 import { openSajuReading } from "@/lib/saju/open";
 
 type Params = { params: Promise<{ paymentId: string }> };
@@ -37,24 +37,24 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   if (result.outcome === "refundable") {
-    // §9 의 전액 환불 경계 안이다(계산 실패·골격 실패 — 사용자가 아직 아무것도 읽지 않았다).
+    // §9 의 전액 환불 경계 안이다(계산 실패·골격 3회 실패 — 사용자가 아직 아무것도 읽지 않았다).
     //
-    // **환불을 여기서 실행하지 않는다.** 결제 계층의 일이고, 읽기 라우트가 결제를 취소하기
-    // 시작하면 그 권한이 어디까지인지 아무도 모르게 된다. 대신 사람이 반드시 보게 만든다 —
-    // 돈은 받았고 줄 물건이 없는 상태라 방치하면 그대로 남는다.
-    await notifyOwner({
-      key: `saju-open-refundable/${uid}/${paymentId}`,
-      level: "urgent",
-      title: "사주 리포트를 열 수 없습니다 — 전액 환불 대상",
-      fields: [
-        ["결제", paymentId],
-        ["사용자", uid],
-        ["사유", result.reason],
-      ],
-      note: "사용자는 돈을 냈고 아직 아무것도 읽지 않았습니다(§9 전액 환불 경계). 환불을 실행해 주세요.",
-    }).catch(() => {});
+    // **환불을 이 라우트가 직접 실행하지는 않는다.** 포트원을 부르고 쿠폰을 복원하고 마커를
+    // 내리는 일은 결제 계층의 책임이고, 읽기 라우트가 그 일을 직접 하기 시작하면 "이 라우트가
+    // 결제에 대해 무엇까지 할 수 있는가"의 경계가 사라진다. 여기서는 **범위가 이름에 박힌
+    // 함수 하나**를 부른다 — 열 수 없는 주문을 환불한다, 그 이상은 하지 않는다.
+    const refund = await refundUnopenableSajuOrder(uid, paymentId, result.reason);
 
-    return NextResponse.json({ error: "refundable", reason: result.reason }, { status: 409 });
+    // 취소가 실패하면 **돈이 묶인다.** 그 경우의 urgent 알림은 그 함수가 이미 보냈으므로
+    // 여기서 또 부르지 않는다 — 같은 사고에 알림이 두 번 오면 둘 다 덜 읽히게 된다.
+    // 사용자에게는 "환불이 지연되고 있다"로 보여야 하므로 코드를 갈라 준다.
+    return NextResponse.json(
+      {
+        error: refund.kind === "cancel_failed" ? "refund_pending" : "refunded",
+        reason: result.reason,
+      },
+      { status: 409 }
+    );
   }
 
   // `opened` 와 `already` 를 굳이 갈라 돌려준다. 화면은 둘 다 같게 다루면 되지만, 로그에서

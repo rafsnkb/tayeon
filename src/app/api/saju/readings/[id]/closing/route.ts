@@ -27,6 +27,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "all_sections_failed" }, { status: 409 });
   }
 
+  if (result.outcome === "not_producible") {
+    // 환불됐거나 보관 기간이 지난 건. 기다려서 풀리는 일이 아니므로 화면은 재시도를 권하지
+    // 말고 전용 안내(환불됨 / 보관 만료)로 끝내야 한다.
+    return NextResponse.json({ error: "not_producible" }, { status: 409 });
+  }
+
   if (result.outcome === "product_gone") {
     // 상품이 레지스트리에서 빠졌다. 저장된 본문은 계속 읽히지만(`view.ts`) 총평은 상품의
     // 문체 규칙 위에서 쓰이므로 만들 수 없다. 500 이 아니라 409 인 이유: 기다려서 풀리는

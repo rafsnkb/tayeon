@@ -61,6 +61,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (result.outcome === "not_found") {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  if (result.outcome === "not_producible") {
+    // 환불·만료된 건은 다시 그리지 않는다. 저장된 그림은 `GET` 으로 계속 나간다.
+    return NextResponse.json({ error: "not_producible" }, { status: 409 });
+  }
+
   if (result.outcome === "unsupported") {
     // 19개 중 이미지를 쓰는 상품은 셋뿐이다. 화면이 이미지 페이지를 아예 그리지 않아야 하는
     // 상품이므로, 여기 온 것 자체가 화면의 버그다 — 조용히 200 으로 넘기지 않는다.
