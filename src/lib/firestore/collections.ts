@@ -59,8 +59,39 @@ export const BIRTHDAY_COUPON_GRANTS = "birthdayCouponGrants";
  *  같은 코드 재등록은 이 문서의 존재만으로 걸러진다. */
 export const USER_DISCOUNT_COUPONS = "discountCoupons";
 
+/** 사주 리포트 **주문 마커**(문서 id = paymentId). users/{uid} 서브컬렉션.
+ *
+ *  리포트 문서와 따로 두는 이유가 둘 있다.
+ *  - **멱등 키**: 결제 확정·열기 요청이 재시도로 두 번 들어와도 이 문서 하나가 "이미 열었다"를
+ *    말해 준다. 컬렉션을 훑거나 인덱스를 만들 필요가 없다.
+ *  - **"결제는 됐는데 아직 안 열림"의 자리**: 리포트 문서는 골격이 있어야만 생기는데(그 앞의
+ *    빈 문서를 만들지 않는 게 `createSajuReading` 의 전제다), 결제와 골격 사이에는 29초가 있다.
+ *    그 구간의 상태를 여기서 표현한다.
+ *
+ *  문서 id 를 paymentId 로 하면서도 **리포트 id 와는 묶지 않는다** — 결제 식별자가 화면 주소에
+ *  박히면 히스토리·공유 링크·분석 경로에 다 남고 되돌릴 수 없다(2026-09-26 판단). 구매 시점
+ *  스냅샷도 여기 담기므로 users 서브트리 안이어야 한다(탈퇴 시 recursiveDelete 대상). */
+export const SAJU_ORDERS = "sajuOrders";
+
+/** 사주·자미두수 **유료 리포트 한 편**(문서 id = 주문 id). 타로의 `ROOMS`/`READINGS` 와는
+ *  완전히 별개다 — 대화가 이어지는 방이 아니라 한 번 팔고 끝나는 결과물이라, 방 개념이 없다.
+ *  이름에 saju 를 붙인 것은 같은 사용자 밑에 `readings` 가 이미 다른 뜻으로 있기 때문이다. */
+export const SAJU_READINGS = "sajuReadings";
+
 /** users/{uid}/rooms/{roomId} 서브컬렉션. */
 export const READINGS = "readings";
+
+/** users/{uid}/sajuReadings/{id} 서브컬렉션 — 섹션 본문 한 페이지.
+ *
+ *  문서 id 는 페이지 번호의 문자열이지만 **정렬에 쓰지 않는다**: 문자열 정렬이면 "10" 이 "2"
+ *  앞에 오기 때문이다. 목록을 만들 때는 문서 안의 `pageNumber`(숫자)로 orderBy 한다. */
+export const SAJU_PAGES = "pages";
+
+/** users/{uid}/sajuReadings/{id} 서브컬렉션 — 페이지가 아닌 부속물. 지금은 이미지 하나뿐이다.
+ *
+ *  **`SAJU_PAGES` 에 넣지 말 것.** 총평을 만들 수 있는지 판단할 때 `pages` 의 문서 수를
+ *  섹션 수와 비교하는데(`produce.ts`), 거기에 이미지가 끼면 그 수가 틀어진다. */
+export const SAJU_ASSETS = "assets";
 
 /** referralGrants/{referrerUid} 서브컬렉션. */
 export const REFERRAL_GRANT_FRIENDS = "friends";
