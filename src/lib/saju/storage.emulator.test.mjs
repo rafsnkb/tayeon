@@ -162,6 +162,51 @@ suite("같은 페이지를 두 번 저장해도 먼저 쓴 본문이 남는다 �
   assert.equal((await storage.getSajuPage(uid, reading.id, 1)).title, "처음");
 });
 
+suite("페이지는 부모 리포트와 같은 만료 Timestamp 를 갖는다 — TTL 을 pages 서브컬렉션까지 걸려면 이게 있어야 한다", async () => {
+  const uid = newUid();
+  const reading = await openedReading(uid);
+  assert.ok(reading.expiresAtTs, "리포트 자체에 만료 Timestamp 가 없다");
+  // 진짜 Timestamp 인스턴스여야 한다 — 문자열이면 TTL 정책이 조용히 아무것도 안 지운다
+  // (retentionTimestamp.ts 머리말의 paymentArchive.retainUntil 사고와 같은 함정).
+  assert.equal(typeof reading.expiresAtTs.toMillis, "function", "리포트의 expiresAtTs 가 Timestamp 가 아니다");
+
+  const created = await storage.saveSajuPage({ uid, id: reading.id, pageNumber: 1, section: section("하나") });
+  assert.equal(
+    created.page.expiresAtTs.toMillis(),
+    reading.expiresAtTs.toMillis(),
+    "새로 저장한 섹션 페이지가 부모와 다른 만료 시각을 가졌다"
+  );
+
+  // Firestore 를 왕복한 뒤에도(쓰기 트랜잭션이 아니라 읽기로 다시 확인) 같아야 한다.
+  const stored = await storage.getSajuPage(uid, reading.id, 1);
+  assert.equal(typeof stored.expiresAtTs.toMillis, "function", "왕복 후 Timestamp 타입을 잃었다");
+  assert.equal(stored.expiresAtTs.toMillis(), reading.expiresAtTs.toMillis());
+
+  // 실패 자리표도 같은 만료를 가져야 한다 — 나중에 본문으로 바뀌는 같은 문서 자리다.
+  const failure = await storage.saveSajuPageFailure({ uid, id: reading.id, pageNumber: 2, attempts: 1 });
+  assert.equal(failure.page.expiresAtTs.toMillis(), reading.expiresAtTs.toMillis());
+});
+
+suite("이미지 문서도 부모와 같은 만료 Timestamp 를 갖는다 — assets 서브컬렉션도 pages 와 같은 이유로 필요하다", async () => {
+  const uid = newUid();
+  const reading = await openedReading(uid);
+  const { putSajuImageBytes } = await import("@/lib/saju/imageStore");
+  const { adminDb } = await import("@/lib/firebase/admin");
+  const { SAJU_ASSETS, SAJU_READINGS, USERS } = await import("@/lib/firestore/collections");
+
+  await putSajuImageBytes({ uid, id: reading.id, webp: Buffer.from("fake-webp-bytes"), contentType: "image/webp", version: 1 });
+
+  // getSajuImageBytes 는 일부러 expiresAtTs 를 내보내지 않으므로(다른 곳으로 새지 않게) 문서를
+  // 직접 읽어 확인한다.
+  const snap = await adminDb
+    .collection(USERS).doc(uid).collection(SAJU_READINGS).doc(reading.id).collection(SAJU_ASSETS).doc("image")
+    .get();
+  assert.ok(snap.exists);
+  const data = snap.data();
+  assert.equal(typeof data.expiresAtTs?.toMillis, "function", "이미지 문서의 expiresAtTs 가 Timestamp 가 아니다");
+  assert.equal(data.expiresAtTs.toMillis(), reading.expiresAtTs.toMillis());
+});
+
 suite("동시에 같은 페이지를 저장해도 하나만 이긴다", async () => {
   const uid = newUid();
   const reading = await openedReading(uid);

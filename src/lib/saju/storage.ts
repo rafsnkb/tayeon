@@ -108,10 +108,17 @@ export type SajuReading = {
  *
  * ⚠️ **호출부 주의:** 2단 생성에 넘길 `written`(`echoOf`)을 만들 때는 반드시
  * `kind === "section"` 만 골라야 한다. 실패 자리표에는 본문이 없어서 `echoOf` 에 넣으면 터진다.
+ *
+ * `expiresAtTs` 는 부모 리포트(`SajuReading.expiresAtTs`)와 **같은 값을 그대로 복사한 것**이다
+ * (2026-09-26, TTL 서브컬렉션 확장) — 새로 계산하지 않는다. Firestore 는 부모 문서가 TTL 로
+ * 지워져도 서브컬렉션을 지우지 않으므로, `pages` 컬렉션 그룹에도 자체 TTL 정책이 필요하고
+ * 그 정책이 볼 필드가 이거다(`src/lib/legal/retentionTimestamp.ts` 런북 참고). ⚠️ **뷰어로
+ * 내보내는 `view.ts` 의 `toReadingView` 가 이 필드를 반드시 제외해야 한다** — Firestore
+ * `Timestamp` 를 그대로 JSON 에 실으면 이상한 모양(`_seconds`/`_nanoseconds`)으로 직렬화된다.
  */
 export type SajuReadingPage =
-  | ({ kind: "section"; pageNumber: number; createdAt: string } & SajuSection)
-  | { kind: "failed"; pageNumber: number; createdAt: string; attempts: number };
+  | ({ kind: "section"; pageNumber: number; createdAt: string; expiresAtTs: Timestamp } & SajuSection)
+  | { kind: "failed"; pageNumber: number; createdAt: string; attempts: number; expiresAtTs: Timestamp };
 
 /** 새 리포트 문서 id 를 미리 채번한다 — 마커와 리포트를 한 트랜잭션에서 쓰려면 id 가 먼저
  *  있어야 한다(`open.ts`). 쓰기는 일어나지 않는다. */
@@ -487,6 +494,9 @@ export async function saveSajuPage(args: {
       ...args.section,
       pageNumber: args.pageNumber,
       createdAt: new Date().toISOString(),
+      // 부모 리포트에서 그대로 복사한다 — 이미 이 트랜잭션에서 읽어 둔 값이라 추가 조회가
+      // 없다(`SajuReadingPage` 주석 참고).
+      expiresAtTs: reading.expiresAtTs,
     };
     tx.set(target, page);
     return { outcome: "created", page };
@@ -533,6 +543,9 @@ export async function saveSajuPageFailure(args: {
       pageNumber: args.pageNumber,
       createdAt: new Date().toISOString(),
       attempts: args.attempts,
+      // 부모 리포트에서 그대로 복사한다(saveSajuPage 와 같은 이유) — 실패 자리표도 나중에
+      // 본문으로 바뀔 수 있는 같은 문서 자리라 만료 시각이 같아야 한다.
+      expiresAtTs: reading.expiresAtTs,
     };
     tx.set(target, page);
     return { outcome: "created", page };

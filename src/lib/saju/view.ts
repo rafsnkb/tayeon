@@ -28,6 +28,19 @@ import type { SajuReading, SajuReadingImage, SajuReadingPage, SajuReadingStatus 
  *  생성을 위한 내부 배정이고, 사용자는 본문에서 그 근거를 **문장으로** 읽는다. */
 export type OutlineEntry = { title: string; gist: string };
 
+/** `Omit` 을 유니온의 **각 갈래마다** 적용한다. `SajuReadingPage` 가 `kind` 로 갈리는 판별
+ *  유니온인데, `Omit<A | B, K>` 를 그냥 쓰면 TypeScript 가 분배하지 않고 `A`·`B` 공통 키만
+ *  남겨 `kind: "failed"` 전용 필드(`attempts`)와 `kind: "section"` 전용 필드(본문)가 통째로
+ *  사라진다 — 판별 유니온이 평평한 객체 타입으로 무너진다. `extends unknown` 조건부 타입이
+ *  분배를 강제한다. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** 화면에 내보내는 페이지 모양. 저장 문서(`SajuReadingPage`)에서 `expiresAtTs` 를 뺀 것과
+ *  같다 — 그건 Firestore TTL 전용 필드라 값 자체가 화면에 필요 없을 뿐 아니라, `Timestamp`
+ *  객체를 그대로 `NextResponse.json` 에 실으면 `_seconds`/`_nanoseconds` 같은 내부 모양으로
+ *  직렬화된다(아래 `omitExpiresAtTs` 참고). */
+export type SajuReadingPageView = DistributiveOmit<SajuReadingPage, "expiresAtTs">;
+
 export type SajuReadingView = {
   id: string;
   productSlug: string;
@@ -39,7 +52,7 @@ export type SajuReadingView = {
   /** 섹션 총수. 화면이 `outline.length` 로 세지 않게 명시한다 — 목차와 페이지 수가 갈라지면
    *  "다음 페이지가 있는가" 판단이 틀린다. */
   sectionCount: number;
-  pages: SajuReadingPage[];
+  pages: SajuReadingPageView[];
   closing: SajuClosing | null;
   image: SajuReadingImage | null;
   lastReadPage: number;
@@ -54,6 +67,17 @@ export type SajuReadingView = {
    *  남은 시간을 서버가 계산해 보내지 않는 이유는 `SajuReadingSummary.expiresAt` 과 같다. */
   expiresAt: string;
 };
+
+/** `SajuReadingPage` 에서 `expiresAtTs` 만 뺀다(2026-09-26) — 이 파일이 "빼는 목록"이 아니라
+ *  "내보낼 목록"으로 짜였다는 원칙(위 머리말 3번)의 유일한 예외다. `pages` 배열은 저장 문서를
+ *  통째로 스프레드해서 내보내므로(§7 이 페이지 필드를 자주 늘리는데 그때마다 여기를 고치게
+ *  하지 않으려는 의도적인 선택), `thesis`·`chart` 처럼 "안 늘어놓기"로 막을 수 없다 — 대신
+ *  TTL 전용으로 새로 생긴 이 필드 하나만 이름으로 콕 집어 뺀다. */
+function omitExpiresAtTs(page: SajuReadingPage): SajuReadingPageView {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 뺄 값이라 의도적으로 안 쓴다
+  const { expiresAtTs, ...rest } = page;
+  return rest;
+}
 
 /**
  * `product` 가 `undefined` 일 수 있다 — 상품이 레지스트리에서 빠졌는데 그 상품으로 팔린
@@ -79,7 +103,7 @@ export function toReadingView(
       gist: s.gist,
     })),
     sectionCount: reading.outline.sections.length,
-    pages: [...pages].sort((a, b) => a.pageNumber - b.pageNumber),
+    pages: [...pages].sort((a, b) => a.pageNumber - b.pageNumber).map(omitExpiresAtTs),
     closing: reading.closing,
     image: reading.image,
     lastReadPage: reading.lastReadPage,

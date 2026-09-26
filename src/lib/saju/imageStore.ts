@@ -20,6 +20,7 @@
 //
 // 대가: 이미지를 볼 때마다 Firestore 문서를 한 번 읽는다(CDN 이 아니다). 한 편에 한 장이고
 // 브라우저가 ETag 로 캐시하므로 실제 호출은 거의 없다.
+import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { SAJU_ASSETS, SAJU_READINGS, USERS } from "@/lib/firestore/collections";
 
@@ -34,6 +35,12 @@ export type StoredSajuImage = {
   /** 몇 번째 그림인가. `SajuReading.image.regeneratedCount` 와 같은 값이고, 응답의 ETag 가 된다. */
   version: number;
   createdAt: string;
+  /** 부모 리포트(`SajuReading.expiresAtTs`)와 같은 값을 그대로 복사한 것 — TTL 정책이 볼 필드다
+   *  (`storage.ts` 의 `SajuReadingPage.expiresAtTs` 와 같은 이유, 2026-09-26). Firestore 는
+   *  부모 문서가 지워져도 `assets` 서브컬렉션을 지우지 않으므로 여기도 자체 만료 필드가
+   *  있어야 한다. 부모 리포트가 무슨 이유로든 존재하지 않으면(정상 흐름에서는 없다) undefined —
+   *  그 경우까지 막으려고 이미지 저장을 실패시키지는 않는다. */
+  expiresAtTs?: Timestamp;
 };
 
 function imageRef(uid: string, id: string) {
@@ -44,6 +51,10 @@ function imageRef(uid: string, id: string) {
     .doc(id)
     .collection(SAJU_ASSETS)
     .doc(IMAGE_DOC);
+}
+
+function readingRef(uid: string, id: string) {
+  return adminDb.collection(USERS).doc(uid).collection(SAJU_READINGS).doc(id);
 }
 
 /**
@@ -65,11 +76,19 @@ export async function putSajuImageBytes(args: {
   contentType: string;
   version: number;
 }): Promise<void> {
+  // 만료 시각은 부모 리포트에서 그대로 가져온다 — 새로 계산하지 않는다(판 시점의 약속이
+  // 리포트 문서에 이미 얼려 있다, retention.ts 의 SAJU_REPORT_RETENTION_DAYS 주석과 같은
+  // 원칙). 호출부(produce.ts)가 이미 리포트를 읽었더라도 여기서 한 번 더 읽는다 — 이미지
+  // 저장은 한 편에 몇 번뿐인 드문 쓰기라 N+1 을 걱정할 자리가 아니다(purchase-history 의
+  // 목록 조회와는 다르다).
+  const readingSnap = await readingRef(args.uid, args.id).get();
+  const expiresAtTs = (readingSnap.data() as { expiresAtTs?: Timestamp } | undefined)?.expiresAtTs;
   await imageRef(args.uid, args.id).set({
     base64: args.webp.toString("base64"),
     contentType: args.contentType,
     version: args.version,
     createdAt: new Date().toISOString(),
+    ...(expiresAtTs ? { expiresAtTs } : {}),
   } satisfies StoredSajuImage);
 }
 

@@ -12,11 +12,12 @@
 // 걸린다. **읽는 속도가 생성 속도를 절대 못 따라잡으므로**, 사용자가 N 을 읽는 동안 N+1 을 미리
 // 만들어 두면 147초가 통째로 사라진다.
 import type { SajuClosing } from "@/lib/saju/generate/closing";
-import type { SajuReadingImage, SajuReadingPage } from "@/lib/saju/storage";
-import type { OutlineEntry, SajuReadingView } from "@/lib/saju/view";
+import type { SajuReadingImage } from "@/lib/saju/storage";
+import type { OutlineEntry, SajuReadingPageView, SajuReadingView } from "@/lib/saju/view";
 
-/** 저장된 섹션 본문 한 장(실패 자리표가 아닌 쪽). */
-type SectionPage = Extract<SajuReadingPage, { kind: "section" }>;
+/** 저장된 섹션 본문 한 장(실패 자리표가 아닌 쪽). 화면이 실제로 받는 모양(`SajuReadingPageView`)
+ *  이다 — TTL 전용 필드(`expiresAtTs`)는 `view.ts` 가 이미 빼고 내려준다(2026-09-26). */
+type SectionPage = Extract<SajuReadingPageView, { kind: "section" }>;
 
 /**
  * 생성이 안 된 이유.
@@ -107,7 +108,7 @@ const READING_FAILED: ReaderError = {
 };
 
 type PageOutcome =
-  | { type: "ready"; page: SajuReadingPage }
+  | { type: "ready"; page: SajuReadingPageView }
   | { type: "missing_previous"; missing: number }
   | { type: "error"; error: ReaderError };
 
@@ -137,7 +138,7 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
   let loading = true;
   let loadError: string | null = null;
   let index = 0;
-  let pages = new Map<number, SajuReadingPage>();
+  let pages = new Map<number, SajuReadingPageView>();
   let pageErrors = new Map<number, ReaderError>();
   let closing: SajuClosing | null = null;
   let closingBusy = false;
@@ -294,7 +295,7 @@ export function createSajuReaderCore(deps: ReaderDeps): SajuReaderCore {
   async function postPage(pageNumber: number): Promise<PageOutcome> {
     const res = await deps.fetch(`${base}/pages/${pageNumber}`, { method: "POST" });
     const body = await readJson(res);
-    if (res.ok && body.page) return { type: "ready", page: body.page as SajuReadingPage };
+    if (res.ok && body.page) return { type: "ready", page: body.page as SajuReadingPageView };
     if (res.status === 409 && body.error === "missing_previous" && typeof body.missing === "number") {
       return { type: "missing_previous", missing: body.missing };
     }

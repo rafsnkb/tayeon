@@ -8,7 +8,7 @@
 // 없어서, 논리가 훅 안에 있으면 이 파일을 쓸 수 없다.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSajuReaderCore } from "./sajuReaderCore.ts";
+import { createSajuReaderCore, isReadingExpired } from "./sajuReaderCore.ts";
 
 /** 섹션 한 장의 본문. 내용은 이 테스트가 보지 않으므로 최소만 채운다. */
 function sectionPage(pageNumber) {
@@ -418,6 +418,52 @@ test("환불된 리포트(reading_failed)도 재시도 불가다", async () => {
   await settle();
 
   assert.equal(core.getSnapshot().page.error.retryable, false);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 만료(§11) — 화면 안내와 별개로 `drive()` 자체가 아무것도 만들면 안 된다
+// ─────────────────────────────────────────────────────────────────────────────
+
+test("isReadingExpired — storage.ts 의 판정과 같은 경계값", () => {
+  const now = new Date("2026-09-26T00:00:00.000Z");
+  assert.equal(isReadingExpired({ expiresAt: "2026-09-25T23:59:59.000Z" }, now), true, "지났으면 만료다");
+  assert.equal(isReadingExpired({ expiresAt: "2026-09-26T00:00:00.000Z" }, now), true, "정확히 그 순간도 만료다(<=)");
+  assert.equal(isReadingExpired({ expiresAt: "2026-09-26T00:00:01.000Z" }, now), false, "1초 남았으면 아직 아니다");
+  assert.equal(isReadingExpired({ expiresAt: "not-a-date" }, now), false, "값이 깨졌으면 만료로 보지 않는다");
+});
+
+test("만료된 리포트를 열어도 새로 만들지 않는다 (이미지 상품 포함)", async () => {
+  // 이게 진짜 걱정거리다: `ensurePage` 는 순서 게이트(§7)가 있어 걸리면 공짜지만, `runImage`·
+  // `runClosing`(`produce.ts`)은 그런 게이트가 없다. `drive()` 가 막지 않으면 만료된 리포트를
+  // 열기만 해도 총평·이미지가 실제로 생성돼 과금된다.
+  const server = makeServer({
+    sectionCount: 2,
+    hasImage: true,
+    initialPages: [sectionPage(1), sectionPage(2)],
+    expiresAt: "2000-01-01T00:00:00.000Z",
+  });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+
+  assert.deepEqual(server.created, [], "만료된 건인데 뭔가 생성됐다 — 돈이 샜다");
+
+  // 넘기기 바가 숨어 있으니 사용자가 못 누르지만, 방어적으로 goTo 를 호출해도 마찬가지여야 한다.
+  core.goTo(2);
+  await settle();
+  assert.deepEqual(server.created, [], "만료 후 이동해도 여전히 만들면 안 된다");
+});
+
+test("환불된 리포트(status: failed)도 이미지 상품이면 열자마자 그려질 뻔한 걸 막는다", async () => {
+  // §9 표대로라면 실패는 골격 이전이라 섹션이 없는 게 보통이지만, 그거야말로 이 테스트가 확인할
+  // 값이다 — 섹션이 0이어도 `hasImagePage()` 는 **상품 정의**만 보므로 `runImage` 가 무조건
+  // 걸릴 뻔했다(레지스트리 조회만으로 이미지 유무를 정하기 때문).
+  const server = makeServer({ sectionCount: 0, hasImage: true, status: "failed" });
+  const { core } = makeCore(server);
+  await core.load();
+  await settle();
+
+  assert.deepEqual(server.created, [], "환불된 건인데 이미지가 생성됐다 — 8원이 샜다");
 });
 
 test("일시적 실패는 재시도할 수 있고, 재시도하면 한 번만 더 보낸다", async () => {
